@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:dart_rss/dart_rss.dart';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
+import '../core/network/user_agent.dart';
 import '../domain/models/librivox_book.dart';
 import '../domain/models/audiobook.dart';
 
@@ -10,7 +11,7 @@ class LibriVoxStreamAndDownloader {
   final http.Client _client;
 
   static const Map<String, String> _headers = {
-    'User-Agent': 'AulosAudiobookPlayer/1.0 (Mozilla/5.0; overengineeredhobbies@gmail.com)',
+    'User-Agent': kHttpUserAgent,
     'Accept': '*/*',
   };
 

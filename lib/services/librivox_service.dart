@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../core/network/rate_limit_dispatcher.dart';
+import '../core/network/user_agent.dart';
 import '../domain/models/librivox_book.dart';
 
 class LibriVoxService {
@@ -12,7 +13,7 @@ class LibriVoxService {
   static const String _archiveUrl = 'https://archive.org/advancedsearch.php';
 
   static const Map<String, String> _headers = {
-    'User-Agent': 'AulosAudiobookPlayer/1.0 (Mozilla/5.0; overengineeredhobbies@gmail.com)',
+    'User-Agent': kHttpUserAgent,
     'Accept': 'application/json, text/plain, */*',
   };
 

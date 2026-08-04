@@ -5,7 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../domain/models/audiobook.dart' as domain;
 
-part 'app_database.g.dart';
+part 'app_database_io.g.dart';
 
 class Audiobooks extends Table {
   TextColumn get id => text()();

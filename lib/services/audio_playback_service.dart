@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import '../domain/models/audiobook.dart';
 import '../database/app_database.dart';
+import 'local_file_playback.dart';
 
 enum PlaybackState {
   idle,
@@ -161,12 +161,11 @@ class AudioPlaybackService {
           chapter.audioPathOrUrl.startsWith('https://')) {
         await _player.setUrl(chapter.audioPathOrUrl);
       } else {
-        final file = File(chapter.audioPathOrUrl);
-        if (!await file.exists()) {
+        final loaded = await playLocalFile(_player, chapter.audioPathOrUrl);
+        if (!loaded) {
           stateNotifier.value = PlaybackState.error;
           return;
         }
-        await _player.setFilePath(file.path);
       }
 
       await _player.setSpeed(_playbackSpeed);

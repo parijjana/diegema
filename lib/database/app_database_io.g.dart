@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'app_database.dart';
+part of 'app_database_io.dart';
 
 // ignore_for_file: type=lint
 class $AudiobooksTable extends Audiobooks

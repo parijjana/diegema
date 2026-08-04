@@ -1,5 +1,5 @@
 class TextSanitizer {
-  /// Sanitizes string fetched from external APIs (LibriVox, Wikipedia) by:
+  /// Sanitizes string fetched from external APIs (LibriVox, archive.org) by:
   /// 1. Replacing `<br>` or `<br/>` tags with newlines (`\n`).
   /// 2. Removing any other HTML/XML tags.
   /// 3. Decoding common HTML/XML entities.

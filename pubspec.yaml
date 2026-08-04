@@ -1,5 +1,5 @@
 name: unamedaudiobookplayer
-description: "A lightweight audiobook player supporting Local Audiobooks, LibriVox streaming, and Wikipedia/OpenLibrary metadata & cover art enrichment."
+description: "A lightweight audiobook player supporting Local Audiobooks, LibriVox streaming, and archive.org cover art."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -13,7 +13,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.2.0
   dart_rss: ^3.0.3
-  archive: ^3.4.10
+  archive: ^4.0.0
   path: ^1.9.0
   path_provider: ^2.1.2
   crypto: ^3.0.3
@@ -27,7 +27,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^5.0.0
   drift_dev: ^2.20.0
   build_runner: ^2.4.9
 

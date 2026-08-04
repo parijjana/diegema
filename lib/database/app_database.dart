@@ -4,7 +4,6 @@ import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../domain/models/audiobook.dart' as domain;
-import '../services/wikipedia_service.dart';
 
 part 'app_database.g.dart';
 
@@ -57,25 +56,11 @@ class Bookmarks extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-class WikipediaCache extends Table {
-  TextColumn get cacheKey => text()();
-  TextColumn get query => text()();
-  TextColumn get title => text()();
-  TextColumn get extract => text()();
-  TextColumn get thumbnailUrl => text().nullable()();
-  TextColumn get pageUrl => text().nullable()();
-  DateTimeColumn get cachedAt => dateTime().withDefault(currentDateAndTime)();
-
-  @override
-  Set<Column> get primaryKey => {cacheKey};
-}
-
 @DriftDatabase(tables: [
   Audiobooks,
   Chapters,
   PlaybackProgress,
   Bookmarks,
-  WikipediaCache,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
@@ -215,34 +200,5 @@ class AppDatabase extends _$AppDatabase {
           ..where((b) => b.audiobookId.equals(audiobookId))
           ..orderBy([(b) => OrderingTerm(expression: b.createdAt, mode: OrderingMode.desc)]))
         .get();
-  }
-
-  // --- Wikipedia Cache ---
-  Future<void> cacheWikipediaSummary({
-    required String cacheKey,
-    required String query,
-    required WikipediaSummary summary,
-  }) async {
-    await into(wikipediaCache).insertOnConflictUpdate(
-      WikipediaCacheCompanion.insert(
-        cacheKey: cacheKey,
-        query: query,
-        title: summary.title,
-        extract: summary.extract,
-        thumbnailUrl: Value(summary.thumbnailUrl),
-        pageUrl: Value(summary.pageUrl),
-      ),
-    );
-  }
-
-  Future<WikipediaSummary?> getCachedWikipediaSummary(String cacheKey) async {
-    final row = await (select(wikipediaCache)..where((w) => w.cacheKey.equals(cacheKey))).getSingleOrNull();
-    if (row == null) return null;
-    return WikipediaSummary(
-      title: row.title,
-      extract: row.extract,
-      thumbnailUrl: row.thumbnailUrl,
-      pageUrl: row.pageUrl,
-    );
   }
 }

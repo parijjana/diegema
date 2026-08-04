@@ -1,14 +1,11 @@
 import 'dart:async';
 
-/// Universal rate limiter for LibriVox, Wikipedia, Audnexus, and iTunes APIs.
+/// Universal rate limiter for the LibriVox / archive.org APIs.
 class RateLimitDispatcher {
   final Map<String, Future<void>> _queues = {};
 
   static const Map<String, Duration> defaultCooldowns = {
-    'wikipedia': Duration(milliseconds: 500),
     'librivox': Duration(seconds: 1),
-    'audnexus': Duration(seconds: 1),
-    'itunes': Duration(milliseconds: 500),
   };
 
   Future<T> dispatch<T>({

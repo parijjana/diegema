@@ -51,10 +51,7 @@ class _BookDetailPaneState extends State<BookDetailPane> {
   }
 
   Future<void> _loadEnrichmentData() async {
-    final coverFuture = widget.artworkService.resolveCoverArtUrl(
-      title: widget.book.title,
-      author: widget.book.authorNames,
-    );
+    final coverFuture = widget.artworkService.resolveCoverArtUrl(widget.book);
     final streamFuture = widget.downloader.parseStreamableBook(widget.book);
 
     final results = await Future.wait([coverFuture, streamFuture]);

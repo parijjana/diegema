@@ -3,6 +3,7 @@ import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
 import '../database/app_database.dart';
 import 'glass_card.dart';
+import 'now_playing_controls.dart';
 
 class AulosNowPlayingScreen extends StatefulWidget {
   final AudioPlaybackService audioService;
@@ -47,13 +48,23 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF14181B),
+        backgroundColor: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('SAVE AUDIO CLIP', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+        title: Text(
+          'SAVE AUDIO CLIP',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+            color: theme.colorScheme.primary,
+          ),
+        ),
         content: TextField(
           controller: noteController,
-          decoration: const InputDecoration(
+          style: TextStyle(color: theme.colorScheme.onSurface),
+          decoration: InputDecoration(
             hintText: 'Enter note or description for clip...',
+            hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
           ),
           autofocus: true,
         ),
@@ -93,9 +104,9 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
       builder: (context, book, child) {
         if (book == null) {
           return Scaffold(
-            backgroundColor: const Color(0xFF0A0C0E),
+            backgroundColor: theme.scaffoldBackgroundColor,
             appBar: AppBar(
-              backgroundColor: const Color(0xFF0A0C0E),
+              backgroundColor: theme.scaffoldBackgroundColor,
               title: const Text('NOW PLAYING'),
             ),
             body: const Center(child: Text('No audiobook currently playing')),
@@ -103,12 +114,12 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
         }
 
         return Scaffold(
-          backgroundColor: const Color(0xFF0A0C0E),
+          backgroundColor: theme.scaffoldBackgroundColor,
           appBar: AppBar(
-            backgroundColor: const Color(0xFF0A0C0E),
+            backgroundColor: theme.scaffoldBackgroundColor,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, size: 24),
+              icon: Icon(Icons.arrow_back_rounded, size: 24, color: theme.colorScheme.onSurface),
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(
@@ -139,17 +150,16 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
                     child: ListView(
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                       children: [
-                        // Large Center Cover Art
                         Center(
                           child: Container(
                             width: 260,
                             height: 260,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(20),
-                              color: const Color(0xFF14181B),
+                              color: theme.colorScheme.surface,
                               boxShadow: [
                                 BoxShadow(
-                                  color: primary.withValues(alpha: 0.3),
+                                  color: primary.withValues(alpha: 0.25),
                                   blurRadius: 36,
                                   spreadRadius: 2,
                                 ),
@@ -169,7 +179,7 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
                                     textAlign: TextAlign.center,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface),
                                   ),
                                 ),
                               ],
@@ -177,7 +187,6 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        // Title & Subtitle Info
                         Column(
                           children: [
                             Text(
@@ -185,7 +194,7 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
                               textAlign: TextAlign.center,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                             ),
                             const SizedBox(height: 6),
                             ValueListenableBuilder<int>(
@@ -204,7 +213,6 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
                           ],
                         ),
                         const SizedBox(height: 28),
-                        // Progress Slider & Timestamps
                         ValueListenableBuilder<Duration>(
                           valueListenable: widget.audioService.positionNotifier,
                           builder: (context, position, child) {
@@ -236,8 +244,8 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
                                       child: Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text(_formatDuration(position), style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                          Text(_formatDuration(duration), style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                          Text(_formatDuration(position), style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+                                          Text(_formatDuration(duration), style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
                                         ],
                                       ),
                                     ),
@@ -248,222 +256,15 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
                           },
                         ),
                         const SizedBox(height: 24),
-                        // Full Aulos Controls Suite
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // Speed Selector
-                              PopupMenuButton<double>(
-                                initialValue: 1.0,
-                                onSelected: (speed) => widget.audioService.setSpeed(speed),
-                                itemBuilder: (context) => [0.5, 0.8, 1.0, 1.25, 1.5, 2.0]
-                                    .map((s) => PopupMenuItem(value: s, child: Text('${s}x')))
-                                    .toList(),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: primary.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: primary.withValues(alpha: 0.3)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      ValueListenableBuilder<double>(
-                                        valueListenable: widget.audioService.speedNotifier,
-                                        builder: (context, speed, child) {
-                                          return Text('${speed}x', style: TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 11));
-                                        },
-                                      ),
-                                      Icon(Icons.arrow_drop_down, color: primary, size: 16),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Sleep Timer Selector
-                              ValueListenableBuilder<Duration?>(
-                                valueListenable: widget.audioService.sleepTimerNotifier,
-                                builder: (context, remainingTimer, child) {
-                                  final isTimerActive = remainingTimer != null;
-                                  return PopupMenuButton<int>(
-                                    onSelected: (minutes) {
-                                      if (minutes == 0) {
-                                        widget.audioService.cancelSleepTimer();
-                                      } else {
-                                        widget.audioService.setSleepTimer(Duration(minutes: minutes));
-                                      }
-                                    },
-                                    itemBuilder: (context) => [
-                                      const PopupMenuItem(value: 0, child: Text('Turn Off Timer')),
-                                      const PopupMenuItem(value: 15, child: Text('15 Minutes')),
-                                      const PopupMenuItem(value: 30, child: Text('30 Minutes')),
-                                      const PopupMenuItem(value: 45, child: Text('45 Minutes')),
-                                      const PopupMenuItem(value: 60, child: Text('60 Minutes')),
-                                    ],
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: isTimerActive ? primary.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.05),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: isTimerActive ? primary : Colors.white.withValues(alpha: 0.1)),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.bedtime_rounded,
-                                            size: 14,
-                                            color: isTimerActive ? primary : Colors.white70,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            isTimerActive ? _formatDuration(remainingTimer) : 'Timer',
-                                            style: TextStyle(
-                                              color: isTimerActive ? primary : Colors.white70,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(width: 12),
-                              // Skip Previous Chapter
-                              IconButton(
-                                onPressed: () {
-                                  final currentIdx = widget.audioService.chapterIndexNotifier.value;
-                                  if (currentIdx > 0) {
-                                    widget.audioService.loadBook(book, initialChapterIndex: currentIdx - 1);
-                                  }
-                                },
-                                icon: Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                                  ),
-                                  child: const Icon(Icons.skip_previous_rounded, size: 22, color: Colors.white),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Replay 15s
-                              IconButton(
-                                onPressed: () => widget.audioService.skipBackward(seconds: 15),
-                                icon: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                                  ),
-                                  child: const Icon(Icons.replay_10_rounded, size: 24, color: Colors.white),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Central Glowing Aulos Play/Pause Button
-                              ValueListenableBuilder<PlaybackState>(
-                                valueListenable: widget.audioService.stateNotifier,
-                                builder: (context, state, child) {
-                                  final isPlaying = state == PlaybackState.playing;
-                                  return IconButton(
-                                    onPressed: () => widget.audioService.togglePlayPause(),
-                                    padding: EdgeInsets.zero,
-                                    icon: Container(
-                                      width: 80,
-                                      height: 80,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [primary, primary.withValues(alpha: 0.7)],
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: primary.withValues(alpha: 0.45),
-                                            blurRadius: 28,
-                                            spreadRadius: 4,
-                                          ),
-                                        ],
-                                      ),
-                                      child: state == PlaybackState.loading
-                                          ? const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                                          : Icon(
-                                              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                              color: Colors.black,
-                                              size: 42,
-                                            ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(width: 12),
-                              // Forward 15s
-                              IconButton(
-                                onPressed: () => widget.audioService.skipForward(seconds: 15),
-                                icon: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                                  ),
-                                  child: const Icon(Icons.forward_10_rounded, size: 24, color: Colors.white),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Skip Next Chapter
-                              IconButton(
-                                onPressed: () {
-                                  final currentIdx = widget.audioService.chapterIndexNotifier.value;
-                                  if (currentIdx < book.chapters.length - 1) {
-                                    widget.audioService.loadBook(book, initialChapterIndex: currentIdx + 1);
-                                  }
-                                },
-                                icon: Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                                  ),
-                                  child: const Icon(Icons.skip_next_rounded, size: 22, color: Colors.white),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Save Clip Button
-                              IconButton(
-                                onPressed: () => _showAddBookmarkDialog(context),
-                                icon: Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: primary.withValues(alpha: 0.1),
-                                    border: Border.all(color: primary.withValues(alpha: 0.3)),
-                                  ),
-                                  child: Icon(Icons.bookmark_add_outlined, size: 20, color: primary),
-                                ),
-                              ),
-                            ],
-                          ),
+                        NowPlayingControls(
+                          audioService: widget.audioService,
+                          book: book,
+                          onAddBookmark: () => _showAddBookmarkDialog(context),
                         ),
                         const SizedBox(height: 24),
-                        // Volume Slider
                         Row(
                           children: [
-                            Icon(Icons.volume_down_rounded, size: 18, color: Colors.grey[400]),
+                            Icon(Icons.volume_down_rounded, size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                             Expanded(
                               child: SliderTheme(
                                 data: SliderTheme.of(context).copyWith(
@@ -480,11 +281,10 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
                                 ),
                               ),
                             ),
-                            Icon(Icons.volume_up_rounded, size: 18, color: Colors.grey[400]),
+                            Icon(Icons.volume_up_rounded, size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                           ],
                         ),
                         const SizedBox(height: 28),
-                        // Chapters Section Header & Chapter List
                         Text(
                           'CHAPTERS',
                           style: TextStyle(
@@ -520,11 +320,14 @@ class _AulosNowPlayingScreenState extends State<AulosNowPlayingScreen> {
                                         ch.title,
                                         style: TextStyle(
                                           fontWeight: isPlayingChapter ? FontWeight.bold : FontWeight.normal,
-                                          color: isPlayingChapter ? primary : Colors.white,
+                                          color: isPlayingChapter ? primary : theme.colorScheme.onSurface,
                                           fontSize: 13,
                                         ),
                                       ),
-                                      subtitle: Text('${(ch.durationSeconds / 60).toStringAsFixed(1)} mins', style: const TextStyle(fontSize: 11)),
+                                      subtitle: Text(
+                                        '${(ch.durationSeconds / 60).toStringAsFixed(1)} mins',
+                                        style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                                      ),
                                       onTap: () async {
                                         await widget.audioService.loadBook(book, initialChapterIndex: idx);
                                       },

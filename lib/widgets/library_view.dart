@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-import 'package:url_launcher/url_launcher.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
 import 'glass_card.dart';
+import 'librivox_volunteer_banner.dart';
+import 'local_audiobook_importer.dart';
 
 class LibraryView extends StatefulWidget {
   final AppDatabase db;
@@ -38,7 +38,6 @@ class _LibraryViewState extends State<LibraryView> {
   Future<void> _loadLibrary() async {
     setState(() => _isLoading = true);
     try {
-      // 1. Scan filesystem for downloaded audiobooks in local storage
       final appDir = await getApplicationDocumentsDirectory();
       final downloadsDir = Directory(p.join(appDir.path, 'unamedaudiobookplayer', 'downloads'));
 
@@ -87,7 +86,6 @@ class _LibraryViewState extends State<LibraryView> {
         }
       }
 
-      // 2. Fetch all books from SQLite database
       final books = await widget.db.getAllAudiobooks();
       if (mounted) {
         setState(() {
@@ -103,253 +101,8 @@ class _LibraryViewState extends State<LibraryView> {
     }
   }
 
-  Future<void> _launchVolunteerUrl() async {
-    final uri = Uri.parse('https://librivox.org/pages/volunteer-for-librivox/');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      debugPrint('Error launching volunteer URL: $e');
-    }
-  }
-
-  Future<void> _importLocalFolder() async {
-    try {
-      final selectedDirectory = await FilePicker.getDirectoryPath(
-        dialogTitle: 'Select Audiobook Directory',
-      );
-
-      if (selectedDirectory == null) return;
-
-      final folderDir = Directory(selectedDirectory);
-      final folderName = p.basename(selectedDirectory);
-
-      final files = await folderDir
-          .list()
-          .where((entity) => entity is File)
-          .cast<File>()
-          .where((f) {
-            final ext = p.extension(f.path).toLowerCase();
-            return ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg'].contains(ext);
-          })
-          .toList();
-
-      files.sort((a, b) => a.path.compareTo(b.path));
-
-      if (files.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No audio files (.mp3, .m4a, etc.) found in selected folder.')),
-          );
-        }
-        return;
-      }
-
-      final bookId = 'imported_folder_${selectedDirectory.hashCode.abs()}';
-      final chapters = files.asMap().entries.map((entry) {
-        final idx = entry.key;
-        final file = entry.value;
-        final title = p.basenameWithoutExtension(file.path);
-        return AudiobookChapter(
-          id: '${bookId}_ch_$idx',
-          title: title,
-          audioPathOrUrl: file.path,
-          durationSeconds: 0,
-          isStream: false,
-        );
-      }).toList();
-
-      final book = UnifiedAudiobook(
-        id: bookId,
-        title: folderName.replaceAll('_', ' '),
-        author: 'Local Audiobook',
-        description: 'Imported from folder: $selectedDirectory',
-        source: 'Local Folder',
-        chapters: chapters,
-        isDownloaded: true,
-      );
-
-      await widget.db.saveAudiobook(book);
-      await _loadLibrary();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Imported "${book.title}" (${chapters.length} chapters)!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Folder import failed: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _importLocalFiles() async {
-    try {
-      final result = await FilePicker.pickFiles(
-        allowMultiple: true,
-        type: FileType.custom,
-        allowedExtensions: ['mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg'],
-        dialogTitle: 'Select Audio Files for Audiobook',
-      );
-
-      if (result == null || result.files.isEmpty) return;
-
-      final List<String> paths = result.files
-          .where((f) => f.path != null)
-          .map((f) => f.path!)
-          .toList()
-        ..sort();
-
-      if (paths.isEmpty) return;
-
-      final firstFile = paths.first;
-      final parentFolder = p.basename(p.dirname(firstFile));
-      final defaultTitle = parentFolder.isNotEmpty && parentFolder != '.' ? parentFolder : 'Imported Audiobook';
-
-      final bookId = 'imported_files_${paths.join().hashCode.abs()}';
-      final chapters = paths.asMap().entries.map((entry) {
-        final idx = entry.key;
-        final path = entry.value;
-        final title = p.basenameWithoutExtension(path);
-        return AudiobookChapter(
-          id: '${bookId}_ch_$idx',
-          title: title,
-          audioPathOrUrl: path,
-          durationSeconds: 0,
-          isStream: false,
-        );
-      }).toList();
-
-      final book = UnifiedAudiobook(
-        id: bookId,
-        title: defaultTitle.replaceAll('_', ' '),
-        author: 'Local Files',
-        description: 'Imported ${paths.length} local audio files.',
-        source: 'Local Files',
-        chapters: chapters,
-        isDownloaded: true,
-      );
-
-      await widget.db.saveAudiobook(book);
-      await _loadLibrary();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Imported "${book.title}" (${chapters.length} files)!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Files import failed: $e')),
-        );
-      }
-    }
-  }
-
-  void _showImportOptionsModal() {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF14181B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'IMPORT LOCAL AUDIOBOOK',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.5,
-                color: primary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: Icon(Icons.folder_open_rounded, color: primary),
-              title: const Text('Import Audiobook Folder', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              subtitle: const Text('Select a directory containing MP3, M4A, or FLAC chapters', style: TextStyle(fontSize: 11)),
-              onTap: () {
-                Navigator.pop(context);
-                _importLocalFolder();
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: Icon(Icons.audio_file_rounded, color: primary),
-              title: const Text('Import Audio Files', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              subtitle: const Text('Select individual audio files to group into an audiobook', style: TextStyle(fontSize: 11)),
-              onTap: () {
-                Navigator.pop(context);
-                _importLocalFiles();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVolunteerBanner(ThemeData theme) {
-    final primary = theme.colorScheme.primary;
-
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      borderColor: primary.withValues(alpha: 0.4),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: primary.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.mic_rounded, color: primary, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'VOLUNTEER FOR LIBRIVOX',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.0),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'Donate your voice or proof-listen to help bring public domain books to life.',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[400]),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: primary),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-            onPressed: _launchVolunteerUrl,
-            child: Text(
-              'JOIN →',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: primary, letterSpacing: 1.0),
-            ),
-          ),
-        ],
-      ),
-    );
+  void _showImportOptions() {
+    LocalAudiobookImporter.showOptionsModal(context, widget.db, _loadLibrary);
   }
 
   @override
@@ -390,7 +143,7 @@ class _LibraryViewState extends State<LibraryView> {
               Text(
                 'Import local audiobooks or download from Discover.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 13),
               ),
               const SizedBox(height: 24),
               Row(
@@ -405,7 +158,7 @@ class _LibraryViewState extends State<LibraryView> {
                     ),
                     icon: const Icon(Icons.folder_open_rounded, size: 18),
                     label: const Text('IMPORT LOCAL BOOK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.0)),
-                    onPressed: _showImportOptionsModal,
+                    onPressed: _showImportOptions,
                   ),
                   const SizedBox(width: 12),
                   OutlinedButton.icon(
@@ -422,7 +175,7 @@ class _LibraryViewState extends State<LibraryView> {
                 ],
               ),
               const SizedBox(height: 32),
-              _buildVolunteerBanner(theme),
+              const LibriVoxVolunteerBanner(),
             ],
           ),
         ),
@@ -458,7 +211,7 @@ class _LibraryViewState extends State<LibraryView> {
                     ),
                     icon: const Icon(Icons.add_rounded, size: 16),
                     label: const Text('IMPORT BOOK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1.0)),
-                    onPressed: _showImportOptionsModal,
+                    onPressed: _showImportOptions,
                   ),
                   const SizedBox(width: 8),
                   IconButton(
@@ -471,9 +224,9 @@ class _LibraryViewState extends State<LibraryView> {
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: _buildVolunteerBanner(theme),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 16),
+          child: LibriVoxVolunteerBanner(),
         ),
         Expanded(
           child: ListView.builder(
@@ -491,7 +244,7 @@ class _LibraryViewState extends State<LibraryView> {
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF14181B),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: primary.withValues(alpha: 0.3)),
                       ),
@@ -503,7 +256,7 @@ class _LibraryViewState extends State<LibraryView> {
                     ),
                     subtitle: Text(
                       '${book.author} • ${book.chapters.length} chapters (${book.source ?? 'Local'})',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                     ),
                     trailing: IconButton(
                       icon: Icon(Icons.play_circle_fill, color: primary, size: 36),

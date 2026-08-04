@@ -1,0 +1,344 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book row &amp; shelf tile — Audiobook Player Design System</title>
+<link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+
+<div class="dsc-toolbar">
+  <strong>Audiobook&nbsp;Player&nbsp;DS</strong>
+  <a href="00-foundations.html">Foundations</a>
+  <a href="01-buttons.html">Buttons</a>
+  <a href="02-book-items.html">Book items</a>
+  <a href="03-book-detail.html">Detail pane</a>
+  <a href="04-banners.html">Banners</a>
+  <a href="05-navigation.html">Navigation</a>
+  <a href="06-player-bar.html">Player bar</a>
+  <a href="07-now-playing.html">Now Playing</a>
+  <a href="08-states.html">States</a>
+  <label style="margin-left:auto">Desktop frame scale
+    <input type="range" id="dscScale" min="40" max="100" value="62">
+    <span id="dscScaleVal">62%</span>
+  </label>
+</div>
+
+<div class="dsc-page">
+<header>
+  <h1>Book row &amp; shelf tile</h1>
+  <p>The two ways a book appears in a list: the library <strong>row</strong>
+  (<code>library_view.dart</code>) and the discover <strong>tile</strong>
+  (<code>librivox_book_item.dart</code>). Both carry a <em>preview only</em> variant that the
+  canned web demo needs, so a visitor can never mistake an unplayable catalogue entry for a
+  working one.</p>
+</header>
+
+<section class="dsc-section">
+  <h2>1. Book row — library list</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> The current row
+  is a <code>ListTile</code> inside a <code>GlassCard</code> with a 14px bold title, a 12px
+  subtitle at <code>alpha: 0.6</code> (4.29:1 — fails AA), a generic
+  <code>Icons.book_rounded</code> instead of the cover, and no progress indicator even though
+  progress is stored. Here: real cover, 17px title, 16px secondary at 7.70:1, resume progress,
+  and status badges.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+
+        <div class="book-row">
+          <div class="cover cover--proc cover--sm" style="width:64px;height:84px"><span class="cover__letter">M</span></div>
+          <div class="book-row__body">
+            <p class="book-row__title">Moby Dick</p>
+            <p class="book-row__meta">Herman Melville &middot; 135 chapters</p>
+            <div class="book-row__progress">
+              <div class="progress"><div class="progress__fill" style="width:42%"></div></div>
+              <p class="t-caption t-secondary t-num" style="margin:4px 0 0">Chapter 57 &middot; 9 h 12 m left</p>
+            </div>
+          </div>
+          <div class="book-row__action"><button class="icon-btn icon-btn--accent" aria-label="Resume Moby Dick">&#9654;</button></div>
+        </div>
+
+        <div class="book-row">
+          <div class="cover cover--proc h-rust cover--sm" style="width:64px;height:84px"><span class="cover__letter">P</span></div>
+          <div class="book-row__body">
+            <p class="book-row__title">Pride and Prejudice</p>
+            <p class="book-row__meta">Jane Austen &middot; 61 chapters</p>
+            <div class="book-row__tags">
+              <span class="badge badge--offline">Downloaded &middot; 412 MB</span>
+              <span class="badge badge--success">Finished</span>
+            </div>
+          </div>
+          <div class="book-row__action"><button class="icon-btn icon-btn--accent" aria-label="Play Pride and Prejudice">&#9654;</button></div>
+        </div>
+
+        <div class="book-row is-selected" aria-current="true">
+          <div class="cover cover--proc h-plum cover--sm" style="width:64px;height:84px"><span class="cover__letter">T</span></div>
+          <div class="book-row__body">
+            <p class="book-row__title">The Time Machine</p>
+            <p class="book-row__meta">H. G. Wells &middot; 12 chapters</p>
+            <div class="book-row__tags"><span class="badge badge--accent">Now playing</span></div>
+          </div>
+          <div class="book-row__action"><button class="icon-btn icon-btn--accent" aria-label="Pause The Time Machine">&#10074;&#10074;</button></div>
+        </div>
+
+        <div class="book-row is-preview">
+          <div class="cover cover--proc h-moss cover--sm" style="width:64px;height:84px"><span class="cover__letter">W</span></div>
+          <div class="book-row__body">
+            <p class="book-row__title">The War of the Worlds</p>
+            <p class="book-row__meta">H. G. Wells &middot; 27 chapters</p>
+            <div class="book-row__tags"><span class="badge badge--preview">&#9888; Preview only — no audio in this demo</span></div>
+          </div>
+          <div class="book-row__action"><button class="icon-btn" aria-label="Audio unavailable in this demo" disabled>&#9654;</button></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+
+        <div class="book-row">
+          <div class="cover cover--proc cover--sm" style="width:64px;height:84px"><span class="cover__letter">M</span></div>
+          <div class="book-row__body">
+            <p class="book-row__title">Moby Dick</p>
+            <p class="book-row__meta">Herman Melville &middot; 135 chapters</p>
+            <div class="book-row__progress">
+              <div class="progress"><div class="progress__fill" style="width:42%"></div></div>
+              <p class="t-caption t-secondary t-num" style="margin:4px 0 0">Chapter 57 &middot; 9 h 12 m left</p>
+            </div>
+          </div>
+          <div class="book-row__action"><button class="icon-btn icon-btn--accent" aria-label="Resume Moby Dick">&#9654;</button></div>
+        </div>
+
+        <div class="book-row">
+          <div class="cover cover--proc h-rust cover--sm" style="width:64px;height:84px"><span class="cover__letter">P</span></div>
+          <div class="book-row__body">
+            <p class="book-row__title">Pride and Prejudice</p>
+            <p class="book-row__meta">Jane Austen &middot; 61 chapters</p>
+            <div class="book-row__tags">
+              <span class="badge badge--offline">Downloaded &middot; 412 MB</span>
+              <span class="badge badge--success">Finished</span>
+            </div>
+          </div>
+          <div class="book-row__action"><button class="icon-btn icon-btn--accent" aria-label="Play Pride and Prejudice">&#9654;</button></div>
+        </div>
+
+        <div class="book-row is-selected" aria-current="true">
+          <div class="cover cover--proc h-plum cover--sm" style="width:64px;height:84px"><span class="cover__letter">T</span></div>
+          <div class="book-row__body">
+            <p class="book-row__title">The Time Machine</p>
+            <p class="book-row__meta">H. G. Wells &middot; 12 chapters</p>
+            <div class="book-row__tags"><span class="badge badge--accent">Now playing</span></div>
+          </div>
+          <div class="book-row__action"><button class="icon-btn icon-btn--accent" aria-label="Pause The Time Machine">&#10074;&#10074;</button></div>
+        </div>
+
+        <div class="book-row is-preview">
+          <div class="cover cover--proc h-moss cover--sm" style="width:64px;height:84px"><span class="cover__letter">W</span></div>
+          <div class="book-row__body">
+            <p class="book-row__title">The War of the Worlds</p>
+            <p class="book-row__meta">H. G. Wells &middot; 27 chapters</p>
+            <div class="book-row__tags"><span class="badge badge--preview">&#9888; Preview only — no audio in this demo</span></div>
+          </div>
+          <div class="book-row__action"><button class="icon-btn" aria-label="Audio unavailable in this demo" disabled>&#9654;</button></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <h3 class="t-title-sm" style="margin-top:32px">Same rows at desktop width</h3>
+  <p class="dsc-note">The row does not change structure; it simply gets more room for the
+  metadata line and can afford an inline secondary action. Titles never wrap.</p>
+
+  <div class="dsc-matrix dsc-matrix--stack">
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="light">
+          <div class="book-row">
+            <div class="cover cover--proc cover--sm" style="width:64px;height:84px"><span class="cover__letter">M</span></div>
+            <div class="book-row__body">
+              <p class="book-row__title">Moby Dick; or, The Whale</p>
+              <p class="book-row__meta">Herman Melville &middot; read by Stewart Wills &middot; 135 chapters &middot; 24 h 41 m</p>
+              <div class="book-row__progress" style="max-width:520px">
+                <div class="progress"><div class="progress__fill" style="width:42%"></div></div>
+                <p class="t-caption t-secondary t-num" style="margin:4px 0 0">Chapter 57 &middot; 9 h 12 m left</p>
+              </div>
+            </div>
+            <div class="book-row__action">
+              <button class="btn btn--ghost btn--sm">Book details</button>
+              <button class="btn btn--primary btn--sm">&#9654;&nbsp; Resume</button>
+            </div>
+          </div>
+          <div class="book-row is-preview">
+            <div class="cover cover--proc h-moss cover--sm" style="width:64px;height:84px"><span class="cover__letter">W</span></div>
+            <div class="book-row__body">
+              <p class="book-row__title">The War of the Worlds</p>
+              <p class="book-row__meta">H. G. Wells &middot; read by Rebecca Dittman &middot; 27 chapters &middot; 6 h 28 m</p>
+              <div class="book-row__tags"><span class="badge badge--preview">&#9888; Preview only — audio is not bundled with this demo</span></div>
+            </div>
+            <div class="book-row__action">
+              <button class="btn btn--ghost btn--sm">Book details</button>
+              <button class="btn btn--primary btn--sm" disabled>&#9654;&nbsp; Resume</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="dark">
+          <div class="book-row">
+            <div class="cover cover--proc cover--sm" style="width:64px;height:84px"><span class="cover__letter">M</span></div>
+            <div class="book-row__body">
+              <p class="book-row__title">Moby Dick; or, The Whale</p>
+              <p class="book-row__meta">Herman Melville &middot; read by Stewart Wills &middot; 135 chapters &middot; 24 h 41 m</p>
+              <div class="book-row__progress" style="max-width:520px">
+                <div class="progress"><div class="progress__fill" style="width:42%"></div></div>
+                <p class="t-caption t-secondary t-num" style="margin:4px 0 0">Chapter 57 &middot; 9 h 12 m left</p>
+              </div>
+            </div>
+            <div class="book-row__action">
+              <button class="btn btn--ghost btn--sm">Book details</button>
+              <button class="btn btn--primary btn--sm">&#9654;&nbsp; Resume</button>
+            </div>
+          </div>
+          <div class="book-row is-preview">
+            <div class="cover cover--proc h-moss cover--sm" style="width:64px;height:84px"><span class="cover__letter">W</span></div>
+            <div class="book-row__body">
+              <p class="book-row__title">The War of the Worlds</p>
+              <p class="book-row__meta">H. G. Wells &middot; read by Rebecca Dittman &middot; 27 chapters &middot; 6 h 28 m</p>
+              <div class="book-row__tags"><span class="badge badge--preview">&#9888; Preview only — audio is not bundled with this demo</span></div>
+            </div>
+            <div class="book-row__action">
+              <button class="btn btn--ghost btn--sm">Book details</button>
+              <button class="btn btn--primary btn--sm" disabled>&#9654;&nbsp; Resume</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>2. Shelf tile</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> The current tile
+  is 110&times;145 with a <strong>10px</strong> title and a <strong>9px</strong> author at
+  <code>alpha: 0.5</code>. That is unreadable for the stated audience. The tile grows to
+  148px so the title can sit at 16px and the author at the 13px floor. The procedural cover
+  keeps its spine crease and serif letter emblem but loses the neon accent strip, the
+  coloured glow shadow and the glossy sheen — those are the leftovers of the rejected
+  cyberpunk pass. Selection is now a solid 2px accent outline rather than a coloured bloom.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light — shelf strip</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="shelf">
+          <div class="section-head"><h2 class="section-head__title">Featured classics</h2><a href="#" class="t-label t-accent">See all</a></div>
+          <div class="shelf__strip">
+            <button class="book-tile"><div class="cover cover--proc"><span class="cover__letter">M</span></div><p class="book-tile__title">Moby Dick; or, The Whale</p><p class="book-tile__author">Herman Melville</p></button>
+            <button class="book-tile is-selected" aria-current="true"><div class="cover cover--proc h-rust"><span class="cover__letter">P</span></div><p class="book-tile__title">Pride and Prejudice</p><p class="book-tile__author">Jane Austen</p></button>
+            <button class="book-tile is-preview"><div class="cover cover--proc h-moss"><span class="cover__letter">W</span></div><p class="book-tile__title">The War of the Worlds</p><p class="book-tile__author">H. G. Wells</p><div class="book-tile__foot"><span class="badge badge--preview">Preview only</span></div></button>
+            <button class="book-tile"><div class="cover cover--proc h-plum"><span class="cover__letter">F</span></div><p class="book-tile__title">Frankenstein</p><p class="book-tile__author">Mary Shelley</p></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — shelf strip</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="shelf">
+          <div class="section-head"><h2 class="section-head__title">Featured classics</h2><a href="#" class="t-label t-accent">See all</a></div>
+          <div class="shelf__strip">
+            <button class="book-tile"><div class="cover cover--proc"><span class="cover__letter">M</span></div><p class="book-tile__title">Moby Dick; or, The Whale</p><p class="book-tile__author">Herman Melville</p></button>
+            <button class="book-tile is-selected" aria-current="true"><div class="cover cover--proc h-rust"><span class="cover__letter">P</span></div><p class="book-tile__title">Pride and Prejudice</p><p class="book-tile__author">Jane Austen</p></button>
+            <button class="book-tile is-preview"><div class="cover cover--proc h-moss"><span class="cover__letter">W</span></div><p class="book-tile__title">The War of the Worlds</p><p class="book-tile__author">H. G. Wells</p><div class="book-tile__foot"><span class="badge badge--preview">Preview only</span></div></button>
+            <button class="book-tile"><div class="cover cover--proc h-plum"><span class="cover__letter">F</span></div><p class="book-tile__title">Frankenstein</p><p class="book-tile__author">Mary Shelley</p></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="t-title-sm" style="margin-top:32px">Search-results grid at desktop width</h3>
+  <div class="dsc-matrix dsc-matrix--stack">
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="light">
+          <div class="section-head"><h2 class="section-head__title">Search results <span class="section-head__count">(24 books for "wells")</span></h2></div>
+          <div class="grid-shelf">
+            <button class="book-tile"><div class="cover cover--proc"><span class="cover__letter">M</span></div><p class="book-tile__title">Moby Dick; or, The Whale</p><p class="book-tile__author">Herman Melville</p></button>
+            <button class="book-tile"><div class="cover cover--proc h-rust"><span class="cover__letter">P</span></div><p class="book-tile__title">Pride and Prejudice</p><p class="book-tile__author">Jane Austen</p></button>
+            <button class="book-tile is-selected" aria-current="true"><div class="cover cover--proc h-plum"><span class="cover__letter">T</span></div><p class="book-tile__title">The Time Machine</p><p class="book-tile__author">H. G. Wells</p></button>
+            <button class="book-tile is-preview"><div class="cover cover--proc h-moss"><span class="cover__letter">W</span></div><p class="book-tile__title">The War of the Worlds</p><p class="book-tile__author">H. G. Wells</p><div class="book-tile__foot"><span class="badge badge--preview">Preview only</span></div></button>
+            <button class="book-tile"><div class="cover cover--proc h-slate"><span class="cover__letter">T</span></div><p class="book-tile__title">The Invisible Man</p><p class="book-tile__author">H. G. Wells</p></button>
+            <button class="book-tile"><div class="cover cover--proc"><span class="cover__letter">T</span></div><p class="book-tile__title">The Island of Doctor Moreau</p><p class="book-tile__author">H. G. Wells</p></button>
+            <button class="book-tile"><div class="cover cover--proc h-rust"><span class="cover__letter">A</span></div><p class="book-tile__title">Anne of Green Gables</p><p class="book-tile__author">L. M. Montgomery</p></button>
+            <button class="book-tile"><div class="cover cover--proc h-plum"><span class="cover__letter">F</span></div><p class="book-tile__title">Frankenstein</p><p class="book-tile__author">Mary Shelley</p></button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="dark">
+          <div class="section-head"><h2 class="section-head__title">Search results <span class="section-head__count">(24 books for "wells")</span></h2></div>
+          <div class="grid-shelf">
+            <button class="book-tile"><div class="cover cover--proc"><span class="cover__letter">M</span></div><p class="book-tile__title">Moby Dick; or, The Whale</p><p class="book-tile__author">Herman Melville</p></button>
+            <button class="book-tile"><div class="cover cover--proc h-rust"><span class="cover__letter">P</span></div><p class="book-tile__title">Pride and Prejudice</p><p class="book-tile__author">Jane Austen</p></button>
+            <button class="book-tile is-selected" aria-current="true"><div class="cover cover--proc h-plum"><span class="cover__letter">T</span></div><p class="book-tile__title">The Time Machine</p><p class="book-tile__author">H. G. Wells</p></button>
+            <button class="book-tile is-preview"><div class="cover cover--proc h-moss"><span class="cover__letter">W</span></div><p class="book-tile__title">The War of the Worlds</p><p class="book-tile__author">H. G. Wells</p><div class="book-tile__foot"><span class="badge badge--preview">Preview only</span></div></button>
+            <button class="book-tile"><div class="cover cover--proc h-slate"><span class="cover__letter">T</span></div><p class="book-tile__title">The Invisible Man</p><p class="book-tile__author">H. G. Wells</p></button>
+            <button class="book-tile"><div class="cover cover--proc"><span class="cover__letter">T</span></div><p class="book-tile__title">The Island of Doctor Moreau</p><p class="book-tile__author">H. G. Wells</p></button>
+            <button class="book-tile"><div class="cover cover--proc h-rust"><span class="cover__letter">A</span></div><p class="book-tile__title">Anne of Green Gables</p><p class="book-tile__author">L. M. Montgomery</p></button>
+            <button class="book-tile"><div class="cover cover--proc h-plum"><span class="cover__letter">F</span></div><p class="book-tile__title">Frankenstein</p><p class="book-tile__author">Mary Shelley</p></button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>3. Accessibility contract</h2>
+  <ul class="t-body-lg" style="max-width:82ch">
+    <li>A row or tile is <strong>one</strong> semantic node: <code>Semantics(button: true, label: "Moby Dick, by Herman Melville, 42 percent complete, chapter 57")</code>. Today each is a bare <code>InkWell</code> with no label, so VoiceOver reads only the visible fragments.</li>
+    <li>The preview-only state is announced, not merely styled: the badge text is part of the label and the play control is <code>Semantics(enabled: false)</code> with a reason.</li>
+    <li>The procedural cover is decorative — <code>ExcludeSemantics</code>. A real cover image gets the book title as its alt text.</li>
+    <li>Selection uses <code>aria-current</code> / <code>Semantics(selected: true)</code>, and is signalled by an outline plus a badge, never by colour alone.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var r = document.getElementById('dscScale'), o = document.getElementById('dscScaleVal');
+  if (!r) return;
+  function apply() {
+    var v = r.value / 100;
+    var n = document.querySelectorAll('.dsc-scaled');
+    for (var i = 0; i < n.length; i++) n[i].style.setProperty('--dsc-scale', v);
+    o.textContent = r.value + '%';
+  }
+  r.addEventListener('input', apply);
+  apply();
+})();
+</script>
+</body>
+</html>

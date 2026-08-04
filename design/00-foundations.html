@@ -1,0 +1,347 @@
+<!-- @dsCard group="Foundations" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foundations — Audiobook Player Design System</title>
+<link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+
+<div class="dsc-toolbar">
+  <strong>Audiobook&nbsp;Player&nbsp;DS</strong>
+  <a href="00-foundations.html">Foundations</a>
+  <a href="01-buttons.html">Buttons</a>
+  <a href="02-book-items.html">Book items</a>
+  <a href="03-book-detail.html">Detail pane</a>
+  <a href="04-banners.html">Banners</a>
+  <a href="05-navigation.html">Navigation</a>
+  <a href="06-player-bar.html">Player bar</a>
+  <a href="07-now-playing.html">Now Playing</a>
+  <a href="08-states.html">States</a>
+  <label style="margin-left:auto">Desktop frame scale
+    <input type="range" id="dscScale" min="40" max="100" value="62">
+    <span id="dscScaleVal">62%</span>
+  </label>
+</div>
+
+<div class="dsc-page">
+<header>
+  <h1>Foundations</h1>
+  <p>Colour ramps, type scale, spacing, radii, elevation and motion for the LibriVox
+  audiobook player. The teal + warm-paper direction is retained and extended into full
+  ramps. Every value below replaces a hardcoded literal in <code>lib/</code>.</p>
+</header>
+
+<!-- ============================ COLOUR ============================ -->
+<section class="dsc-section">
+  <h2>1. Colour — primitive ramps</h2>
+  <p class="dsc-note">Four hardcoded colours become four ramps. The existing values are
+  preserved as the anchor step of each ramp: <code>#2E6D7D</code> is <code>teal-500</code>,
+  <code>#CC4D22</code> is <code>rust-500</code>, <code>#F8F8F5</code> is <code>paper-100</code>,
+  <code>#101417</code> is <code>ink-900</code>, <code>#181C20</code> is <code>ink-800</code>,
+  <code>#E6E4DF</code> is <code>bone-200</code>.</p>
+
+  <h3 class="t-title-sm">Teal (primary)</h3>
+  <div class="dsc-swatches" style="margin-bottom:24px">
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#EEF5F7"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">teal-50</span><span class="dsc-swatch__hex">#EEF5F7</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#D7E7EB"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">teal-100</span><span class="dsc-swatch__hex">#D7E7EB</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#AECFD7"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">teal-200</span><span class="dsc-swatch__hex">#AECFD7</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#7FB2BF"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">teal-300</span><span class="dsc-swatch__hex">#7FB2BF</span><br><span class="dsc-swatch__hex">dark-mode accent</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#4F8F9F"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">teal-400</span><span class="dsc-swatch__hex">#4F8F9F</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#2E6D7D"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">teal-500</span><span class="dsc-swatch__hex">#2E6D7D</span><br><span class="dsc-swatch__hex">light fill · existing</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#265A68"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">teal-600</span><span class="dsc-swatch__hex">#265A68</span><br><span class="dsc-swatch__hex">light accent TEXT</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#1E4753"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">teal-700</span><span class="dsc-swatch__hex">#1E4753</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#17353E"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">teal-800</span><span class="dsc-swatch__hex">#17353E</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#102429"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">teal-900</span><span class="dsc-swatch__hex">#102429</span></div></div>
+  </div>
+
+  <h3 class="t-title-sm">Rust (secondary / call to action)</h3>
+  <div class="dsc-swatches" style="margin-bottom:24px">
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#FCF0EB"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">rust-50</span><span class="dsc-swatch__hex">#FCF0EB</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#F8DCD1"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">rust-100</span><span class="dsc-swatch__hex">#F8DCD1</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#F0B9A3"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">rust-200</span><span class="dsc-swatch__hex">#F0B9A3</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#E5906F"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">rust-300</span><span class="dsc-swatch__hex">#E5906F</span><br><span class="dsc-swatch__hex">dark-mode CTA</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#D96B44"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">rust-400</span><span class="dsc-swatch__hex">#D96B44</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#CC4D22"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">rust-500</span><span class="dsc-swatch__hex">#CC4D22</span><br><span class="dsc-swatch__hex">existing · decorative only</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#A93E1B"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">rust-600</span><span class="dsc-swatch__hex">#A93E1B</span><br><span class="dsc-swatch__hex">light CTA fill</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#863116"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">rust-700</span><span class="dsc-swatch__hex">#863116</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#632410"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">rust-800</span><span class="dsc-swatch__hex">#632410</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#41180B"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">rust-900</span><span class="dsc-swatch__hex">#41180B</span></div></div>
+  </div>
+
+  <h3 class="t-title-sm">Paper (light neutrals) &amp; Ink / Bone (dark neutrals)</h3>
+  <div class="dsc-swatches">
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#FFFFFF;border-bottom:1px solid #E0DED6"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">paper-0</span><span class="dsc-swatch__hex">#FFFFFF</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#F8F8F5"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">paper-100</span><span class="dsc-swatch__hex">#F8F8F5</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#EFEEE8"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">paper-200</span><span class="dsc-swatch__hex">#EFEEE8</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#E0DED6"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">paper-300</span><span class="dsc-swatch__hex">#E0DED6</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#C4C1B6"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">paper-400</span><span class="dsc-swatch__hex">#C4C1B6</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#9A968B"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">paper-500</span><span class="dsc-swatch__hex">#9A968B</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#767268"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">paper-600</span><span class="dsc-swatch__hex">#767268</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#55534C"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">paper-700</span><span class="dsc-swatch__hex">#55534C</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#3A382F"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">paper-800</span><span class="dsc-swatch__hex">#3A382F</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#22201C"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">paper-900</span><span class="dsc-swatch__hex">#22201C</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#101417"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">ink-900</span><span class="dsc-swatch__hex">#101417</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#181C20"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">ink-800</span><span class="dsc-swatch__hex">#181C20</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#22272C"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">ink-700</span><span class="dsc-swatch__hex">#22272C</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#2E353B"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">ink-600</span><span class="dsc-swatch__hex">#2E353B</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#414951"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">ink-500</span><span class="dsc-swatch__hex">#414951</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#666F77"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">ink-400</span><span class="dsc-swatch__hex">#666F77</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#E6E4DF"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">bone-200</span><span class="dsc-swatch__hex">#E6E4DF</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#B4B0A6"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">bone-400</span><span class="dsc-swatch__hex">#B4B0A6</span></div></div>
+    <div class="dsc-swatch"><div class="dsc-swatch__chip" style="background:#928D83"></div><div class="dsc-swatch__meta"><span class="dsc-swatch__name">bone-500</span><span class="dsc-swatch__hex">#928D83</span></div></div>
+  </div>
+</section>
+
+<!-- ======================= SEMANTIC + CONTRAST ======================= -->
+<section class="dsc-section">
+  <h2>2. Semantic tokens, both themes</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> The current
+  themes share one accent (<code>#2E6D7D</code>) across light and dark. On the dark surface
+  <code>#181C20</code> that teal measures <strong>2.94:1</strong> — it fails AA for text and
+  fails even the 3:1 non-text threshold. Dark mode therefore lightens the accent to
+  <code>teal-300 #7FB2BF</code> (7.36:1). The teal identity is unchanged; only the step moves.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="card" style="margin-bottom:12px">
+          <p class="t-title-sm" style="margin:0 0 4px">Surface / text</p>
+          <p class="t-body-lg" style="margin:0 0 4px">Primary text — 16.26:1</p>
+          <p class="t-body t-secondary" style="margin:0 0 4px">Secondary text — 7.70:1</p>
+          <p class="t-body t-muted" style="margin:0 0 4px">Muted text — 5.33:1</p>
+          <p class="t-body t-accent" style="margin:0">Accent text — 7.65:1</p>
+        </div>
+        <div class="card card--accent">
+          <p class="t-label" style="margin:0 0 4px;color:var(--accent-text)">Accent wash surface</p>
+          <p class="t-body" style="margin:0">Body on wash — 14.74:1</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="card" style="margin-bottom:12px">
+          <p class="t-title-sm" style="margin:0 0 4px">Surface / text</p>
+          <p class="t-body-lg" style="margin:0 0 4px">Primary text — 13.48:1</p>
+          <p class="t-body t-secondary" style="margin:0 0 4px">Secondary text — 7.91:1</p>
+          <p class="t-body t-muted" style="margin:0 0 4px">Muted text — 5.19:1</p>
+          <p class="t-body t-accent" style="margin:0">Accent text — 7.36:1</p>
+        </div>
+        <div class="card card--accent">
+          <p class="t-label" style="margin:0 0 4px;color:var(--accent-text)">Accent wash surface</p>
+          <p class="t-body" style="margin:0">Body on wash</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="t-title-sm" style="margin-top:32px">Measured contrast ratios</h3>
+  <div class="dsc-scroller">
+  <table class="dsc-table">
+    <thead><tr><th>Pair</th><th>Ratio</th><th>Required</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td><code>text</code> #22201C on <code>surface</code> #FFFFFF</td><td>16.26:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA / AAA</td></tr>
+      <tr><td><code>text-secondary</code> #55534C on #FFFFFF</td><td>7.70:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA / AAA</td></tr>
+      <tr><td><code>text-muted</code> #6E6B62 on #FFFFFF</td><td>5.33:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA</td></tr>
+      <tr><td><strong>CURRENT</strong> onSurface α=0.6 (#7A7A7A) on #FFFFFF</td><td>4.29:1</td><td>4.5:1</td><td class="dsc-fail">FAIL AA — removed</td></tr>
+      <tr><td><code>accent-text</code> teal-600 on #FFFFFF</td><td>7.65:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA / AAA</td></tr>
+      <tr><td>teal-500 #2E6D7D on #FFFFFF</td><td>5.83:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA</td></tr>
+      <tr><td>white on teal-500 (primary button)</td><td>5.83:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA</td></tr>
+      <tr><td>white on rust-600 (CTA button)</td><td>6.19:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA</td></tr>
+      <tr><td>rust-500 #CC4D22 on #FFFFFF</td><td>4.51:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA (margin 0.01 — not used for text)</td></tr>
+      <tr><td><code>border-contrast</code> paper-600 on #FFFFFF</td><td>4.80:1</td><td>3:1</td><td class="dsc-pass">PASS (non-text)</td></tr>
+      <tr><td><code>border</code> paper-300 on #FFFFFF</td><td>1.35:1</td><td>3:1</td><td class="dsc-fail">Decorative only — never the sole boundary cue</td></tr>
+      <tr><td><code>focus-ring</code> teal-600 on #FFFFFF</td><td>7.65:1</td><td>3:1</td><td class="dsc-pass">PASS</td></tr>
+      <tr><td><code>text-disabled</code> #8C8880 on paper-200</td><td>3.04:1</td><td>—</td><td class="dsc-pass">Exempt (disabled), still ≥3:1</td></tr>
+      <tr><td>error #B3261E on #FFFFFF</td><td>6.54:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA</td></tr>
+      <tr><td colspan="4" style="background:var(--surface-sunken)"><strong>Dark theme</strong></td></tr>
+      <tr><td><code>text</code> bone-200 on <code>surface</code> ink-800</td><td>13.48:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA / AAA</td></tr>
+      <tr><td><code>text-secondary</code> bone-400 on ink-800</td><td>7.91:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA / AAA</td></tr>
+      <tr><td><code>text-muted</code> bone-500 on ink-800</td><td>5.19:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA</td></tr>
+      <tr><td><strong>CURRENT</strong> onSurface α=0.6 (#949493) on ink-800</td><td>5.64:1</td><td>4.5:1</td><td class="dsc-pass">passes, but replaced by an opaque token</td></tr>
+      <tr><td><strong>CURRENT</strong> teal-500 #2E6D7D on ink-800</td><td>2.94:1</td><td>4.5:1</td><td class="dsc-fail">FAIL AA and FAIL 3:1 — replaced</td></tr>
+      <tr><td><code>accent</code> teal-300 on ink-800</td><td>7.36:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA / AAA</td></tr>
+      <tr><td>ink-900 on teal-300 (primary button)</td><td>7.95:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA / AAA</td></tr>
+      <tr><td><code>cta</code> rust-300 on ink-800</td><td>6.98:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA</td></tr>
+      <tr><td>ink-900 on rust-300 (CTA button)</td><td>7.54:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA / AAA</td></tr>
+      <tr><td><code>border-contrast</code> ink-400 on ink-800</td><td>3.35:1</td><td>3:1</td><td class="dsc-pass">PASS (non-text)</td></tr>
+      <tr><td><code>border</code> ink-600 on ink-800</td><td>1.38:1</td><td>3:1</td><td class="dsc-fail">Decorative only</td></tr>
+      <tr><td><code>focus-ring</code> teal-300 on ink-800</td><td>7.36:1</td><td>3:1</td><td class="dsc-pass">PASS</td></tr>
+      <tr><td>error #F2857A on ink-800</td><td>6.86:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA</td></tr>
+      <tr><td>warning #E3B341 on ink-800</td><td>8.80:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA / AAA</td></tr>
+      <tr><td>success #6ECF9F on ink-800</td><td>9.05:1</td><td>4.5:1</td><td class="dsc-pass">PASS AA / AAA</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============================ TYPE ============================ -->
+<section class="dsc-section">
+  <h2>3. Type scale</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> The current
+  widgets use 9, 10, 11, 12, 13 and 14px as raw literals. The floor here is
+  <strong>13px</strong>, and 13px is permitted only for information repeated elsewhere.
+  Default reading size is <strong>17px</strong>. Book titles in a shelf tile go from 10px
+  to 16px; author lines from 9px to 13px; player timecodes from 10px to 13px tabular.</p>
+  <p class="dsc-note dsc-note--change"><strong>All-caps is retired.</strong> "YOUR LIBRARY IS
+  EMPTY", "IMPORT LOCAL BOOK", "DISCOVER", "NOW PLAYING", "VOLUNTEER FOR LIBRIVOX" and the
+  <code>GlassCard</code> title all use uppercase with <code>letterSpacing: 1.0–2.0</code>.
+  Uppercase costs word-shape recognition, is read letter-by-letter by some screen readers,
+  and is the single strongest "sci-fi HUD" signal in the current UI. Everything becomes
+  sentence case with weight and size carrying the hierarchy. Letter-spacing is 0 everywhere
+  except tabular timecodes.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <p class="t-display">Display 34/40</p>
+        <p class="t-title-lg">Title lg 28/34</p>
+        <p class="t-title-md">Title md 22/28</p>
+        <p class="t-title-sm">Title sm 18/24</p>
+        <p class="t-body-lg">Body lg 17/26 — the default reading size for descriptions and list rows.</p>
+        <p class="t-body">Body 16/24 — dense metadata.</p>
+        <p class="t-label">Label 15/20 — buttons, chips, nav.</p>
+        <p class="t-caption t-secondary">Caption 13/18 — floor. Redundant info only.</p>
+        <p class="t-body t-num">Timecode 00:00 / 42:17</p>
+        <p class="t-title-md t-serif">Serif accent — book titles &amp; wordmark</p>
+      </div>
+    </div>
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <p class="t-display">Display 34/40</p>
+        <p class="t-title-lg">Title lg 28/34</p>
+        <p class="t-title-md">Title md 22/28</p>
+        <p class="t-title-sm">Title sm 18/24</p>
+        <p class="t-body-lg">Body lg 17/26 — the default reading size for descriptions and list rows.</p>
+        <p class="t-body">Body 16/24 — dense metadata.</p>
+        <p class="t-label">Label 15/20 — buttons, chips, nav.</p>
+        <p class="t-caption t-secondary">Caption 13/18 — floor. Redundant info only.</p>
+        <p class="t-body t-num">Timecode 00:00 / 42:17</p>
+        <p class="t-title-md t-serif">Serif accent — book titles &amp; wordmark</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="t-title-sm" style="margin-top:32px">Old vs new label treatment</h3>
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Before (light)</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <p style="font-size:16px;font-weight:900;letter-spacing:2px;margin:0 0 8px">YOUR LIBRARY IS EMPTY</p>
+        <p style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:#2E6D7D;margin:0 0 8px">YOUR LIBRARY (3)</p>
+        <p style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(34,34,34,.4);margin:0">DESCRIPTION</p>
+      </div>
+    </div>
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>After (light)</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <p class="t-title-md" style="margin:0 0 8px">Your library is empty</p>
+        <p class="t-title-sm" style="margin:0 0 8px">Your library <span class="section-head__count">(3 books)</span></p>
+        <p class="t-title-sm" style="margin:0">Description</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ SPACING ============================ -->
+<section class="dsc-section">
+  <h2>4. Spacing, radii, elevation</h2>
+  <p class="dsc-note">4px base. The current code mixes 2, 3, 4, 6, 8, 10, 12, 14, 16, 20, 24 and
+  32 — the odd values (3, 6, 10, 14) are dropped.</p>
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--fluid" style="max-width:620px">
+      <div class="dsc-frame__bar"><span>Spacing scale</span><span class="dsc-dim">light</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:12px"><code style="width:80px">--sp-1</code><div style="height:16px;width:4px;background:var(--accent-fill)"></div><span class="t-caption t-secondary">4px</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><code style="width:80px">--sp-2</code><div style="height:16px;width:8px;background:var(--accent-fill)"></div><span class="t-caption t-secondary">8px</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><code style="width:80px">--sp-3</code><div style="height:16px;width:12px;background:var(--accent-fill)"></div><span class="t-caption t-secondary">12px</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><code style="width:80px">--sp-4</code><div style="height:16px;width:16px;background:var(--accent-fill)"></div><span class="t-caption t-secondary">16px — default card padding</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><code style="width:80px">--sp-5</code><div style="height:16px;width:20px;background:var(--accent-fill)"></div><span class="t-caption t-secondary">20px</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><code style="width:80px">--sp-6</code><div style="height:16px;width:24px;background:var(--accent-fill)"></div><span class="t-caption t-secondary">24px</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><code style="width:80px">--sp-8</code><div style="height:16px;width:32px;background:var(--accent-fill)"></div><span class="t-caption t-secondary">32px — section gap</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><code style="width:80px">--sp-10</code><div style="height:16px;width:40px;background:var(--accent-fill)"></div><span class="t-caption t-secondary">40px</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><code style="width:80px">--sp-12</code><div style="height:16px;width:48px;background:var(--accent-fill)"></div><span class="t-caption t-secondary">48px</span></div>
+          <div style="display:flex;align-items:center;gap:12px"><code style="width:80px">--sp-16</code><div style="height:16px;width:64px;background:var(--accent-fill)"></div><span class="t-caption t-secondary">64px</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--fluid" style="max-width:620px">
+      <div class="dsc-frame__bar"><span>Radii &amp; elevation</span><span class="dsc-dim">dark</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+          <div style="text-align:center"><div style="width:72px;height:56px;background:var(--accent-wash);border:1px solid var(--accent-wash-border);border-radius:var(--r-xs)"></div><span class="t-caption t-secondary">xs 4</span></div>
+          <div style="text-align:center"><div style="width:72px;height:56px;background:var(--accent-wash);border:1px solid var(--accent-wash-border);border-radius:var(--r-sm)"></div><span class="t-caption t-secondary">sm 8</span></div>
+          <div style="text-align:center"><div style="width:72px;height:56px;background:var(--accent-wash);border:1px solid var(--accent-wash-border);border-radius:var(--r-md)"></div><span class="t-caption t-secondary">md 12</span></div>
+          <div style="text-align:center"><div style="width:72px;height:56px;background:var(--accent-wash);border:1px solid var(--accent-wash-border);border-radius:var(--r-lg)"></div><span class="t-caption t-secondary">lg 16</span></div>
+          <div style="text-align:center"><div style="width:72px;height:56px;background:var(--accent-wash);border:1px solid var(--accent-wash-border);border-radius:var(--r-xl)"></div><span class="t-caption t-secondary">xl 24</span></div>
+          <div style="text-align:center"><div style="width:72px;height:56px;background:var(--accent-wash);border:1px solid var(--accent-wash-border);border-radius:var(--r-pill)"></div><span class="t-caption t-secondary">pill</span></div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div class="card" style="box-shadow:var(--shadow-0);width:120px"><span class="t-caption">elev 0</span></div>
+          <div class="card" style="box-shadow:var(--shadow-1);width:120px"><span class="t-caption">elev 1 — cards</span></div>
+          <div class="card" style="box-shadow:var(--shadow-2);width:120px"><span class="t-caption">elev 2 — menus</span></div>
+          <div class="card" style="box-shadow:var(--shadow-3);width:120px"><span class="t-caption">elev 3 — player</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="dsc-note dsc-note--change" style="margin-top:16px"><strong>Departure from today.</strong>
+  <code>GlassCard</code> applies a 20-sigma <code>BackdropFilter</code> blur plus an
+  <code>onSurface</code> alpha wash on nearly every surface in the app. It is expensive to
+  composite on every frame, and it makes text contrast depend on whatever scrolls beneath.
+  It is replaced by opaque surfaces with a hairline border and a real shadow scale. Contrast
+  then becomes a property that can be proven rather than estimated.</p>
+</section>
+
+<!-- ============================ MOTION ============================ -->
+<section class="dsc-section">
+  <h2>5. Motion &amp; touch targets</h2>
+  <div class="dsc-scroller">
+  <table class="dsc-table">
+    <thead><tr><th>Token</th><th>Value</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td><code>--dur-instant</code></td><td>0ms</td><td>State that must not animate (playhead text)</td></tr>
+      <tr><td><code>--dur-fast</code></td><td>120ms</td><td>Hover, press, focus ring</td></tr>
+      <tr><td><code>--dur-base</code></td><td>200ms</td><td>Default. Matches the existing AnimatedContainer/AnimatedAlign</td></tr>
+      <tr><td><code>--dur-slow</code></td><td>320ms</td><td>Sheets, drawer, detail-pane swap</td></tr>
+      <tr><td><code>--ease-standard</code></td><td>cubic-bezier(.2,0,0,1)</td><td>Everything by default</td></tr>
+      <tr><td><code>--ease-decel</code></td><td>cubic-bezier(0,0,0,1)</td><td>Entering the screen</td></tr>
+      <tr><td><code>--ease-accel</code></td><td>cubic-bezier(.3,0,1,1)</td><td>Leaving the screen</td></tr>
+      <tr><td><code>--tap-min</code></td><td>44px</td><td>Floor for every interactive element</td></tr>
+      <tr><td><code>--tap-comfy</code></td><td>56px</td><td>Player transport secondary controls</td></tr>
+      <tr><td><code>--tap-primary</code></td><td>76px</td><td>Now Playing play/pause</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="dsc-note">All animation must respect <code>MediaQuery.disableAnimations</code> /
+  <code>prefers-reduced-motion</code>. The shimmer on skeletons and the spinner are the only
+  looping animations in the system, and both stop under reduced motion.</p>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var r = document.getElementById('dscScale'), o = document.getElementById('dscScaleVal');
+  if (!r) return;
+  function apply() {
+    var v = r.value / 100;
+    var n = document.querySelectorAll('.dsc-scaled');
+    for (var i = 0; i < n.length; i++) n[i].style.setProperty('--dsc-scale', v);
+    o.textContent = r.value + '%';
+  }
+  r.addEventListener('input', apply);
+  apply();
+})();
+</script>
+</body>
+</html>

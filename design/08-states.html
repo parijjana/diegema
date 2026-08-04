@@ -1,0 +1,332 @@
+<!-- @dsCard group="States" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Empty, loading &amp; error states — Audiobook Player Design System</title>
+<link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+
+<div class="dsc-toolbar">
+  <strong>Audiobook&nbsp;Player&nbsp;DS</strong>
+  <a href="00-foundations.html">Foundations</a>
+  <a href="01-buttons.html">Buttons</a>
+  <a href="02-book-items.html">Book items</a>
+  <a href="03-book-detail.html">Detail pane</a>
+  <a href="04-banners.html">Banners</a>
+  <a href="05-navigation.html">Navigation</a>
+  <a href="06-player-bar.html">Player bar</a>
+  <a href="07-now-playing.html">Now Playing</a>
+  <a href="08-states.html">States</a>
+  <label style="margin-left:auto">Desktop frame scale
+    <input type="range" id="dscScale" min="40" max="100" value="62">
+    <span id="dscScaleVal">62%</span>
+  </label>
+</div>
+
+<div class="dsc-page">
+<header>
+  <h1>Empty, loading &amp; error states</h1>
+  <p>The current build has three bare <code>CircularProgressIndicator</code>s, one styled empty
+  state, one plain-text "No audiobooks found for this search.", and <strong>no error state at
+  all</strong> — network failures surface as a <code>SnackBar</code> or as a silent
+  <code>debugPrint</code>. This page defines the full set.</p>
+</header>
+
+<section class="dsc-section">
+  <h2>1. Empty states</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> The empty library
+  reads "YOUR LIBRARY IS EMPTY" at 16px/w900 with <code>letterSpacing: 2.0</code> — shouting at
+  someone who has just installed the app. It also stacks two uppercase buttons and repeats the
+  volunteer banner. Sentence case, one primary action, one secondary.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light — empty library</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="state">
+          <div class="state__icon" aria-hidden="true">&#9776;</div>
+          <h2 class="t-title-md state__title">Your library is empty</h2>
+          <p class="state__body">Browse 22,000 free public-domain audiobooks, or add books you already have on this device.</p>
+          <div class="state__actions">
+            <button class="btn btn--primary btn--lg">Browse LibriVox</button>
+            <button class="btn btn--secondary btn--lg">Import a local book</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — no search results</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="state">
+          <div class="state__icon" aria-hidden="true">&#9906;</div>
+          <h2 class="t-title-md state__title">Nothing found for "quantm"</h2>
+          <p class="state__body">Check the spelling, or try searching by the author's surname alone.</p>
+          <div class="state__actions">
+            <button class="btn btn--secondary btn--md">Search "quantum" instead</button>
+            <button class="btn btn--ghost btn--md">Clear search</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dsc-matrix" style="margin-top:20px">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light — no bookmarks</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="state">
+          <div class="state__icon" aria-hidden="true">&#9873;</div>
+          <h2 class="t-title-md state__title">No bookmarks yet</h2>
+          <p class="state__body">Tap <strong>Bookmark</strong> while you listen to save the spot you're at, with a note.</p>
+        </div>
+      </div>
+    </div>
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — offline, nothing downloaded</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="state">
+          <div class="state__icon" aria-hidden="true">&#8856;</div>
+          <h2 class="t-title-md state__title">You're offline</h2>
+          <p class="state__body">Books you've downloaded still play. Browsing the LibriVox catalogue needs a connection.</p>
+          <div class="state__actions"><button class="btn btn--secondary btn--md">Show downloaded books</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>2. Loading states</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> Every load is a
+  centred spinner. On the discover screen that means a blank screen for the ~7 s the rework
+  plan measures on a cold start. Skeletons that match the eventual layout are used instead;
+  the spinner is kept only for short, in-place actions such as a chapter starting.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light — shelf skeleton</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light" aria-busy="true">
+        <div class="skeleton skeleton--title" style="width:180px;margin-bottom:16px"></div>
+        <div style="display:flex;gap:16px">
+          <div style="width:148px"><div class="skeleton skeleton--cover" style="width:100%;aspect-ratio:3/4;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:100%;margin-bottom:6px"></div><div class="skeleton skeleton--text" style="width:60%;height:13px"></div></div>
+          <div style="width:148px"><div class="skeleton skeleton--cover" style="width:100%;aspect-ratio:3/4;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:85%;margin-bottom:6px"></div><div class="skeleton skeleton--text" style="width:50%;height:13px"></div></div>
+        </div>
+        <p class="visually-hidden" role="status">Loading featured classics</p>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — library row skeleton</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark" aria-busy="true">
+        <div class="book-row" style="border-color:var(--border)">
+          <div class="skeleton skeleton--cover" style="width:64px;height:84px"></div>
+          <div class="book-row__body"><div class="skeleton skeleton--title" style="width:70%;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:45%"></div></div>
+        </div>
+        <div class="book-row" style="border-color:var(--border)">
+          <div class="skeleton skeleton--cover" style="width:64px;height:84px"></div>
+          <div class="book-row__body"><div class="skeleton skeleton--title" style="width:55%;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:60%"></div></div>
+        </div>
+        <div class="book-row" style="border-color:var(--border)">
+          <div class="skeleton skeleton--cover" style="width:64px;height:84px"></div>
+          <div class="book-row__body"><div class="skeleton skeleton--title" style="width:80%;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:35%"></div></div>
+        </div>
+        <p class="visually-hidden" role="status">Loading your library</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="dsc-matrix" style="margin-top:20px">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light — determinate + first-run</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="state">
+          <span class="spinner" style="width:44px;height:44px"></span>
+          <h2 class="t-title-sm state__title">Building your offline catalogue</h2>
+          <p class="state__body">One-off download of the LibriVox index, about 7 MB. You can start browsing as soon as it's done.</p>
+          <div style="width:100%"><div class="progress"><div class="progress__fill" style="width:64%"></div></div>
+          <p class="t-caption t-secondary t-num" style="margin:6px 0 0">14,200 of 22,000 books</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — inline spinner</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="card">
+          <p class="t-label" style="margin:0 0 12px">Short, in-place actions keep a spinner</p>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn--primary is-loading"><span class="spinner" style="border-color:rgba(16,20,23,.3);border-top-color:#101417"></span>Starting…</button>
+            <span class="spinner"></span>
+            <span class="spinner" style="width:20px;height:20px;border-width:2px"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>3. Error states</h2>
+  <p class="dsc-note dsc-note--change"><strong>New — none of this exists today.</strong>
+  Failures currently vanish into <code>debugPrint('Error scanning library: $e')</code> or into
+  a <code>SnackBar</code> carrying a raw exception string ("Download failed: $e"). Every error
+  here says what failed, what the user can do, and keeps the technical detail available but
+  secondary.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light — catalogue unreachable</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="state state--error">
+          <div class="state__icon" aria-hidden="true">&#9888;</div>
+          <h2 class="t-title-md state__title">Couldn't reach LibriVox</h2>
+          <p class="state__body">Your downloaded books still work. We'll keep trying in the background.</p>
+          <div class="state__actions">
+            <button class="btn btn--primary btn--md">Try again</button>
+            <button class="btn btn--secondary btn--md">Go to my library</button>
+          </div>
+          <details style="width:100%">
+            <summary class="t-caption t-muted" style="cursor:pointer">Technical detail</summary>
+            <p class="state__detail" style="margin:8px 0 0">SocketException: Failed host lookup 'librivox.org' (OS Error: nodename nor servname provided)</p>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — download failed</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="state state--error">
+          <div class="state__icon" aria-hidden="true">&#9888;</div>
+          <h2 class="t-title-md state__title">Download stopped</h2>
+          <p class="state__body">Moby Dick stopped at 37% — the connection dropped. Nothing was lost; resuming picks up where it left off.</p>
+          <div class="state__actions">
+            <button class="btn btn--primary btn--md">Resume download</button>
+            <button class="btn btn--ghost btn--md">Remove partial file</button>
+          </div>
+          <details style="width:100%">
+            <summary class="t-caption t-muted" style="cursor:pointer">Technical detail</summary>
+            <p class="state__detail" style="margin:8px 0 0">ClientException: Connection closed before full body was received (21.4 MB of 58.1 MB)</p>
+          </details>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="t-title-sm" style="margin-top:32px">Inline &amp; partial errors</h3>
+  <p class="dsc-note">Not every failure deserves a whole screen. A shelf that fails while the
+  rest of the page loaded fine gets an inline error in its own slot, so the user keeps what
+  did work.</p>
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="section-head"><h2 class="section-head__title">Top history books</h2></div>
+        <div class="inline-error" role="alert">
+          <span aria-hidden="true">&#9888;</span>
+          <div>
+            <strong>This shelf didn't load.</strong>
+            <div style="margin-top:8px"><button class="btn btn--secondary btn--sm">Retry this shelf</button></div>
+          </div>
+        </div>
+        <div class="section-head" style="margin-top:24px"><h2 class="section-head__title">Top poetry books</h2></div>
+        <div class="shelf__strip">
+          <button class="book-tile"><div class="cover cover--proc"><span class="cover__letter">L</span></div><p class="book-tile__title">Leaves of Grass</p><p class="book-tile__author">Walt Whitman</p></button>
+          <button class="book-tile"><div class="cover cover--proc h-rust"><span class="cover__letter">S</span></div><p class="book-tile__title">Sonnets</p><p class="book-tile__author">William Shakespeare</p></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — form / import error</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="card">
+          <h2 class="t-title-sm" style="margin:0 0 12px">Import a local book</h2>
+          <div class="inline-error" role="alert" style="margin-bottom:12px">
+            <span aria-hidden="true">&#9888;</span>
+            <div><strong>No audio in that folder.</strong> Choose a folder containing .mp3 or .m4b files.</div>
+          </div>
+          <p class="t-body t-secondary" style="margin:0 0 12px">~/Downloads/scans</p>
+          <div style="display:flex;gap:8px"><button class="btn btn--primary btn--md">Choose another folder</button><button class="btn btn--ghost btn--md">Cancel</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>4. Full-width states at 1280px</h2>
+  <p class="dsc-note">On desktop the state block stays at its 480px max width and centres in
+  the available column rather than stretching. The measure is the point.</p>
+  <div class="dsc-matrix dsc-matrix--stack">
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="light">
+          <div style="min-height:360px;display:grid;place-items:center">
+            <div class="state">
+              <div class="state__icon" aria-hidden="true">&#9776;</div>
+              <h2 class="t-title-lg state__title">Your library is empty</h2>
+              <p class="state__body">Browse 22,000 free public-domain audiobooks, or add books you already have on this computer.</p>
+              <div class="state__actions">
+                <button class="btn btn--primary btn--lg">Browse LibriVox</button>
+                <button class="btn btn--secondary btn--lg">Import a local book</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Dark — skeleton grid</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="dark" aria-busy="true">
+          <div class="skeleton skeleton--title" style="width:220px;margin-bottom:16px"></div>
+          <div class="grid-shelf" style="grid-template-columns:repeat(7,1fr)">
+            <div><div class="skeleton skeleton--cover" style="width:100%;aspect-ratio:3/4;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:100%;margin-bottom:6px"></div><div class="skeleton skeleton--text" style="width:55%;height:13px"></div></div>
+            <div><div class="skeleton skeleton--cover" style="width:100%;aspect-ratio:3/4;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:80%;margin-bottom:6px"></div><div class="skeleton skeleton--text" style="width:65%;height:13px"></div></div>
+            <div><div class="skeleton skeleton--cover" style="width:100%;aspect-ratio:3/4;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:95%;margin-bottom:6px"></div><div class="skeleton skeleton--text" style="width:40%;height:13px"></div></div>
+            <div><div class="skeleton skeleton--cover" style="width:100%;aspect-ratio:3/4;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:70%;margin-bottom:6px"></div><div class="skeleton skeleton--text" style="width:60%;height:13px"></div></div>
+            <div><div class="skeleton skeleton--cover" style="width:100%;aspect-ratio:3/4;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:88%;margin-bottom:6px"></div><div class="skeleton skeleton--text" style="width:50%;height:13px"></div></div>
+            <div><div class="skeleton skeleton--cover" style="width:100%;aspect-ratio:3/4;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:100%;margin-bottom:6px"></div><div class="skeleton skeleton--text" style="width:45%;height:13px"></div></div>
+            <div><div class="skeleton skeleton--cover" style="width:100%;aspect-ratio:3/4;margin-bottom:8px"></div><div class="skeleton skeleton--text" style="width:75%;margin-bottom:6px"></div><div class="skeleton skeleton--text" style="width:58%;height:13px"></div></div>
+          </div>
+          <p class="visually-hidden" role="status">Loading featured classics</p>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>5. State rules</h2>
+  <ul class="t-body-lg" style="max-width:82ch">
+    <li>Every asynchronous surface declares all four of loading / empty / error / content. A screen with no declared error state is not finished.</li>
+    <li>Loading containers set <code>aria-busy</code> and carry a visually-hidden <code>role="status"</code> describing what is loading.</li>
+    <li>Skeletons mirror the real layout so nothing jumps when content arrives.</li>
+    <li>Errors are <code>role="alert"</code>, name the thing that failed, and always offer at least one action.</li>
+    <li>Raw exception text is never the headline. It lives behind a "Technical detail" disclosure so it can still be pasted into a forum report.</li>
+    <li>Empty states are one sentence of orientation plus at most two actions. No uppercase.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var r = document.getElementById('dscScale'), o = document.getElementById('dscScaleVal');
+  if (!r) return;
+  function apply() {
+    var v = r.value / 100;
+    var n = document.querySelectorAll('.dsc-scaled');
+    for (var i = 0; i < n.length; i++) n[i].style.setProperty('--dsc-scale', v);
+    o.textContent = r.value + '%';
+  }
+  r.addEventListener('input', apply);
+  apply();
+})();
+</script>
+</body>
+</html>

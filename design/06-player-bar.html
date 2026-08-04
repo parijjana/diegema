@@ -1,0 +1,283 @@
+<!-- @dsCard group="Player" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Persistent player bar — Audiobook Player Design System</title>
+<link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+
+<div class="dsc-toolbar">
+  <strong>Audiobook&nbsp;Player&nbsp;DS</strong>
+  <a href="00-foundations.html">Foundations</a>
+  <a href="01-buttons.html">Buttons</a>
+  <a href="02-book-items.html">Book items</a>
+  <a href="03-book-detail.html">Detail pane</a>
+  <a href="04-banners.html">Banners</a>
+  <a href="05-navigation.html">Navigation</a>
+  <a href="06-player-bar.html">Player bar</a>
+  <a href="07-now-playing.html">Now Playing</a>
+  <a href="08-states.html">States</a>
+  <label style="margin-left:auto">Desktop frame scale
+    <input type="range" id="dscScale" min="40" max="100" value="62">
+    <span id="dscScaleVal">62%</span>
+  </label>
+</div>
+
+<div class="dsc-page">
+<header>
+  <h1>Persistent player bar</h1>
+  <p>Maps to <code>persistent_player_bar.dart</code>. Docked to the bottom of every screen
+  while something is loaded. Tapping the identity area opens Now&nbsp;Playing; the transport
+  controls do not open anything, they just work in place.</p>
+</header>
+
+<section class="dsc-section">
+  <h2>1. Phone — 390px</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> Current bar: a
+  <code>GlassCard</code> with a 20-sigma backdrop blur, a 3px slider track with a 6px thumb,
+  10px timecodes at α0.6 (4.29:1 — fails AA), a 12px chapter line at α0.6, and six controls
+  crammed into a <code>FittedBox</code> that shrinks them below any usable target on a narrow
+  screen. Here the surface is opaque, the scrub track is 6px with a 20px thumb, timecodes are
+  13px tabular at 7.70:1, and the bar sheds its secondary controls below 560px instead of
+  scaling them down. The bookmark button moves out of the leading slot — it was sitting where
+  the cover should be.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light — playing</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view dsc-view--flush" data-theme="light">
+        <div style="height:110px;background:var(--bg)"></div>
+        <div class="player-bar">
+          <div class="scrub player-bar__scrub">
+            <div class="scrub__track">
+              <div class="scrub__buffer" style="width:61%"></div>
+              <div class="scrub__fill" style="width:43%"></div>
+              <div class="scrub__thumb" style="left:43%"></div>
+            </div>
+            <div class="scrub__times"><span>12:41</span><span>29:18</span></div>
+          </div>
+          <div class="player-bar__main">
+            <div class="player-bar__id">
+              <div class="cover cover--proc player-bar__cover" style="width:44px;height:58px"><span class="cover__letter">M</span></div>
+              <div style="min-width:0">
+                <p class="player-bar__title">Moby Dick</p>
+                <p class="player-bar__chapter">57 — The Deck</p>
+              </div>
+            </div>
+            <div class="player-bar__transport">
+              <button class="icon-btn" aria-label="Back 15 seconds">&#8634;</button>
+              <button class="icon-btn icon-btn--accent" aria-label="Pause" style="width:56px;height:56px;min-width:56px;min-height:56px;font-size:26px;background:var(--accent-fill);color:var(--text-on-accent);border-color:var(--accent-fill)">&#10074;&#10074;</button>
+              <button class="icon-btn" aria-label="Forward 15 seconds">&#8635;</button>
+            </div>
+            <div class="player-bar__extra">
+              <button class="icon-btn" aria-label="Playback speed">1.0&times;</button>
+              <button class="icon-btn" aria-label="Add bookmark">&#9873;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — buffering</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view dsc-view--flush" data-theme="dark">
+        <div style="height:110px;background:var(--bg)"></div>
+        <div class="player-bar">
+          <div class="scrub player-bar__scrub">
+            <div class="scrub__track">
+              <div class="scrub__buffer" style="width:46%"></div>
+              <div class="scrub__fill" style="width:43%"></div>
+              <div class="scrub__thumb" style="left:43%"></div>
+            </div>
+            <div class="scrub__times"><span>12:41</span><span>29:18</span></div>
+          </div>
+          <div class="player-bar__main">
+            <div class="player-bar__id">
+              <div class="cover cover--proc player-bar__cover" style="width:44px;height:58px"><span class="cover__letter">M</span></div>
+              <div style="min-width:0">
+                <p class="player-bar__title">Moby Dick</p>
+                <p class="player-bar__chapter">Buffering…</p>
+              </div>
+            </div>
+            <div class="player-bar__transport">
+              <button class="icon-btn" aria-label="Back 15 seconds" disabled>&#8634;</button>
+              <span class="spinner" style="width:44px;height:44px;margin:0 6px"></span>
+              <button class="icon-btn" aria-label="Forward 15 seconds" disabled>&#8635;</button>
+            </div>
+            <div class="player-bar__extra">
+              <button class="icon-btn" aria-label="Playback speed">1.0&times;</button>
+              <button class="icon-btn" aria-label="Add bookmark">&#9873;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="t-title-sm" style="margin-top:32px">Error state — playback failed</h3>
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view dsc-view--flush" data-theme="light">
+        <div style="height:60px;background:var(--bg)"></div>
+        <div class="player-bar" style="border-top-color:var(--danger)">
+          <div class="inline-error" role="alert" style="margin-bottom:12px">
+            <span aria-hidden="true">&#9888;</span>
+            <div><strong>Couldn't load this chapter.</strong> archive.org didn't respond.</div>
+          </div>
+          <div class="player-bar__main">
+            <div class="player-bar__id">
+              <div class="cover cover--proc player-bar__cover" style="width:44px;height:58px"><span class="cover__letter">M</span></div>
+              <div style="min-width:0"><p class="player-bar__title">Moby Dick</p><p class="player-bar__chapter">57 — The Deck</p></div>
+            </div>
+            <div class="player-bar__transport"><button class="btn btn--primary btn--sm">Try again</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view dsc-view--flush" data-theme="dark">
+        <div style="height:60px;background:var(--bg)"></div>
+        <div class="player-bar" style="border-top-color:var(--danger)">
+          <div class="inline-error" role="alert" style="margin-bottom:12px">
+            <span aria-hidden="true">&#9888;</span>
+            <div><strong>Couldn't load this chapter.</strong> archive.org didn't respond.</div>
+          </div>
+          <div class="player-bar__main">
+            <div class="player-bar__id">
+              <div class="cover cover--proc player-bar__cover" style="width:44px;height:58px"><span class="cover__letter">M</span></div>
+              <div style="min-width:0"><p class="player-bar__title">Moby Dick</p><p class="player-bar__chapter">57 — The Deck</p></div>
+            </div>
+            <div class="player-bar__transport"><button class="btn btn--primary btn--sm">Try again</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>2. Desktop — 1280px</h2>
+  <p class="dsc-note">Above the 560px container breakpoint the bar keeps the cover, the speed
+  selector, the sleep timer, the bookmark button and chapter skip. The layout rule is a
+  container query on the bar itself, so the same widget behaves correctly inside a narrow
+  pane on a wide window.</p>
+
+  <div class="dsc-matrix dsc-matrix--stack">
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view dsc-view--flush" data-theme="light">
+          <div style="height:80px;background:var(--bg)"></div>
+          <div class="player-bar">
+            <div class="scrub player-bar__scrub">
+              <div class="scrub__track">
+                <div class="scrub__buffer" style="width:61%"></div>
+                <div class="scrub__fill" style="width:43%"></div>
+                <div class="scrub__thumb" style="left:43%"></div>
+              </div>
+              <div class="scrub__times"><span>12:41 elapsed</span><span>16:37 left &middot; 29:18 total</span></div>
+            </div>
+            <div class="player-bar__main">
+              <div class="player-bar__id">
+                <div class="cover cover--proc player-bar__cover" style="width:48px;height:64px"><span class="cover__letter">M</span></div>
+                <div style="min-width:0">
+                  <p class="player-bar__title">Moby Dick; or, The Whale</p>
+                  <p class="player-bar__chapter">Chapter 57 — The Deck &middot; Herman Melville</p>
+                </div>
+              </div>
+              <div class="player-bar__transport">
+                <button class="icon-btn" aria-label="Previous chapter">&#9198;</button>
+                <button class="icon-btn" aria-label="Back 15 seconds">&#8634;</button>
+                <button class="icon-btn icon-btn--accent" aria-label="Pause" style="width:56px;height:56px;min-width:56px;min-height:56px;font-size:26px;background:var(--accent-fill);color:var(--text-on-accent);border-color:var(--accent-fill)">&#10074;&#10074;</button>
+                <button class="icon-btn" aria-label="Forward 15 seconds">&#8635;</button>
+                <button class="icon-btn" aria-label="Next chapter">&#9197;</button>
+              </div>
+              <div class="player-bar__extra">
+                <button class="selector"><span class="selector__value">1.0&times;</span> <span aria-hidden="true">&#9662;</span></button>
+                <button class="selector" aria-label="Sleep timer"><span aria-hidden="true">&#9789;</span> Timer</button>
+                <button class="icon-btn icon-btn--outlined" aria-label="Add bookmark">&#9873;</button>
+                <button class="icon-btn icon-btn--outlined" aria-label="Open Now Playing">&#9650;</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Dark — sleep timer running</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view dsc-view--flush" data-theme="dark">
+          <div style="height:80px;background:var(--bg)"></div>
+          <div class="player-bar">
+            <div class="scrub player-bar__scrub">
+              <div class="scrub__track">
+                <div class="scrub__buffer" style="width:61%"></div>
+                <div class="scrub__fill" style="width:43%"></div>
+                <div class="scrub__thumb" style="left:43%"></div>
+              </div>
+              <div class="scrub__times"><span>12:41 elapsed</span><span>16:37 left &middot; 29:18 total</span></div>
+            </div>
+            <div class="player-bar__main">
+              <div class="player-bar__id">
+                <div class="cover cover--proc player-bar__cover" style="width:48px;height:64px"><span class="cover__letter">M</span></div>
+                <div style="min-width:0">
+                  <p class="player-bar__title">Moby Dick; or, The Whale</p>
+                  <p class="player-bar__chapter">Chapter 57 — The Deck &middot; Herman Melville</p>
+                </div>
+              </div>
+              <div class="player-bar__transport">
+                <button class="icon-btn" aria-label="Previous chapter">&#9198;</button>
+                <button class="icon-btn" aria-label="Back 15 seconds">&#8634;</button>
+                <button class="icon-btn icon-btn--accent" aria-label="Play" style="width:56px;height:56px;min-width:56px;min-height:56px;font-size:26px;background:var(--accent-fill);color:var(--text-on-accent);border-color:var(--accent-fill)">&#9654;</button>
+                <button class="icon-btn" aria-label="Forward 15 seconds">&#8635;</button>
+                <button class="icon-btn" aria-label="Next chapter">&#9197;</button>
+              </div>
+              <div class="player-bar__extra">
+                <button class="selector is-active"><span class="selector__value">1.5&times;</span> <span aria-hidden="true">&#9662;</span></button>
+                <button class="selector is-active" aria-label="Sleep timer, 24 minutes remaining"><span aria-hidden="true">&#9789;</span> <span class="selector__value">24:03</span></button>
+                <button class="icon-btn icon-btn--outlined" aria-label="Add bookmark">&#9873;</button>
+                <button class="icon-btn icon-btn--outlined" aria-label="Open Now Playing">&#9650;</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>3. Accessibility contract</h2>
+  <ul class="t-body-lg" style="max-width:82ch">
+    <li>The bar is a labelled region ("Player"). It is placed <em>after</em> the main content in DOM/semantic order but is reachable by a skip link, so screen-reader users are not forced through it on every screen.</li>
+    <li>The scrub bar is a real slider: <code>aria-valuenow/min/max</code> plus <code>aria-valuetext="12 minutes 41 seconds of 29 minutes 18 seconds"</code>. Arrow keys move 15&nbsp;s, page keys move 60&nbsp;s.</li>
+    <li>Play/pause is a single toggle whose label changes, never two swapped buttons — the current build swaps <code>Icons.play_circle_filled</code> for <code>Icons.pause_circle_filled</code> with no label at all.</li>
+    <li>Position updates are <em>not</em> a live region; announcing every second would make the app unusable with a screen reader. State changes (play, pause, chapter change, buffering, error) are announced.</li>
+    <li>Media keys and the OS lock-screen controls carry the same title/chapter/artwork metadata.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var r = document.getElementById('dscScale'), o = document.getElementById('dscScaleVal');
+  if (!r) return;
+  function apply() {
+    var v = r.value / 100;
+    var n = document.querySelectorAll('.dsc-scaled');
+    for (var i = 0; i < n.length; i++) n[i].style.setProperty('--dsc-scale', v);
+    o.textContent = r.value + '%';
+  }
+  r.addEventListener('input', apply);
+  apply();
+})();
+</script>
+</body>
+</html>

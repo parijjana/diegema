@@ -1,0 +1,258 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book detail pane — Audiobook Player Design System</title>
+<link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+
+<div class="dsc-toolbar">
+  <strong>Audiobook&nbsp;Player&nbsp;DS</strong>
+  <a href="00-foundations.html">Foundations</a>
+  <a href="01-buttons.html">Buttons</a>
+  <a href="02-book-items.html">Book items</a>
+  <a href="03-book-detail.html">Detail pane</a>
+  <a href="04-banners.html">Banners</a>
+  <a href="05-navigation.html">Navigation</a>
+  <a href="06-player-bar.html">Player bar</a>
+  <a href="07-now-playing.html">Now Playing</a>
+  <a href="08-states.html">States</a>
+  <label style="margin-left:auto">Desktop frame scale
+    <input type="range" id="dscScale" min="40" max="100" value="62">
+    <span id="dscScaleVal">62%</span>
+  </label>
+</div>
+
+<div class="dsc-page">
+<header>
+  <h1>Book detail pane</h1>
+  <p>Maps to <code>book_detail_pane.dart</code>. On desktop it is the right-hand column of the
+  two-pane split (5fr / 4fr). On phone it is a full screen pushed onto the navigator. The
+  content and the components are the same; only the container changes.</p>
+</header>
+
+<section class="dsc-section">
+  <h2>1. Phone — full screen</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> Current pane:
+  110&times;110 square cover (book covers are not square), a 13px description at
+  <code>alpha: 0.85</code>, chapter rows with a 12px title and a <strong>10px</strong>
+  duration, and an all-caps "DESCRIPTION" eyebrow at 10px/α0.4. The download button is the
+  only affordance and it is rust-filled at full width, which reads as the primary action even
+  though most users want <em>stream now</em>. Here streaming is primary and downloading is the
+  secondary call to action. Chapter durations render as "12 min", never "0.0 mins" — the
+  0-duration bug is treated as a state, shown below.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="detail">
+          <div class="detail__hero">
+            <div class="cover cover--proc cover--xl"><span class="cover__letter">T</span></div>
+            <div style="min-width:0">
+              <h1 class="t-title-md t-serif detail__title">The Time Machine</h1>
+              <p class="detail__byline">H. G. Wells</p>
+              <p class="detail__narrator">Read by Mark F. Smith</p>
+              <div class="detail__facts">
+                <span class="badge badge--offline">12 chapters</span>
+                <span class="badge badge--offline">3 h 24 m</span>
+                <span class="badge badge--offline">English</span>
+                <span class="badge badge--accent">Public domain</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail__actions">
+            <button class="btn btn--primary btn--lg btn--block">&#9654;&nbsp; Start listening</button>
+            <button class="btn btn--secondary btn--md btn--block">&#8681;&nbsp; Download for offline (58 MB)</button>
+          </div>
+
+          <h2 class="t-title-sm" style="margin:0 0 8px">Description</h2>
+          <p class="detail__desc" style="margin:0 0 24px">The Time Traveller journeys to the
+          year 802,701 AD, where he finds humanity split into two species — the gentle Eloi
+          and the subterranean Morlocks. First published in 1895, this is the novel that gave
+          the phrase "time machine" to the language.</p>
+
+          <h2 class="t-title-sm" style="margin:0">Chapters <span class="section-head__count">(12)</span></h2>
+          <ul class="chapter-list">
+            <li><button class="chapter" aria-current="true"><span class="chapter__num">1</span><span class="chapter__title">Introduction</span><span class="chapter__dur">18 min</span></button></li>
+            <li><button class="chapter"><span class="chapter__num">2</span><span class="chapter__title">The Machine</span><span class="chapter__dur">14 min</span></button></li>
+            <li><button class="chapter"><span class="chapter__num">3</span><span class="chapter__title">The Time Traveller Returns</span><span class="chapter__dur">21 min</span></button></li>
+            <li><button class="chapter"><span class="chapter__num">4</span><span class="chapter__title">Time Travelling</span><span class="chapter__dur">16 min</span></button></li>
+            <li><button class="chapter"><span class="chapter__num">5</span><span class="chapter__title">In the Golden Age</span><span class="chapter__dur">—</span></button></li>
+          </ul>
+          <p class="t-caption t-muted" style="margin:8px 0 0">A dash means the duration is not
+          yet known. It is never rendered as "0.0&nbsp;mins".</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — downloading</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="detail">
+          <div class="detail__hero">
+            <div class="cover cover--proc h-rust cover--xl"><span class="cover__letter">T</span></div>
+            <div style="min-width:0">
+              <h1 class="t-title-md t-serif detail__title">The Time Machine</h1>
+              <p class="detail__byline">H. G. Wells</p>
+              <p class="detail__narrator">Read by Mark F. Smith</p>
+              <div class="detail__facts">
+                <span class="badge badge--offline">12 chapters</span>
+                <span class="badge badge--offline">3 h 24 m</span>
+                <span class="badge badge--offline">English</span>
+                <span class="badge badge--accent">Public domain</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail__actions" style="flex-direction:column;align-items:stretch">
+            <button class="btn btn--primary btn--lg btn--block">&#9654;&nbsp; Continue from 42 min</button>
+            <div>
+              <div class="progress" style="margin-bottom:6px"><div class="progress__fill" style="width:37%"></div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <span class="t-caption t-secondary t-num">Downloading — 37% of 58 MB</span>
+                <button class="btn btn--ghost btn--sm">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <h2 class="t-title-sm" style="margin:0 0 8px">Description</h2>
+          <p class="detail__desc" style="margin:0 0 24px">The Time Traveller journeys to the
+          year 802,701 AD, where he finds humanity split into two species — the gentle Eloi
+          and the subterranean Morlocks.</p>
+
+          <h2 class="t-title-sm" style="margin:0">Chapters <span class="section-head__count">(12)</span></h2>
+          <ul class="chapter-list">
+            <li><button class="chapter" aria-current="true"><span class="chapter__num">1</span><span class="chapter__title">Introduction</span><span class="chapter__dur">18 min</span></button></li>
+            <li><button class="chapter"><span class="chapter__num">2</span><span class="chapter__title">The Machine</span><span class="chapter__dur">14 min</span></button></li>
+            <li><button class="chapter"><span class="chapter__num">3</span><span class="chapter__title">The Time Traveller Returns</span><span class="chapter__dur">21 min</span></button></li>
+            <li><button class="chapter"><span class="chapter__num">4</span><span class="chapter__title">Time Travelling</span><span class="chapter__dur">16 min</span></button></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>2. Desktop — two-pane split</h2>
+  <p class="dsc-note">Left pane is the browse column, right pane is this component. The split
+  is <code>5fr / 4fr</code> with a 16px gutter, matching the existing
+  <code>StorefrontBodyLayout</code> flex 5 / 4. Below 768px the split collapses and the detail
+  pane becomes a pushed route, exactly as today.</p>
+
+  <div class="dsc-matrix dsc-matrix--stack">
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="light">
+          <div style="display:grid;grid-template-columns:5fr 4fr;gap:16px;align-items:start">
+            <div class="card card--flat">
+              <div class="section-head"><h2 class="section-head__title">Featured classics</h2></div>
+              <div class="grid-shelf" style="grid-template-columns:repeat(4,1fr)">
+                <button class="book-tile"><div class="cover cover--proc"><span class="cover__letter">M</span></div><p class="book-tile__title">Moby Dick</p><p class="book-tile__author">Herman Melville</p></button>
+                <button class="book-tile"><div class="cover cover--proc h-rust"><span class="cover__letter">P</span></div><p class="book-tile__title">Pride and Prejudice</p><p class="book-tile__author">Jane Austen</p></button>
+                <button class="book-tile is-selected" aria-current="true"><div class="cover cover--proc h-plum"><span class="cover__letter">T</span></div><p class="book-tile__title">The Time Machine</p><p class="book-tile__author">H. G. Wells</p></button>
+                <button class="book-tile is-preview"><div class="cover cover--proc h-moss"><span class="cover__letter">W</span></div><p class="book-tile__title">The War of the Worlds</p><p class="book-tile__author">H. G. Wells</p><div class="book-tile__foot"><span class="badge badge--preview">Preview only</span></div></button>
+              </div>
+            </div>
+
+            <div class="card card--flat detail">
+              <div class="detail__hero">
+                <div class="cover cover--proc h-plum cover--xl"><span class="cover__letter">T</span></div>
+                <div style="min-width:0">
+                  <h1 class="t-title-lg t-serif detail__title">The Time Machine</h1>
+                  <p class="detail__byline">H. G. Wells</p>
+                  <p class="detail__narrator">Read by Mark F. Smith</p>
+                  <div class="detail__facts">
+                    <span class="badge badge--offline">12 chapters</span>
+                    <span class="badge badge--offline">3 h 24 m</span>
+                    <span class="badge badge--offline">English</span>
+                    <span class="badge badge--accent">Public domain</span>
+                  </div>
+                  <div class="detail__actions">
+                    <button class="btn btn--primary btn--lg">&#9654;&nbsp; Start listening</button>
+                    <button class="btn btn--secondary btn--lg">&#8681;&nbsp; Download (58 MB)</button>
+                  </div>
+                </div>
+              </div>
+              <h2 class="t-title-sm" style="margin:0 0 8px">Description</h2>
+              <p class="detail__desc" style="margin:0 0 24px">The Time Traveller journeys to the year
+              802,701 AD, where he finds humanity split into two species — the gentle Eloi and the
+              subterranean Morlocks. First published in 1895, this is the novel that gave the phrase
+              "time machine" to the language.</p>
+              <h2 class="t-title-sm" style="margin:0">Chapters <span class="section-head__count">(12)</span></h2>
+              <ul class="chapter-list">
+                <li><button class="chapter" aria-current="true"><span class="chapter__num">1</span><span class="chapter__title">Introduction</span><span class="chapter__dur">18 min</span></button></li>
+                <li><button class="chapter"><span class="chapter__num">2</span><span class="chapter__title">The Machine</span><span class="chapter__dur">14 min</span></button></li>
+                <li><button class="chapter"><span class="chapter__num">3</span><span class="chapter__title">The Time Traveller Returns</span><span class="chapter__dur">21 min</span></button></li>
+                <li><button class="chapter"><span class="chapter__num">4</span><span class="chapter__title">Time Travelling</span><span class="chapter__dur">16 min</span></button></li>
+                <li><button class="chapter"><span class="chapter__num">5</span><span class="chapter__title">In the Golden Age</span><span class="chapter__dur">—</span></button></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Dark — empty right pane</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="dark">
+          <div style="display:grid;grid-template-columns:5fr 4fr;gap:16px;align-items:start">
+            <div class="card card--flat">
+              <div class="section-head"><h2 class="section-head__title">Featured classics</h2></div>
+              <div class="grid-shelf" style="grid-template-columns:repeat(4,1fr)">
+                <button class="book-tile"><div class="cover cover--proc"><span class="cover__letter">M</span></div><p class="book-tile__title">Moby Dick</p><p class="book-tile__author">Herman Melville</p></button>
+                <button class="book-tile"><div class="cover cover--proc h-rust"><span class="cover__letter">P</span></div><p class="book-tile__title">Pride and Prejudice</p><p class="book-tile__author">Jane Austen</p></button>
+                <button class="book-tile"><div class="cover cover--proc h-plum"><span class="cover__letter">T</span></div><p class="book-tile__title">The Time Machine</p><p class="book-tile__author">H. G. Wells</p></button>
+                <button class="book-tile is-preview"><div class="cover cover--proc h-moss"><span class="cover__letter">W</span></div><p class="book-tile__title">The War of the Worlds</p><p class="book-tile__author">H. G. Wells</p><div class="book-tile__foot"><span class="badge badge--preview">Preview only</span></div></button>
+              </div>
+            </div>
+            <div class="card card--flat" style="min-height:420px;display:grid;place-items:center">
+              <div class="state" style="padding:24px">
+                <div class="state__icon">&#9776;</div>
+                <h2 class="t-title-sm state__title">Choose a book</h2>
+                <p class="state__body">Select any title on the left to see its chapters, its
+                description and the people who recorded it.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>3. Accessibility contract</h2>
+  <ul class="t-body-lg" style="max-width:82ch">
+    <li>The pane is a landmark. On desktop the split is <code>role="region"</code> with an accessible name; selecting a tile moves focus into the detail heading so a keyboard user is not stranded.</li>
+    <li>The chapter list is a real list with position announced ("Chapter 3 of 12"). The currently playing chapter uses <code>aria-current</code>.</li>
+    <li>Download progress is a live region announcing at 0/25/50/75/100%, not on every frame.</li>
+    <li>Description text is selectable and reflows to a maximum of 68 characters per line.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var r = document.getElementById('dscScale'), o = document.getElementById('dscScaleVal');
+  if (!r) return;
+  function apply() {
+    var v = r.value / 100;
+    var n = document.querySelectorAll('.dsc-scaled');
+    for (var i = 0; i < n.length; i++) n[i].style.setProperty('--dsc-scale', v);
+    o.textContent = r.value + '%';
+  }
+  r.addEventListener('input', apply);
+  apply();
+})();
+</script>
+</body>
+</html>

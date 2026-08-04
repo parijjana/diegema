@@ -1,0 +1,239 @@
+<!-- @dsCard group="Navigation" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App header, search &amp; navigation — Audiobook Player Design System</title>
+<link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+
+<div class="dsc-toolbar">
+  <strong>Audiobook&nbsp;Player&nbsp;DS</strong>
+  <a href="00-foundations.html">Foundations</a>
+  <a href="01-buttons.html">Buttons</a>
+  <a href="02-book-items.html">Book items</a>
+  <a href="03-book-detail.html">Detail pane</a>
+  <a href="04-banners.html">Banners</a>
+  <a href="05-navigation.html">Navigation</a>
+  <a href="06-player-bar.html">Player bar</a>
+  <a href="07-now-playing.html">Now Playing</a>
+  <a href="08-states.html">States</a>
+  <label style="margin-left:auto">Desktop frame scale
+    <input type="range" id="dscScale" min="40" max="100" value="62">
+    <span id="dscScaleVal">62%</span>
+  </label>
+</div>
+
+<div class="dsc-page">
+<header>
+  <h1>App header, search &amp; navigation</h1>
+  <p>Maps to <code>app_header.dart</code> and <code>storefront_navigation.dart</code>. The
+  header is one component with a container-query breakpoint at 700px; below it, primary
+  navigation moves to a bottom bar, which is where a phone user's thumb actually is.</p>
+</header>
+
+<section class="dsc-section">
+  <h2>1. Desktop header — 1280px</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> The current
+  header is a single unwrapped <code>Row</code>: it does not respond to width at all and will
+  overflow on a phone. Nav pills are 11px <code>FontWeight.w900</code> uppercase with
+  <code>letterSpacing: 1.0</code> ("LIBRARY", "DISCOVER", "NOW PLAYING"). The search field
+  animates from a 36px icon to a 200px box with an 11px hint. The theme switch is a 56&times;28
+  custom sliding track with 12px icons and no accessible label. All of that is replaced:
+  15px sentence-case nav at 44px tall, a persistent search field, and a labelled theme toggle.
+  The wordmark moves to the serif face — it is a library, not a console.</p>
+
+  <div class="dsc-matrix dsc-matrix--stack">
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view dsc-view--flush" data-theme="light">
+          <header class="app-header">
+            <div class="brand">
+              <div class="brand__mark" aria-hidden="true">&#9834;</div>
+              <div>
+                <p class="brand__name">Aulos</p>
+                <p class="brand__tag">Public domain audiobooks</p>
+              </div>
+            </div>
+            <nav class="nav" aria-label="Primary">
+              <button class="nav__item" aria-current="page">Library</button>
+              <button class="nav__item">Discover</button>
+              <button class="nav__item">Now playing</button>
+            </nav>
+            <div class="header-actions">
+              <label class="search">
+                <span aria-hidden="true">&#9906;</span>
+                <input type="search" placeholder="Search 22,000 audiobooks" aria-label="Search audiobooks">
+              </label>
+              <button class="icon-btn icon-btn--outlined" aria-label="Bookmarks">&#9873;</button>
+              <button class="theme-toggle" aria-pressed="false"><span aria-hidden="true">&#9788;</span> <span>Light</span></button>
+            </div>
+          </header>
+          <div style="padding:16px 20px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+              <button class="chip is-selected" aria-selected="true">All</button>
+              <button class="chip">Fiction</button>
+              <button class="chip">History</button>
+              <button class="chip">Poetry</button>
+              <button class="chip">Children</button>
+              <button class="chip">Science</button>
+              <button class="chip">Philosophy</button>
+            </div>
+            <p class="t-body t-secondary" style="margin:0">Category sub-bar. Chips are 44px tall
+            and their selected state uses fill + outline + weight, never colour alone.</p>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Dark — search focused</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view dsc-view--flush" data-theme="dark">
+          <header class="app-header">
+            <div class="brand">
+              <div class="brand__mark" aria-hidden="true">&#9834;</div>
+              <div>
+                <p class="brand__name">Aulos</p>
+                <p class="brand__tag">Public domain audiobooks</p>
+              </div>
+            </div>
+            <nav class="nav" aria-label="Primary">
+              <button class="nav__item">Library</button>
+              <button class="nav__item" aria-current="page">Discover</button>
+              <button class="nav__item">Now playing</button>
+            </nav>
+            <div class="header-actions">
+              <label class="search" style="border-color:var(--focus-ring);box-shadow:0 0 0 2px var(--focus-ring)">
+                <span aria-hidden="true">&#9906;</span>
+                <input type="search" value="wells" aria-label="Search audiobooks">
+                <button class="icon-btn" aria-label="Clear search" style="width:32px;height:32px;min-width:32px;min-height:32px">&#215;</button>
+              </label>
+              <button class="icon-btn icon-btn--outlined" aria-label="Bookmarks">&#9873;</button>
+              <button class="theme-toggle" aria-pressed="true"><span aria-hidden="true">&#9789;</span> <span>Dark</span></button>
+            </div>
+          </header>
+          <div style="padding:16px 20px">
+            <div class="card card--sunken" style="max-width:520px">
+              <p class="t-label" style="margin:0 0 8px">Suggestions</p>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <button class="chapter" style="grid-template-columns:auto 1fr"><span aria-hidden="true">&#9906;</span><span class="chapter__title">wells — 24 books</span></button>
+                <button class="chapter" style="grid-template-columns:auto 1fr"><span aria-hidden="true">&#9906;</span><span class="chapter__title">H. G. Wells — author</span></button>
+                <button class="chapter" style="grid-template-columns:auto 1fr"><span aria-hidden="true">&#8635;</span><span class="chapter__title">wells time machine — recent</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>2. Phone header + bottom navigation — 390px</h2>
+  <p class="dsc-note">Below the 700px container breakpoint the nav row and the brand tagline
+  drop out of the header, search takes the full width, and primary destinations move to a
+  bottom bar with 56px targets and visible labels. Icon-only bottom bars are a known problem
+  for the audience here, so every item keeps its label.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view dsc-view--flush" data-theme="light">
+        <header class="app-header">
+          <div class="brand">
+            <div class="brand__mark" aria-hidden="true">&#9834;</div>
+            <div><p class="brand__name">Aulos</p><p class="brand__tag">Public domain audiobooks</p></div>
+          </div>
+          <div class="header-actions">
+            <label class="search" style="max-width:170px">
+              <span aria-hidden="true">&#9906;</span>
+              <input type="search" placeholder="Search" aria-label="Search audiobooks">
+            </label>
+            <button class="theme-toggle" aria-pressed="false" aria-label="Switch to dark theme"><span aria-hidden="true">&#9788;</span> <span>Light</span></button>
+          </div>
+        </header>
+        <div style="padding:16px;min-height:150px">
+          <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px">
+            <button class="chip is-selected" aria-selected="true">All</button>
+            <button class="chip">Fiction</button>
+            <button class="chip">History</button>
+            <button class="chip">Poetry</button>
+          </div>
+        </div>
+        <nav class="bottom-nav" aria-label="Primary">
+          <button class="bottom-nav__item" aria-current="page"><span class="bottom-nav__icon" aria-hidden="true">&#9776;</span>Library</button>
+          <button class="bottom-nav__item"><span class="bottom-nav__icon" aria-hidden="true">&#9906;</span>Discover</button>
+          <button class="bottom-nav__item"><span class="bottom-nav__icon" aria-hidden="true">&#9654;</span>Playing</button>
+          <button class="bottom-nav__item"><span class="bottom-nav__icon" aria-hidden="true">&#9873;</span>Bookmarks</button>
+        </nav>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view dsc-view--flush" data-theme="dark">
+        <header class="app-header">
+          <div class="brand">
+            <div class="brand__mark" aria-hidden="true">&#9834;</div>
+            <div><p class="brand__name">Aulos</p><p class="brand__tag">Public domain audiobooks</p></div>
+          </div>
+          <div class="header-actions">
+            <label class="search" style="max-width:170px">
+              <span aria-hidden="true">&#9906;</span>
+              <input type="search" placeholder="Search" aria-label="Search audiobooks">
+            </label>
+            <button class="theme-toggle" aria-pressed="true" aria-label="Switch to light theme"><span aria-hidden="true">&#9789;</span> <span>Dark</span></button>
+          </div>
+        </header>
+        <div style="padding:16px;min-height:150px">
+          <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px">
+            <button class="chip is-selected" aria-selected="true">All</button>
+            <button class="chip">Fiction</button>
+            <button class="chip">History</button>
+            <button class="chip">Poetry</button>
+          </div>
+        </div>
+        <nav class="bottom-nav" aria-label="Primary">
+          <button class="bottom-nav__item"><span class="bottom-nav__icon" aria-hidden="true">&#9776;</span>Library</button>
+          <button class="bottom-nav__item" aria-current="page"><span class="bottom-nav__icon" aria-hidden="true">&#9906;</span>Discover</button>
+          <button class="bottom-nav__item"><span class="bottom-nav__icon" aria-hidden="true">&#9654;</span>Playing</button>
+          <button class="bottom-nav__item"><span class="bottom-nav__icon" aria-hidden="true">&#9873;</span>Bookmarks</button>
+        </nav>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>3. Accessibility contract</h2>
+  <ul class="t-body-lg" style="max-width:82ch">
+    <li>Header is <code>&lt;header&gt;</code> / <code>Semantics(header: true)</code>; nav is a labelled landmark. The current build has neither.</li>
+    <li>The theme switch is a labelled toggle with <code>aria-pressed</code> / <code>Semantics(toggled:)</code>. The current sliding switch has a tooltip but no semantic role.</li>
+    <li>Search is a real <code>type="search"</code> field with a visible label or an <code>aria-label</code>, and results are announced through a polite live region ("24 books found").</li>
+    <li>Search is never hidden behind an animated icon. Collapsing it costs a tap and hides the app's most important affordance from anyone scanning the screen.</li>
+    <li>Every nav destination is reachable by keyboard in visual order, with the same focus ring as everything else.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var r = document.getElementById('dscScale'), o = document.getElementById('dscScaleVal');
+  if (!r) return;
+  function apply() {
+    var v = r.value / 100;
+    var n = document.querySelectorAll('.dsc-scaled');
+    for (var i = 0; i < n.length; i++) n[i].style.setProperty('--dsc-scale', v);
+    o.textContent = r.value + '%';
+  }
+  r.addEventListener('input', apply);
+  apply();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,262 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buttons &amp; controls — Audiobook Player Design System</title>
+<link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+
+<div class="dsc-toolbar">
+  <strong>Audiobook&nbsp;Player&nbsp;DS</strong>
+  <a href="00-foundations.html">Foundations</a>
+  <a href="01-buttons.html">Buttons</a>
+  <a href="02-book-items.html">Book items</a>
+  <a href="03-book-detail.html">Detail pane</a>
+  <a href="04-banners.html">Banners</a>
+  <a href="05-navigation.html">Navigation</a>
+  <a href="06-player-bar.html">Player bar</a>
+  <a href="07-now-playing.html">Now Playing</a>
+  <a href="08-states.html">States</a>
+  <label style="margin-left:auto">Desktop frame scale
+    <input type="range" id="dscScale" min="40" max="100" value="62">
+    <span id="dscScaleVal">62%</span>
+  </label>
+</div>
+
+<div class="dsc-page">
+<header>
+  <h1>Buttons &amp; controls</h1>
+  <p>Five variants, three sizes, and every state. All labels are sentence case — no
+  uppercase, no letter-spacing. Minimum height is 44px in every size, including
+  <code>--sm</code>, because the audience skews older and imprecise pointing is the norm.</p>
+</header>
+
+<section class="dsc-section">
+  <h2>1. Variants &amp; sizes</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> Current buttons
+  are 11px or 10px bold uppercase with <code>letterSpacing: 1.0</code> and
+  <code>vertical: 6–12</code> padding — several fall well under 44px tall. Labels also lose
+  their word shape ("IMPORT LOCAL BOOK"). Here every label is 15px sentence case at
+  weight 600, and the box is 44/44/56px tall.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <p class="t-label t-secondary" style="margin:0 0 8px">Primary — the single main action per view</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <button class="btn btn--primary btn--sm">Small</button>
+          <button class="btn btn--primary btn--md">Medium</button>
+          <button class="btn btn--primary btn--lg"><span class="i">&#9654;</span>Large</button>
+        </div>
+        <p class="t-label t-secondary" style="margin:0 0 8px">Call to action (rust) — download, import</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <button class="btn btn--cta btn--sm">Small</button>
+          <button class="btn btn--cta btn--md">Download book</button>
+        </div>
+        <p class="t-label t-secondary" style="margin:0 0 8px">Secondary (outlined)</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <button class="btn btn--secondary btn--sm">Small</button>
+          <button class="btn btn--secondary btn--md">Browse LibriVox</button>
+        </div>
+        <p class="t-label t-secondary" style="margin:0 0 8px">Ghost</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <button class="btn btn--ghost btn--sm">Small</button>
+          <button class="btn btn--ghost btn--md">Skip for now</button>
+        </div>
+        <p class="t-label t-secondary" style="margin:0 0 8px">Neutral &amp; danger</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn--neutral btn--md">Refresh</button>
+          <button class="btn btn--danger btn--md">Remove download</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <p class="t-label t-secondary" style="margin:0 0 8px">Primary — the single main action per view</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <button class="btn btn--primary btn--sm">Small</button>
+          <button class="btn btn--primary btn--md">Medium</button>
+          <button class="btn btn--primary btn--lg"><span class="i">&#9654;</span>Large</button>
+        </div>
+        <p class="t-label t-secondary" style="margin:0 0 8px">Call to action (rust) — download, import</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <button class="btn btn--cta btn--sm">Small</button>
+          <button class="btn btn--cta btn--md">Download book</button>
+        </div>
+        <p class="t-label t-secondary" style="margin:0 0 8px">Secondary (outlined)</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <button class="btn btn--secondary btn--sm">Small</button>
+          <button class="btn btn--secondary btn--md">Browse LibriVox</button>
+        </div>
+        <p class="t-label t-secondary" style="margin:0 0 8px">Ghost</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <button class="btn btn--ghost btn--sm">Small</button>
+          <button class="btn btn--ghost btn--md">Skip for now</button>
+        </div>
+        <p class="t-label t-secondary" style="margin:0 0 8px">Neutral &amp; danger</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn--neutral btn--md">Refresh</button>
+          <button class="btn btn--danger btn--md">Remove download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>2. States</h2>
+  <p class="dsc-note">Disabled state is a real token pair (<code>surface-sunken</code> +
+  <code>text-disabled</code>), not an opacity multiplier — opacity on a translucent surface
+  produces an unpredictable ratio. The focus ring is 3px at
+  <code>--focus-ring</code> with a 2px offset, identical in both themes and on every control.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:12px 16px;align-items:center">
+          <span class="t-caption t-secondary">Default</span>   <div><button class="btn btn--primary">Play book</button></div>
+          <span class="t-caption t-secondary">Hover</span>     <div><button class="btn btn--primary" style="background:var(--accent-fill-hover);border-color:var(--accent-fill-hover)">Play book</button></div>
+          <span class="t-caption t-secondary">Pressed</span>   <div><button class="btn btn--primary" style="background:var(--accent-fill-active);border-color:var(--accent-fill-active)">Play book</button></div>
+          <span class="t-caption t-secondary">Focused</span>   <div><button class="btn btn--primary is-focused">Play book</button></div>
+          <span class="t-caption t-secondary">Loading</span>   <div><button class="btn btn--primary is-loading"><span class="spinner" style="border-color:rgba(255,255,255,.35);border-top-color:#fff"></span>Loading…</button></div>
+          <span class="t-caption t-secondary">Disabled</span>  <div><button class="btn btn--primary" disabled>Play book</button></div>
+          <span class="t-caption t-secondary">Disabled&nbsp;2</span><div><button class="btn btn--secondary" disabled>Browse LibriVox</button></div>
+          <span class="t-caption t-secondary">Icon</span>      <div style="display:flex;gap:8px">
+            <button class="icon-btn" aria-label="Bookmark">&#9873;</button>
+            <button class="icon-btn icon-btn--outlined" aria-label="Refresh">&#8635;</button>
+            <button class="icon-btn icon-btn--accent" aria-label="Add bookmark">&#43;</button>
+            <button class="icon-btn is-focused" aria-label="Search">&#9906;</button>
+            <button class="icon-btn" aria-label="Delete" disabled>&#215;</button>
+          </div>
+          <span class="t-caption t-secondary">Chips</span>     <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="chip is-selected" aria-selected="true">Fiction</button>
+            <button class="chip">History</button>
+            <button class="chip">Poetry</button>
+          </div>
+          <span class="t-caption t-secondary">Full width</span><div><button class="btn btn--cta btn--lg btn--block">Download full audiobook (58&nbsp;MB)</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:12px 16px;align-items:center">
+          <span class="t-caption t-secondary">Default</span>   <div><button class="btn btn--primary">Play book</button></div>
+          <span class="t-caption t-secondary">Hover</span>     <div><button class="btn btn--primary" style="background:var(--accent-fill-hover);border-color:var(--accent-fill-hover)">Play book</button></div>
+          <span class="t-caption t-secondary">Pressed</span>   <div><button class="btn btn--primary" style="background:var(--accent-fill-active);border-color:var(--accent-fill-active)">Play book</button></div>
+          <span class="t-caption t-secondary">Focused</span>   <div><button class="btn btn--primary is-focused">Play book</button></div>
+          <span class="t-caption t-secondary">Loading</span>   <div><button class="btn btn--primary is-loading"><span class="spinner" style="border-color:rgba(16,20,23,.3);border-top-color:#101417"></span>Loading…</button></div>
+          <span class="t-caption t-secondary">Disabled</span>  <div><button class="btn btn--primary" disabled>Play book</button></div>
+          <span class="t-caption t-secondary">Disabled&nbsp;2</span><div><button class="btn btn--secondary" disabled>Browse LibriVox</button></div>
+          <span class="t-caption t-secondary">Icon</span>      <div style="display:flex;gap:8px">
+            <button class="icon-btn" aria-label="Bookmark">&#9873;</button>
+            <button class="icon-btn icon-btn--outlined" aria-label="Refresh">&#8635;</button>
+            <button class="icon-btn icon-btn--accent" aria-label="Add bookmark">&#43;</button>
+            <button class="icon-btn is-focused" aria-label="Search">&#9906;</button>
+            <button class="icon-btn" aria-label="Delete" disabled>&#215;</button>
+          </div>
+          <span class="t-caption t-secondary">Chips</span>     <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="chip is-selected" aria-selected="true">Fiction</button>
+            <button class="chip">History</button>
+            <button class="chip">Poetry</button>
+          </div>
+          <span class="t-caption t-secondary">Full width</span><div><button class="btn btn--cta btn--lg btn--block">Download full audiobook (58&nbsp;MB)</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>3. Desktop row — action bars at 1280px</h2>
+  <p class="dsc-note">On desktop, actions sit inline in a section header. On phone they stack
+  full width. The only difference is layout; the components are identical.</p>
+
+  <div class="dsc-matrix dsc-matrix--stack">
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="light">
+          <div class="section-head">
+            <h2 class="section-head__title">Your library <span class="section-head__count">(12 books)</span></h2>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn--secondary btn--sm">Import a local book</button>
+              <button class="btn btn--ghost btn--sm">Refresh</button>
+              <button class="btn btn--primary btn--sm">Continue listening</button>
+            </div>
+          </div>
+          <div style="height:1px;background:var(--border);margin-bottom:16px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="chip is-selected" aria-selected="true">All</button>
+            <button class="chip">Downloaded</button>
+            <button class="chip">In progress</button>
+            <button class="chip">Finished</button>
+            <button class="chip">Imported</button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="dark">
+          <div class="section-head">
+            <h2 class="section-head__title">Your library <span class="section-head__count">(12 books)</span></h2>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn--secondary btn--sm">Import a local book</button>
+              <button class="btn btn--ghost btn--sm">Refresh</button>
+              <button class="btn btn--primary btn--sm">Continue listening</button>
+            </div>
+          </div>
+          <div style="height:1px;background:var(--border);margin-bottom:16px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="chip is-selected" aria-selected="true">All</button>
+            <button class="chip">Downloaded</button>
+            <button class="chip">In progress</button>
+            <button class="chip">Finished</button>
+            <button class="chip">Imported</button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>4. Accessibility contract</h2>
+  <ul class="t-body-lg" style="max-width:82ch">
+    <li>Every icon-only button carries a <code>Semantics(label:)</code> / <code>tooltip</code>. There are none in <code>lib/</code> today.</li>
+    <li>Minimum hit box 44&times;44 logical pixels, enforced by the button itself, not by the caller's padding.</li>
+    <li>Focus ring is drawn by the design system, never suppressed. Keyboard order follows visual order.</li>
+    <li>Disabled controls remain in the accessibility tree with <code>aria-disabled</code> / <code>Semantics(enabled: false)</code> so a screen-reader user learns the control exists and why it is off.</li>
+    <li>Loading buttons announce via <code>aria-busy</code> / a live region, not by silently swapping the label.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var r = document.getElementById('dscScale'), o = document.getElementById('dscScaleVal');
+  if (!r) return;
+  function apply() {
+    var v = r.value / 100;
+    var n = document.querySelectorAll('.dsc-scaled');
+    for (var i = 0; i < n.length; i++) n[i].style.setProperty('--dsc-scale', v);
+    o.textContent = r.value + '%';
+  }
+  r.addEventListener('input', apply);
+  apply();
+})();
+</script>
+</body>
+</html>

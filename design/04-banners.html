@@ -1,0 +1,215 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banners — Audiobook Player Design System</title>
+<link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+
+<div class="dsc-toolbar">
+  <strong>Audiobook&nbsp;Player&nbsp;DS</strong>
+  <a href="00-foundations.html">Foundations</a>
+  <a href="01-buttons.html">Buttons</a>
+  <a href="02-book-items.html">Book items</a>
+  <a href="03-book-detail.html">Detail pane</a>
+  <a href="04-banners.html">Banners</a>
+  <a href="05-navigation.html">Navigation</a>
+  <a href="06-player-bar.html">Player bar</a>
+  <a href="07-now-playing.html">Now Playing</a>
+  <a href="08-states.html">States</a>
+  <label style="margin-left:auto">Desktop frame scale
+    <input type="range" id="dscScale" min="40" max="100" value="62">
+    <span id="dscScaleVal">62%</span>
+  </label>
+</div>
+
+<div class="dsc-page">
+<header>
+  <h1>Banners</h1>
+  <p>Three banners: the LibriVox volunteer banner
+  (<code>librivox_volunteer_banner.dart</code>), the auto-resume banner
+  (<code>auto_resume_banner.dart</code>) and the demo-mode notice the canned web build needs.
+  All three share one component with a colour role swap.</p>
+</header>
+
+<section class="dsc-section">
+  <h2>1. LibriVox volunteer banner</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departure from today.</strong> Current banner
+  reads "VOLUNTEER FOR LIBRIVOX" at 12px/700 with <code>letterSpacing: 1.0</code>, body copy at
+  11px α0.6, and a "JOIN →" button at <strong>10px</strong> uppercase. It also appears
+  <em>twice</em> in the library view — once in the empty state and once above the list. Here it
+  is sentence case at 18px, body at 16px/7.70:1, a 44px-tall button with a real verb, and it
+  appears once per screen. Being the credit to the volunteers who record every book in the app,
+  it is worth reading.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="banner">
+          <div class="banner__icon" aria-hidden="true">&#9679;</div>
+          <div class="banner__body">
+            <h2 class="banner__title">Volunteer for LibriVox</h2>
+            <p class="banner__text">Every book here was recorded by a volunteer. Lend your
+            voice, or proof-listen a chapter.</p>
+          </div>
+          <button class="btn btn--secondary btn--md">Find out how</button>
+        </div>
+      </div>
+    </div>
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="banner">
+          <div class="banner__icon" aria-hidden="true">&#9679;</div>
+          <div class="banner__body">
+            <h2 class="banner__title">Volunteer for LibriVox</h2>
+            <p class="banner__text">Every book here was recorded by a volunteer. Lend your
+            voice, or proof-listen a chapter.</p>
+          </div>
+          <button class="btn btn--secondary btn--md">Find out how</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="t-title-sm" style="margin-top:32px">At desktop width</h3>
+  <div class="dsc-matrix dsc-matrix--stack">
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="light">
+          <div class="banner">
+            <div class="banner__icon" aria-hidden="true">&#9679;</div>
+            <div class="banner__body">
+              <h2 class="banner__title">Volunteer for LibriVox</h2>
+              <p class="banner__text">Every book in this app was recorded by a volunteer and released
+              into the public domain. Lend your voice to a chapter, or proof-listen someone else's.</p>
+            </div>
+            <button class="btn btn--secondary btn--md">Find out how</button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="dark">
+          <div class="banner">
+            <div class="banner__icon" aria-hidden="true">&#9679;</div>
+            <div class="banner__body">
+              <h2 class="banner__title">Volunteer for LibriVox</h2>
+              <p class="banner__text">Every book in this app was recorded by a volunteer and released
+              into the public domain. Lend your voice to a chapter, or proof-listen someone else's.</p>
+            </div>
+            <button class="btn btn--secondary btn--md">Find out how</button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>2. Auto-resume banner</h2>
+  <p class="dsc-note">Shown when a book was left part-finished. Dismissible, and the dismiss
+  control is a real 44px button rather than a small tap area.</p>
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="banner">
+          <div class="cover cover--proc banner__icon" style="border-radius:var(--r-cover);width:44px;height:58px"><span class="cover__letter">M</span></div>
+          <div class="banner__body">
+            <h2 class="banner__title">Pick up where you left off</h2>
+            <p class="banner__text">Moby Dick — chapter 57, 9 h 12 m remaining</p>
+          </div>
+          <button class="btn btn--primary btn--md">&#9654;&nbsp; Resume</button>
+          <button class="icon-btn" aria-label="Dismiss">&#215;</button>
+        </div>
+      </div>
+    </div>
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="banner">
+          <div class="cover cover--proc banner__icon" style="border-radius:var(--r-cover);width:44px;height:58px"><span class="cover__letter">M</span></div>
+          <div class="banner__body">
+            <h2 class="banner__title">Pick up where you left off</h2>
+            <p class="banner__text">Moby Dick — chapter 57, 9 h 12 m remaining</p>
+          </div>
+          <button class="btn btn--primary btn--md">&#9654;&nbsp; Resume</button>
+          <button class="icon-btn" aria-label="Dismiss">&#215;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>3. Demo-mode notice</h2>
+  <p class="dsc-note">Required by the canned web demo. It must be the first thing on the page
+  and it must not be dismissible — the rework plan is explicit that nobody should believe they
+  were shown a working app that isn't one. Uses the warm (rust) role so it does not read as
+  chrome.</p>
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="banner banner--warm" role="note">
+          <div class="banner__icon" aria-hidden="true">&#9888;</div>
+          <div class="banner__body">
+            <h2 class="banner__title">This is a demo</h2>
+            <p class="banner__text">A curated slice of the LibriVox catalogue. Books marked
+            <strong>Preview only</strong> have no audio here. Everything else plays for real.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="banner banner--warm" role="note">
+          <div class="banner__icon" aria-hidden="true">&#9888;</div>
+          <div class="banner__body">
+            <h2 class="banner__title">This is a demo</h2>
+            <p class="banner__text">A curated slice of the LibriVox catalogue. Books marked
+            <strong>Preview only</strong> have no audio here. Everything else plays for real.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>4. Accessibility contract</h2>
+  <ul class="t-body-lg" style="max-width:82ch">
+    <li>Banners are <code>role="note"</code> / <code>Semantics(container: true)</code> with the title as their accessible name, so a screen reader reads them as one unit.</li>
+    <li>The volunteer banner's link opens externally and says so — "Find out how (opens librivox.org)" in the accessible label.</li>
+    <li>The auto-resume banner is <em>not</em> a live region; announcing it on load would interrupt. It is reachable in normal reading order.</li>
+    <li>The demo notice is announced once on first load via a polite live region.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var r = document.getElementById('dscScale'), o = document.getElementById('dscScaleVal');
+  if (!r) return;
+  function apply() {
+    var v = r.value / 100;
+    var n = document.querySelectorAll('.dsc-scaled');
+    for (var i = 0; i < n.length; i++) n[i].style.setProperty('--dsc-scale', v);
+    o.textContent = r.value + '%';
+  }
+  r.addEventListener('input', apply);
+  apply();
+})();
+</script>
+</body>
+</html>

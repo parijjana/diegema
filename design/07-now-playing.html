@@ -1,0 +1,370 @@
+<!-- @dsCard group="Player" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Now Playing — Audiobook Player Design System</title>
+<link rel="stylesheet" href="tokens.css">
+</head>
+<body>
+
+<div class="dsc-toolbar">
+  <strong>Audiobook&nbsp;Player&nbsp;DS</strong>
+  <a href="00-foundations.html">Foundations</a>
+  <a href="01-buttons.html">Buttons</a>
+  <a href="02-book-items.html">Book items</a>
+  <a href="03-book-detail.html">Detail pane</a>
+  <a href="04-banners.html">Banners</a>
+  <a href="05-navigation.html">Navigation</a>
+  <a href="06-player-bar.html">Player bar</a>
+  <a href="07-now-playing.html">Now Playing</a>
+  <a href="08-states.html">States</a>
+  <label style="margin-left:auto">Desktop frame scale
+    <input type="range" id="dscScale" min="40" max="100" value="62">
+    <span id="dscScaleVal">62%</span>
+  </label>
+</div>
+
+<div class="dsc-page">
+<header>
+  <h1>Now Playing</h1>
+  <p>Maps to <code>now_playing_screen.dart</code> and <code>now_playing_controls.dart</code>.
+  The full transport cluster: play/pause, &plusmn;15&nbsp;s, previous/next chapter, speed
+  0.5&times;–2&times;, sleep timer and bookmark.</p>
+</header>
+
+<section class="dsc-section">
+  <h2>1. Transport cluster</h2>
+  <p class="dsc-note dsc-note--change"><strong>Departures from today.</strong>
+  (a) The current cluster wraps everything in a <code>FittedBox(scaleDown)</code>, so on a
+  phone the whole row — including the 80px play button — shrinks together until nothing meets
+  a 44px target. Here the cluster wraps onto a second line instead of shrinking.
+  (b) The skip buttons are labelled &plusmn;15&nbsp;s but draw
+  <code>Icons.replay_10_rounded</code> / <code>Icons.forward_10_rounded</code>, so the icon
+  says 10 and the code does 15. The number is now rendered from the same value that drives the
+  seek, and it is user-configurable.
+  (c) The speed and sleep-timer chips are 11px bold text inside a
+  <code>PopupMenuButton</code> with no accessible name. They become labelled selectors with a
+  visible current value, plus an expanded speed row for direct selection.
+  (d) The play button drops its 24px coloured bloom shadow — a leftover of the rejected neon
+  pass — for a plain elevation-2 shadow.</p>
+
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light — playing</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="transport" style="margin-bottom:16px">
+          <button class="t-btn" aria-label="Previous chapter">&#9198;</button>
+          <button class="t-btn" aria-label="Back 15 seconds"><span aria-hidden="true">&#8634;</span><span class="t-btn__num">15</span></button>
+          <button class="t-btn t-btn--play" aria-label="Pause">&#10074;&#10074;</button>
+          <button class="t-btn" aria-label="Forward 15 seconds"><span aria-hidden="true">&#8635;</span><span class="t-btn__num">15</span></button>
+          <button class="t-btn" aria-label="Next chapter">&#9197;</button>
+        </div>
+        <div class="transport">
+          <button class="selector" aria-label="Playback speed, currently 1 times"><span class="selector__value">1.0&times;</span> <span aria-hidden="true">&#9662;</span></button>
+          <button class="selector" aria-label="Sleep timer, off"><span aria-hidden="true">&#9789;</span> Sleep timer</button>
+          <button class="selector" aria-label="Add a bookmark here"><span aria-hidden="true">&#9873;</span> Bookmark</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — paused, timer running</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="transport" style="margin-bottom:16px">
+          <button class="t-btn" aria-label="Previous chapter" disabled>&#9198;</button>
+          <button class="t-btn" aria-label="Back 15 seconds"><span aria-hidden="true">&#8634;</span><span class="t-btn__num">15</span></button>
+          <button class="t-btn t-btn--play" aria-label="Play">&#9654;</button>
+          <button class="t-btn" aria-label="Forward 15 seconds"><span aria-hidden="true">&#8635;</span><span class="t-btn__num">15</span></button>
+          <button class="t-btn" aria-label="Next chapter">&#9197;</button>
+        </div>
+        <div class="transport">
+          <button class="selector is-active" aria-label="Playback speed, currently 1.5 times"><span class="selector__value">1.5&times;</span> <span aria-hidden="true">&#9662;</span></button>
+          <button class="selector is-active" aria-label="Sleep timer, 24 minutes 3 seconds remaining"><span aria-hidden="true">&#9789;</span> <span class="selector__value">24:03</span></button>
+          <button class="selector" aria-label="Add a bookmark here"><span aria-hidden="true">&#9873;</span> Bookmark</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="t-title-sm" style="margin-top:32px">Speed selector, expanded</h3>
+  <p class="dsc-note">0.5&times; to 2&times; in the steps the audio service already supports.
+  Each option is its own 44px target, so a user with a tremor is not fighting a popup menu.
+  On phone this opens as a bottom sheet; on desktop as a menu anchored to the selector.</p>
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="light">
+        <div class="card">
+          <h2 class="t-title-sm" style="margin:0 0 4px">Playback speed</h2>
+          <p class="t-body t-secondary" style="margin:0 0 12px">Faster speeds shorten the book but can make some narrators harder to follow.</p>
+          <div class="speed-scale" role="radiogroup" aria-label="Playback speed">
+            <button class="speed-scale__opt" role="radio" aria-checked="false">0.5&times;</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="false">0.75&times;</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="true">1.0&times;</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="false">1.25&times;</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="false">1.5&times;</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="false">1.75&times;</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="false">2.0&times;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark — sleep timer</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view" data-theme="dark">
+        <div class="card">
+          <h2 class="t-title-sm" style="margin:0 0 4px">Sleep timer</h2>
+          <p class="t-body t-secondary" style="margin:0 0 12px">Playback fades out over the last 20 seconds.</p>
+          <div class="speed-scale" role="radiogroup" aria-label="Sleep timer">
+            <button class="speed-scale__opt" role="radio" aria-checked="false">Off</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="false">15 min</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="true">30 min</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="false">45 min</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="false">60 min</button>
+            <button class="speed-scale__opt" role="radio" aria-checked="false">End of chapter</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>2. Full screen — phone</h2>
+  <div class="dsc-matrix">
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view dsc-view--flush" data-theme="light">
+        <div style="padding:12px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)">
+          <button class="icon-btn" aria-label="Close Now Playing">&#9660;</button>
+          <p class="t-label t-secondary" style="margin:0;flex:1;text-align:center">Now playing</p>
+          <button class="icon-btn" aria-label="Chapters and bookmarks">&#9776;</button>
+        </div>
+        <div style="padding:24px 16px;text-align:center">
+          <div class="cover cover--proc" style="width:220px;height:292px;margin:0 auto 20px"><span class="cover__letter">M</span></div>
+          <h1 class="t-title-md t-serif" style="margin:0 0 4px">Moby Dick; or, The Whale</h1>
+          <p class="t-body-lg t-secondary" style="margin:0 0 2px">Herman Melville</p>
+          <p class="t-body t-muted" style="margin:0 0 20px">Read by Stewart Wills</p>
+
+          <div class="scrub" style="margin-bottom:20px">
+            <div class="scrub__track">
+              <div class="scrub__buffer" style="width:61%"></div>
+              <div class="scrub__fill" style="width:43%"></div>
+              <div class="scrub__thumb" style="left:43%"></div>
+            </div>
+            <div class="scrub__times"><span>12:41</span><span>&minus;16:37</span></div>
+          </div>
+
+          <p class="t-label" style="margin:0 0 16px">Chapter 57 of 135 — The Deck</p>
+
+          <div class="transport" style="margin-bottom:16px">
+            <button class="t-btn" aria-label="Previous chapter">&#9198;</button>
+            <button class="t-btn" aria-label="Back 15 seconds"><span aria-hidden="true">&#8634;</span><span class="t-btn__num">15</span></button>
+            <button class="t-btn t-btn--play" aria-label="Pause">&#10074;&#10074;</button>
+            <button class="t-btn" aria-label="Forward 15 seconds"><span aria-hidden="true">&#8635;</span><span class="t-btn__num">15</span></button>
+            <button class="t-btn" aria-label="Next chapter">&#9197;</button>
+          </div>
+          <div class="transport">
+            <button class="selector" aria-label="Playback speed, currently 1 times"><span class="selector__value">1.0&times;</span></button>
+            <button class="selector" aria-label="Sleep timer, off"><span aria-hidden="true">&#9789;</span> Timer</button>
+            <button class="selector" aria-label="Add a bookmark here"><span aria-hidden="true">&#9873;</span> Bookmark</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsc-frame dsc-frame--phone">
+      <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">390px</span></div>
+      <div class="dsc-view dsc-view--flush" data-theme="dark">
+        <div style="padding:12px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)">
+          <button class="icon-btn" aria-label="Close Now Playing">&#9660;</button>
+          <p class="t-label t-secondary" style="margin:0;flex:1;text-align:center">Now playing</p>
+          <button class="icon-btn" aria-label="Chapters and bookmarks">&#9776;</button>
+        </div>
+        <div style="padding:24px 16px;text-align:center">
+          <div class="cover cover--proc h-plum" style="width:220px;height:292px;margin:0 auto 20px"><span class="cover__letter">M</span></div>
+          <h1 class="t-title-md t-serif" style="margin:0 0 4px">Moby Dick; or, The Whale</h1>
+          <p class="t-body-lg t-secondary" style="margin:0 0 2px">Herman Melville</p>
+          <p class="t-body t-muted" style="margin:0 0 20px">Read by Stewart Wills</p>
+
+          <div class="scrub" style="margin-bottom:20px">
+            <div class="scrub__track">
+              <div class="scrub__buffer" style="width:61%"></div>
+              <div class="scrub__fill" style="width:43%"></div>
+              <div class="scrub__thumb" style="left:43%"></div>
+            </div>
+            <div class="scrub__times"><span>12:41</span><span>&minus;16:37</span></div>
+          </div>
+
+          <p class="t-label" style="margin:0 0 16px">Chapter 57 of 135 — The Deck</p>
+
+          <div class="transport" style="margin-bottom:16px">
+            <button class="t-btn" aria-label="Previous chapter">&#9198;</button>
+            <button class="t-btn" aria-label="Back 15 seconds"><span aria-hidden="true">&#8634;</span><span class="t-btn__num">15</span></button>
+            <button class="t-btn t-btn--play" aria-label="Play">&#9654;</button>
+            <button class="t-btn" aria-label="Forward 15 seconds"><span aria-hidden="true">&#8635;</span><span class="t-btn__num">15</span></button>
+            <button class="t-btn" aria-label="Next chapter">&#9197;</button>
+          </div>
+          <div class="transport">
+            <button class="selector is-active" aria-label="Playback speed, currently 1.5 times"><span class="selector__value">1.5&times;</span></button>
+            <button class="selector is-active" aria-label="Sleep timer, 24 minutes remaining"><span aria-hidden="true">&#9789;</span> <span class="selector__value">24:03</span></button>
+            <button class="selector" aria-label="Add a bookmark here"><span aria-hidden="true">&#9873;</span> Bookmark</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>3. Full screen — desktop 1280px</h2>
+  <p class="dsc-note">On a wide window Now Playing becomes a two-column layout: artwork and
+  transport on the left, chapter list and bookmarks on the right. Nothing is hidden behind a
+  drawer that the current build opens from the header.</p>
+
+  <div class="dsc-matrix dsc-matrix--stack">
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Light</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="light">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start">
+            <div style="text-align:center">
+              <div class="cover cover--proc" style="width:280px;height:372px;margin:0 auto 20px"><span class="cover__letter">M</span></div>
+              <h1 class="t-title-lg t-serif" style="margin:0 0 4px">Moby Dick; or, The Whale</h1>
+              <p class="t-body-lg t-secondary" style="margin:0 0 2px">Herman Melville</p>
+              <p class="t-body t-muted" style="margin:0 0 20px">Read by Stewart Wills &middot; LibriVox 2007</p>
+              <div class="scrub" style="margin-bottom:20px">
+                <div class="scrub__track">
+                  <div class="scrub__buffer" style="width:61%"></div>
+                  <div class="scrub__fill" style="width:43%"></div>
+                  <div class="scrub__thumb" style="left:43%"></div>
+                </div>
+                <div class="scrub__times"><span>12:41 elapsed</span><span>16:37 left</span></div>
+              </div>
+              <div class="transport" style="margin-bottom:16px">
+                <button class="t-btn" aria-label="Previous chapter">&#9198;</button>
+                <button class="t-btn" aria-label="Back 15 seconds"><span aria-hidden="true">&#8634;</span><span class="t-btn__num">15</span></button>
+                <button class="t-btn t-btn--play" aria-label="Pause">&#10074;&#10074;</button>
+                <button class="t-btn" aria-label="Forward 15 seconds"><span aria-hidden="true">&#8635;</span><span class="t-btn__num">15</span></button>
+                <button class="t-btn" aria-label="Next chapter">&#9197;</button>
+              </div>
+              <div class="transport">
+                <button class="selector"><span class="selector__value">1.0&times;</span> <span aria-hidden="true">&#9662;</span></button>
+                <button class="selector"><span aria-hidden="true">&#9789;</span> Sleep timer</button>
+                <button class="selector"><span aria-hidden="true">&#9873;</span> Bookmark</button>
+              </div>
+            </div>
+            <div>
+              <div class="card card--flat" style="margin-bottom:16px">
+                <h2 class="t-title-sm" style="margin:0 0 8px">Chapters <span class="section-head__count">(135)</span></h2>
+                <ul class="chapter-list" style="margin:0">
+                  <li><button class="chapter"><span class="chapter__num">55</span><span class="chapter__title">The Dart</span><span class="chapter__dur">6 min</span></button></li>
+                  <li><button class="chapter"><span class="chapter__num">56</span><span class="chapter__title">The Whale-Line</span><span class="chapter__dur">11 min</span></button></li>
+                  <li><button class="chapter" aria-current="true"><span class="chapter__num">57</span><span class="chapter__title">The Deck</span><span class="chapter__dur">29 min</span></button></li>
+                  <li><button class="chapter"><span class="chapter__num">58</span><span class="chapter__title">Stubb Kills a Whale</span><span class="chapter__dur">18 min</span></button></li>
+                  <li><button class="chapter"><span class="chapter__num">59</span><span class="chapter__title">The Dart</span><span class="chapter__dur">7 min</span></button></li>
+                </ul>
+              </div>
+              <div class="card card--flat">
+                <h2 class="t-title-sm" style="margin:0 0 8px">Bookmarks <span class="section-head__count">(3)</span></h2>
+                <ul class="chapter-list" style="margin:0">
+                  <li><button class="chapter"><span class="chapter__num t-num">04:12</span><span class="chapter__title">"Call me Ishmael"</span><span class="chapter__dur">Ch. 1</span></button></li>
+                  <li><button class="chapter"><span class="chapter__num t-num">21:58</span><span class="chapter__title">Queequeg's coffin</span><span class="chapter__dur">Ch. 39</span></button></li>
+                  <li><button class="chapter"><span class="chapter__num t-num">09:03</span><span class="chapter__title">The doubloon speech</span><span class="chapter__dur">Ch. 57</span></button></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="dsc-scroller"><div class="dsc-scaled">
+      <div class="dsc-frame dsc-frame--desktop">
+        <div class="dsc-frame__bar"><span>Dark</span><span class="dsc-dim">1280px</span></div>
+        <div class="dsc-view" data-theme="dark">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start">
+            <div style="text-align:center">
+              <div class="cover cover--proc h-plum" style="width:280px;height:372px;margin:0 auto 20px"><span class="cover__letter">M</span></div>
+              <h1 class="t-title-lg t-serif" style="margin:0 0 4px">Moby Dick; or, The Whale</h1>
+              <p class="t-body-lg t-secondary" style="margin:0 0 2px">Herman Melville</p>
+              <p class="t-body t-muted" style="margin:0 0 20px">Read by Stewart Wills &middot; LibriVox 2007</p>
+              <div class="scrub" style="margin-bottom:20px">
+                <div class="scrub__track">
+                  <div class="scrub__buffer" style="width:61%"></div>
+                  <div class="scrub__fill" style="width:43%"></div>
+                  <div class="scrub__thumb" style="left:43%"></div>
+                </div>
+                <div class="scrub__times"><span>12:41 elapsed</span><span>16:37 left</span></div>
+              </div>
+              <div class="transport" style="margin-bottom:16px">
+                <button class="t-btn" aria-label="Previous chapter">&#9198;</button>
+                <button class="t-btn" aria-label="Back 15 seconds"><span aria-hidden="true">&#8634;</span><span class="t-btn__num">15</span></button>
+                <button class="t-btn t-btn--play" aria-label="Pause">&#10074;&#10074;</button>
+                <button class="t-btn" aria-label="Forward 15 seconds"><span aria-hidden="true">&#8635;</span><span class="t-btn__num">15</span></button>
+                <button class="t-btn" aria-label="Next chapter">&#9197;</button>
+              </div>
+              <div class="transport">
+                <button class="selector"><span class="selector__value">1.0&times;</span> <span aria-hidden="true">&#9662;</span></button>
+                <button class="selector"><span aria-hidden="true">&#9789;</span> Sleep timer</button>
+                <button class="selector"><span aria-hidden="true">&#9873;</span> Bookmark</button>
+              </div>
+            </div>
+            <div>
+              <div class="card card--flat" style="margin-bottom:16px">
+                <h2 class="t-title-sm" style="margin:0 0 8px">Chapters <span class="section-head__count">(135)</span></h2>
+                <ul class="chapter-list" style="margin:0">
+                  <li><button class="chapter"><span class="chapter__num">55</span><span class="chapter__title">The Dart</span><span class="chapter__dur">6 min</span></button></li>
+                  <li><button class="chapter"><span class="chapter__num">56</span><span class="chapter__title">The Whale-Line</span><span class="chapter__dur">11 min</span></button></li>
+                  <li><button class="chapter" aria-current="true"><span class="chapter__num">57</span><span class="chapter__title">The Deck</span><span class="chapter__dur">29 min</span></button></li>
+                  <li><button class="chapter"><span class="chapter__num">58</span><span class="chapter__title">Stubb Kills a Whale</span><span class="chapter__dur">18 min</span></button></li>
+                  <li><button class="chapter"><span class="chapter__num">59</span><span class="chapter__title">The Dart</span><span class="chapter__dur">7 min</span></button></li>
+                </ul>
+              </div>
+              <div class="card card--flat">
+                <h2 class="t-title-sm" style="margin:0 0 8px">Bookmarks <span class="section-head__count">(3)</span></h2>
+                <ul class="chapter-list" style="margin:0">
+                  <li><button class="chapter"><span class="chapter__num t-num">04:12</span><span class="chapter__title">"Call me Ishmael"</span><span class="chapter__dur">Ch. 1</span></button></li>
+                  <li><button class="chapter"><span class="chapter__num t-num">21:58</span><span class="chapter__title">Queequeg's coffin</span><span class="chapter__dur">Ch. 39</span></button></li>
+                  <li><button class="chapter"><span class="chapter__num t-num">09:03</span><span class="chapter__title">The doubloon speech</span><span class="chapter__dur">Ch. 57</span></button></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section class="dsc-section">
+  <h2>4. Accessibility contract</h2>
+  <ul class="t-body-lg" style="max-width:82ch">
+    <li>Every transport control has an explicit label. The skip labels contain the real interval and re-read correctly if the user changes it from 15&nbsp;s.</li>
+    <li>Speed and sleep timer are <code>radiogroup</code>s with the current value in the trigger's accessible name — a user never has to open the menu to learn the current speed.</li>
+    <li>The remaining-time figure is the one users act on, so it is shown as a signed value (&minus;16:37) alongside elapsed, and both are tabular.</li>
+    <li>Keyboard: space toggles play, left/right seek &plusmn;15&nbsp;s, up/down change speed one step, <code>[</code> and <code>]</code> change chapter, <code>b</code> adds a bookmark.</li>
+    <li>Nothing in this screen is hover-only. Every control is present and hit-testable on touch.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var r = document.getElementById('dscScale'), o = document.getElementById('dscScaleVal');
+  if (!r) return;
+  function apply() {
+    var v = r.value / 100;
+    var n = document.querySelectorAll('.dsc-scaled');
+    for (var i = 0; i < n.length; i++) n[i].style.setProperty('--dsc-scale', v);
+    o.textContent = r.value + '%';
+  }
+  r.addEventListener('input', apply);
+  apply();
+})();
+</script>
+</body>
+</html>

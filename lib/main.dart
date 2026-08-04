@@ -23,11 +23,18 @@ class HomeScreen extends StatefulWidget {
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
 
+  /// Optional injected LibriVoxService, used by tests to avoid live HTTP
+  /// calls during the initial category-shelf load in initState. Defaults
+  /// to a real LibriVoxService (which makes real network requests) when
+  /// omitted.
+  final LibriVoxService? libriVoxService;
+
   const HomeScreen({
     super.key,
     required this.db,
     required this.isDarkMode,
     required this.onToggleTheme,
+    this.libriVoxService,
   });
 
   @override
@@ -67,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _libriVoxService = LibriVoxService();
+    _libriVoxService = widget.libriVoxService ?? LibriVoxService();
     _artworkService = ArtworkEnrichmentService();
     _downloader = LibriVoxStreamAndDownloader();
     _audioService = AudioPlaybackService(db: widget.db);

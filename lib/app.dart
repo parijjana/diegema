@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'database/app_database.dart';
 import 'main.dart';
+import 'services/librivox_service.dart';
 
+/// Root widget. [database] and [libriVoxService] are optional injection
+/// points so tests can supply an in-memory database and a mocked HTTP
+/// client instead of the real path_provider-backed database and live
+/// librivox.org network calls that the defaults use.
 class AudiobookApp extends StatefulWidget {
-  const AudiobookApp({super.key});
+  final AppDatabase? database;
+  final LibriVoxService? libriVoxService;
+
+  const AudiobookApp({super.key, this.database, this.libriVoxService});
 
   @override
   State<AudiobookApp> createState() => _AudiobookAppState();
@@ -16,7 +24,7 @@ class _AudiobookAppState extends State<AudiobookApp> {
   @override
   void initState() {
     super.initState();
-    _db = AppDatabase();
+    _db = widget.database ?? AppDatabase();
   }
 
   @override
@@ -81,6 +89,7 @@ class _AudiobookAppState extends State<AudiobookApp> {
         db: _db,
         isDarkMode: _isDarkMode,
         onToggleTheme: () => setState(() => _isDarkMode = !_isDarkMode),
+        libriVoxService: widget.libriVoxService,
       ),
     );
   }

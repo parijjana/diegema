@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
+import '../core/playback_constants.dart';
 import '../domain/models/audiobook.dart';
 import '../database/app_database.dart';
 import 'local_file_playback.dart';
@@ -209,13 +210,13 @@ class AudioPlaybackService {
     await _persistCurrentProgress();
   }
 
-  Future<void> skipForward({int seconds = 15}) async {
+  Future<void> skipForward({int seconds = kSkipSeconds}) async {
     final newPos = positionNotifier.value + Duration(seconds: seconds);
     final maxDur = durationNotifier.value;
     await seek(newPos > maxDur ? maxDur : newPos);
   }
 
-  Future<void> skipBackward({int seconds = 15}) async {
+  Future<void> skipBackward({int seconds = kSkipSeconds}) async {
     final newPos = positionNotifier.value - Duration(seconds: seconds);
     await seek(newPos < Duration.zero ? Duration.zero : newPos);
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/playback_constants.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
 
@@ -39,7 +40,7 @@ class NowPlayingControls extends StatelessWidget {
           PopupMenuButton<double>(
             initialValue: 1.0,
             onSelected: (speed) => audioService.setSpeed(speed),
-            itemBuilder: (context) => [0.5, 0.8, 1.0, 1.25, 1.5, 2.0]
+            itemBuilder: (context) => kPlaybackSpeedOptions
                 .map((s) => PopupMenuItem(value: s, child: Text('${s}x')))
                 .toList(),
             child: Container(
@@ -155,7 +156,7 @@ class NowPlayingControls extends StatelessWidget {
           const SizedBox(width: 8),
           // Replay 15s
           IconButton(
-            onPressed: () => audioService.skipBackward(seconds: 15),
+            onPressed: () => audioService.skipBackward(seconds: kSkipSeconds),
             icon: Container(
               width: 48,
               height: 48,
@@ -164,7 +165,7 @@ class NowPlayingControls extends StatelessWidget {
                 color: onSurface.withValues(alpha: 0.05),
                 border: Border.all(color: onSurface.withValues(alpha: 0.15)),
               ),
-              child: Icon(Icons.replay_10_rounded, size: 24, color: onSurface),
+              child: Icon(Icons.replay_15_rounded, size: 24, color: onSurface),
             ),
           ),
           const SizedBox(width: 12),
@@ -212,7 +213,7 @@ class NowPlayingControls extends StatelessWidget {
           const SizedBox(width: 12),
           // Forward 15s
           IconButton(
-            onPressed: () => audioService.skipForward(seconds: 15),
+            onPressed: () => audioService.skipForward(seconds: kSkipSeconds),
             icon: Container(
               width: 48,
               height: 48,
@@ -221,7 +222,7 @@ class NowPlayingControls extends StatelessWidget {
                 color: onSurface.withValues(alpha: 0.05),
                 border: Border.all(color: onSurface.withValues(alpha: 0.15)),
               ),
-              child: Icon(Icons.forward_10_rounded, size: 24, color: onSurface),
+              child: Icon(Icons.forward_15_rounded, size: 24, color: onSurface),
             ),
           ),
           const SizedBox(width: 8),

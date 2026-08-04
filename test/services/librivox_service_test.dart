@@ -5,7 +5,8 @@ import 'package:unamedaudiobookplayer/services/librivox_service.dart';
 
 void main() {
   group('LibriVoxService TDD Unit Tests', () {
-    test('searchBooks returns parsed books from LibriVox API response', () async {
+    test('searchBooks returns parsed books from LibriVox API response',
+        () async {
       final mockClient = MockClient((request) async {
         if (request.url.host == 'librivox.org') {
           const responseJson = '''
@@ -25,7 +26,8 @@ void main() {
             ]
           }
           ''';
-          return http.Response(responseJson, 200, headers: {'content-type': 'application/json'});
+          return http.Response(responseJson, 200,
+              headers: {'content-type': 'application/json'});
         }
         return http.Response('Not Found', 444);
       });
@@ -36,13 +38,17 @@ void main() {
       expect(books.length, equals(1));
       expect(books.first.title, equals('Dracula'));
       expect(books.first.authorNames, equals('Bram Stoker'));
-      expect(books.first.coverArtUrl, equals('https://archive.org/services/img/dracula_librivox'));
+      expect(books.first.coverArtUrl,
+          equals('https://archive.org/services/img/dracula_librivox'));
     });
 
-    test('searchBooks falls back to Internet Archive search when LibriVox returns empty', () async {
+    test(
+        'searchBooks falls back to Internet Archive search when LibriVox returns empty',
+        () async {
       final mockClient = MockClient((request) async {
         if (request.url.host == 'librivox.org') {
-          return http.Response('{"books": []}', 200, headers: {'content-type': 'application/json'});
+          return http.Response('{"books": []}', 200,
+              headers: {'content-type': 'application/json'});
         }
         if (request.url.host == 'archive.org') {
           const iaResponse = '''
@@ -59,7 +65,8 @@ void main() {
             }
           }
           ''';
-          return http.Response(iaResponse, 200, headers: {'content-type': 'application/json'});
+          return http.Response(iaResponse, 200,
+              headers: {'content-type': 'application/json'});
         }
         return http.Response('Error', 500);
       });
@@ -70,7 +77,10 @@ void main() {
       expect(books.length, equals(1));
       expect(books.first.title, equals('Frankenstein'));
       expect(books.first.authorNames, equals('Mary Shelley'));
-      expect(books.first.coverArtUrl, equals('https://archive.org/services/img/frankenstein_1205_librivox'));
+      expect(
+          books.first.coverArtUrl,
+          equals(
+              'https://archive.org/services/img/frankenstein_1205_librivox'));
     });
   });
 }

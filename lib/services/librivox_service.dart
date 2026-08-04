@@ -37,12 +37,14 @@ class LibriVoxService {
       call: () async {
         if (term.isNotEmpty) {
           // Use Internet Archive LibriVox collection search for keyword queries
-          final searchResults = await _searchInternetArchiveLibriVox(term, limit: limit);
+          final searchResults =
+              await _searchInternetArchiveLibriVox(term, limit: limit);
           if (searchResults.isNotEmpty) return searchResults;
         }
 
         // Fetch direct LibriVox API feed
-        final url = '$_baseUrl/?format=json&extended=1&limit=$limit&offset=$offset';
+        final url =
+            '$_baseUrl/?format=json&extended=1&limit=$limit&offset=$offset';
         try {
           final response = await _client
               .get(Uri.parse(url), headers: _headers)
@@ -54,13 +56,13 @@ class LibriVoxService {
             final List<LibriVoxBook> books = [];
 
             if (booksData is JsonMap) {
-              for (var entry in booksData.values) {
+              for (final entry in booksData.values) {
                 if (entry is JsonMap) {
                   books.add(LibriVoxBook.fromJson(entry));
                 }
               }
             } else if (booksData is List) {
-              for (var item in booksData) {
+              for (final item in booksData) {
                 if (item is JsonMap) {
                   books.add(LibriVoxBook.fromJson(item));
                 }
@@ -77,9 +79,11 @@ class LibriVoxService {
     );
   }
 
-  Future<List<LibriVoxBook>> _searchInternetArchiveLibriVox(String term, {int limit = 20}) async {
+  Future<List<LibriVoxBook>> _searchInternetArchiveLibriVox(String term,
+      {int limit = 20}) async {
     try {
-      final archiveQuery = '$_archiveUrl?q=collection:(librivoxaudio) AND mediatype:(audio) AND (title:(${Uri.encodeComponent(term)}) OR creator:(${Uri.encodeComponent(term)}))&fl[]=identifier,title,creator,description,publicdate&sort[]=downloads+desc&rows=$limit&output=json';
+      final archiveQuery =
+          '$_archiveUrl?q=collection:(librivoxaudio) AND mediatype:(audio) AND (title:(${Uri.encodeComponent(term)}) OR creator:(${Uri.encodeComponent(term)}))&fl[]=identifier,title,creator,description,publicdate&sort[]=downloads+desc&rows=$limit&output=json';
 
       final response = await _client
           .get(Uri.parse(archiveQuery), headers: _headers)
@@ -99,19 +103,23 @@ class LibriVoxService {
               final creator = doc['creator']?.toString() ?? 'LibriVox Reader';
               final description = doc['description']?.toString() ?? '';
 
-              books.add(LibriVoxBook(
-                id: id,
-                title: title,
-                description: description,
-                totalTimeSecs: 0,
-                authors: [
-                  LibriVoxAuthor(id: id, firstName: '', lastName: creator)
-                ],
-                urlRss: 'https://archive.org/advancedsearch.php?q=identifier:$id',
-                urlZipFile: 'https://archive.org/compress/$id/formats=64KBPS%20MP3&file=/$id.zip',
-                language: 'English',
-                narrators: [creator],
-              ));
+              books.add(
+                LibriVoxBook(
+                  id: id,
+                  title: title,
+                  description: description,
+                  totalTimeSecs: 0,
+                  authors: [
+                    LibriVoxAuthor(id: id, firstName: '', lastName: creator),
+                  ],
+                  urlRss:
+                      'https://archive.org/advancedsearch.php?q=identifier:$id',
+                  urlZipFile:
+                      'https://archive.org/compress/$id/formats=64KBPS%20MP3&file=/$id.zip',
+                  language: 'English',
+                  narrators: [creator],
+                ),
+              );
             }
           }
         }

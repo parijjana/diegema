@@ -220,7 +220,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       AppHeader(
                         activeNavTab: _activeNavTab,
-                        onSelectTab: (idx) => setState(() => _activeNavTab = idx),
+                        onSelectTab: (idx) =>
+                            setState(() => _activeNavTab = idx),
                         isSearchExpanded: _isSearchExpanded,
                         onToggleSearch: () {
                           setState(() {
@@ -236,7 +237,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         onToggleTheme: widget.onToggleTheme,
                         audioService: _audioService,
                         db: widget.db,
-                        onOpenDrawer: () => _scaffoldKey.currentState?.openEndDrawer(),
+                        onOpenDrawer: () =>
+                            _scaffoldKey.currentState?.openEndDrawer(),
                       ),
                       const SizedBox(height: 8),
                       if (_activeNavTab == 1) ...[
@@ -245,7 +247,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           selectedCategory: _selectedCategory,
                           onSelectCategory: (name) {
                             setState(() => _selectedCategory = name);
-                            final cat = _categories.firstWhere((c) => c['name'] == name);
+                            final cat = _categories
+                                .firstWhere((c) => c['name'] == name);
                             if (cat['query']!.isNotEmpty) {
                               _performSearch(cat['query']!);
                             } else {
@@ -269,7 +272,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           audioService: _audioService,
                           artworkService: _artworkService,
                           downloader: _downloader,
-                          onGoToDiscover: () => setState(() => _activeNavTab = 1),
+                          onGoToDiscover: () =>
+                              setState(() => _activeNavTab = 1),
                         ),
                       ),
                     ],
@@ -280,7 +284,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    child: PersistentPlayerBar(audioService: _audioService, db: widget.db),
+                    child: PersistentPlayerBar(
+                        audioService: _audioService, db: widget.db),
                   ),
               ],
             );

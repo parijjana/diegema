@@ -29,8 +29,10 @@ class AudioPlaybackService {
   Timer? _sleepTimerTicker;
   Timer? _progressSaveTimer;
 
-  final ValueNotifier<PlaybackState> stateNotifier = ValueNotifier(PlaybackState.idle);
-  final ValueNotifier<UnifiedAudiobook?> currentBookNotifier = ValueNotifier(null);
+  final ValueNotifier<PlaybackState> stateNotifier =
+      ValueNotifier(PlaybackState.idle);
+  final ValueNotifier<UnifiedAudiobook?> currentBookNotifier =
+      ValueNotifier(null);
   final ValueNotifier<int> chapterIndexNotifier = ValueNotifier(0);
   final ValueNotifier<Duration> positionNotifier = ValueNotifier(Duration.zero);
   final ValueNotifier<Duration> durationNotifier = ValueNotifier(Duration.zero);
@@ -60,7 +62,8 @@ class AudioPlaybackService {
       final processingState = playerState.processingState;
       final playing = playerState.playing;
 
-      if (processingState == ProcessingState.loading || processingState == ProcessingState.buffering) {
+      if (processingState == ProcessingState.loading ||
+          processingState == ProcessingState.buffering) {
         stateNotifier.value = PlaybackState.loading;
       } else if (processingState == ProcessingState.completed) {
         stateNotifier.value = PlaybackState.completed;
@@ -106,7 +109,8 @@ class AudioPlaybackService {
     }
   }
 
-  Future<void> loadBook(UnifiedAudiobook book, {int? initialChapterIndex, Duration? initialPosition}) async {
+  Future<void> loadBook(UnifiedAudiobook book,
+      {int? initialChapterIndex, Duration? initialPosition}) async {
     await init();
     _currentBook = book;
     currentBookNotifier.value = book;
@@ -142,7 +146,9 @@ class AudioPlaybackService {
   }
 
   Future<void> _playCurrentChapter({Duration? seekToPosition}) async {
-    if (_currentBook == null || _currentChapterIndex < 0 || _currentChapterIndex >= _currentBook!.chapters.length) {
+    if (_currentBook == null ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _currentBook!.chapters.length) {
       return;
     }
 
@@ -150,7 +156,9 @@ class AudioPlaybackService {
     stateNotifier.value = PlaybackState.loading;
 
     try {
-      if (chapter.isStream || chapter.audioPathOrUrl.startsWith('http://') || chapter.audioPathOrUrl.startsWith('https://')) {
+      if (chapter.isStream ||
+          chapter.audioPathOrUrl.startsWith('http://') ||
+          chapter.audioPathOrUrl.startsWith('https://')) {
         await _player.setUrl(chapter.audioPathOrUrl);
       } else {
         final file = File(chapter.audioPathOrUrl);
@@ -175,14 +183,15 @@ class AudioPlaybackService {
   }
 
   void _onChapterCompleted() {
-    if (_currentBook != null && _currentChapterIndex < _currentBook!.chapters.length - 1) {
+    if (_currentBook != null &&
+        _currentChapterIndex < _currentBook!.chapters.length - 1) {
       nextChapter();
     } else {
       stateNotifier.value = PlaybackState.completed;
     }
   }
 
-  Future<void> play() async => await _player.play();
+  Future<void> play() async => _player.play();
   Future<void> pause() async {
     await _player.pause();
     await _persistCurrentProgress();
@@ -213,7 +222,8 @@ class AudioPlaybackService {
   }
 
   Future<void> nextChapter() async {
-    if (_currentBook != null && _currentChapterIndex < _currentBook!.chapters.length - 1) {
+    if (_currentBook != null &&
+        _currentChapterIndex < _currentBook!.chapters.length - 1) {
       _currentChapterIndex++;
       chapterIndexNotifier.value = _currentChapterIndex;
       await _playCurrentChapter();
@@ -264,7 +274,8 @@ class AudioPlaybackService {
 
     _sleepTimerTicker = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_sleepTimerRemaining != null && _sleepTimerRemaining!.inSeconds > 0) {
-        _sleepTimerRemaining = _sleepTimerRemaining! - const Duration(seconds: 1);
+        _sleepTimerRemaining =
+            _sleepTimerRemaining! - const Duration(seconds: 1);
         sleepTimerNotifier.value = _sleepTimerRemaining;
       } else {
         cancelSleepTimer();

@@ -28,31 +28,35 @@ class LocalAudiobookService {
       files.sort((a, b) => p.basename(a.path).compareTo(p.basename(b.path)));
 
       final List<AudiobookChapter> chapters = [];
-      String bookTitle = p.basename(folderPath);
-      String author = 'Local Library';
+      final String bookTitle = p.basename(folderPath);
+      const String author = 'Local Library';
 
       for (int i = 0; i < files.length; i++) {
         final file = files[i];
-        String chapterTitle = p.basenameWithoutExtension(file.path);
+        final String chapterTitle = p.basenameWithoutExtension(file.path);
 
-        chapters.add(AudiobookChapter(
-          id: '${file.path}_$i',
-          title: chapterTitle,
-          audioPathOrUrl: file.path,
-          durationSeconds: 0,
-          isStream: false,
-        ));
+        chapters.add(
+          AudiobookChapter(
+            id: '${file.path}_$i',
+            title: chapterTitle,
+            audioPathOrUrl: file.path,
+            durationSeconds: 0,
+            isStream: false,
+          ),
+        );
       }
 
-      audiobooks.add(UnifiedAudiobook(
-        id: folderPath,
-        title: bookTitle,
-        author: author,
-        description: 'Local audiobook folder: $folderPath',
-        source: 'Local',
-        chapters: chapters,
-        isDownloaded: true,
-      ));
+      audiobooks.add(
+        UnifiedAudiobook(
+          id: folderPath,
+          title: bookTitle,
+          author: author,
+          description: 'Local audiobook folder: $folderPath',
+          source: 'Local',
+          chapters: chapters,
+          isDownloaded: true,
+        ),
+      );
     }
 
     return audiobooks;

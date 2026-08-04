@@ -11,7 +11,8 @@ void main() {
       expect(service.sleepTimerNotifier.value, isNull);
 
       service.setSleepTimer(const Duration(minutes: 15));
-      expect(service.sleepTimerNotifier.value, equals(const Duration(minutes: 15)));
+      expect(service.sleepTimerNotifier.value,
+          equals(const Duration(minutes: 15)));
 
       service.cancelSleepTimer();
       expect(service.sleepTimerNotifier.value, isNull);
@@ -21,7 +22,8 @@ void main() {
       final service = AudioPlaybackService();
 
       service.setSleepTimer(const Duration(minutes: 30));
-      expect(service.sleepTimerNotifier.value, equals(const Duration(minutes: 30)));
+      expect(service.sleepTimerNotifier.value,
+          equals(const Duration(minutes: 30)));
 
       service.cancelSleepTimer();
       expect(service.sleepTimerNotifier.value, isNull);

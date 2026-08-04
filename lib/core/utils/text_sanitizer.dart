@@ -7,7 +7,8 @@ class TextSanitizer {
   static String sanitize(String input) {
     if (input.isEmpty) return '';
 
-    var clean = input.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
+    var clean =
+        input.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
     clean = clean.replaceAll(RegExp(r'<[^>]*>'), '');
     clean = clean
         .replaceAll('&amp;', '&')

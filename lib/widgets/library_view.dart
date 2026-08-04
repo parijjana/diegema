@@ -39,10 +39,12 @@ class _LibraryViewState extends State<LibraryView> {
     setState(() => _isLoading = true);
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      final downloadsDir = Directory(p.join(appDir.path, 'unamedaudiobookplayer', 'downloads'));
+      final downloadsDir =
+          Directory(p.join(appDir.path, 'unamedaudiobookplayer', 'downloads'));
 
       if (await downloadsDir.exists()) {
-        final List<FileSystemEntity> entities = await downloadsDir.list().toList();
+        final List<FileSystemEntity> entities =
+            await downloadsDir.list().toList();
         for (final entity in entities) {
           if (entity is Directory) {
             final folderName = p.basename(entity.path);
@@ -128,7 +130,8 @@ class _LibraryViewState extends State<LibraryView> {
                   shape: BoxShape.circle,
                   border: Border.all(color: primary.withValues(alpha: 0.3)),
                 ),
-                child: Icon(Icons.collections_bookmark_rounded, size: 48, color: primary),
+                child: Icon(Icons.collections_bookmark_rounded,
+                    size: 48, color: primary),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -143,7 +146,9 @@ class _LibraryViewState extends State<LibraryView> {
               Text(
                 'Import local audiobooks or download from Discover.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 13),
+                style: TextStyle(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontSize: 13),
               ),
               const SizedBox(height: 24),
               Row(
@@ -153,11 +158,17 @@ class _LibraryViewState extends State<LibraryView> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,
                       foregroundColor: theme.colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
                     ),
                     icon: const Icon(Icons.folder_open_rounded, size: 18),
-                    label: const Text('IMPORT LOCAL BOOK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.0)),
+                    label: const Text('IMPORT LOCAL BOOK',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            letterSpacing: 1.0)),
                     onPressed: _showImportOptions,
                   ),
                   const SizedBox(width: 12),
@@ -165,11 +176,17 @@ class _LibraryViewState extends State<LibraryView> {
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: primary),
                       foregroundColor: primary,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
                     ),
                     icon: const Icon(Icons.explore_rounded, size: 18),
-                    label: const Text('DISCOVER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.0)),
+                    label: const Text('DISCOVER',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            letterSpacing: 1.0)),
                     onPressed: widget.onGoToDiscover,
                   ),
                 ],
@@ -206,11 +223,16 @@ class _LibraryViewState extends State<LibraryView> {
                       backgroundColor: primary.withValues(alpha: 0.15),
                       foregroundColor: primary,
                       side: BorderSide(color: primary.withValues(alpha: 0.4)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       minimumSize: Size.zero,
                     ),
                     icon: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text('IMPORT BOOK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1.0)),
+                    label: const Text('IMPORT BOOK',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                            letterSpacing: 1.0)),
                     onPressed: _showImportOptions,
                   ),
                   const SizedBox(width: 8),
@@ -244,22 +266,29 @@ class _LibraryViewState extends State<LibraryView> {
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: primary.withValues(alpha: 0.3)),
+                        border:
+                            Border.all(color: primary.withValues(alpha: 0.3)),
                       ),
                       child: Icon(Icons.book_rounded, color: primary, size: 24),
                     ),
                     title: Text(
                       book.title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                     subtitle: Text(
                       '${book.author} • ${book.chapters.length} chapters (${book.source ?? 'Local'})',
-                      style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6)),
                     ),
                     trailing: IconButton(
-                      icon: Icon(Icons.play_circle_fill, color: primary, size: 36),
+                      icon: Icon(Icons.play_circle_fill,
+                          color: primary, size: 36),
                       onPressed: () async {
                         await widget.audioService.loadBook(book);
                       },

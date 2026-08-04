@@ -37,13 +37,25 @@ class CategorySubBar extends StatelessWidget {
           final cat = categories[index];
           final isSelected = selectedCategory == cat['name'];
           return ChoiceChip(
-            label: Text(cat['name']!, style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+            label: Text(cat['name']!,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal)),
             selected: isSelected,
             selectedColor: theme.colorScheme.primary.withValues(alpha: 0.25),
-            backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.05),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            side: BorderSide(color: isSelected ? theme.colorScheme.primary : Colors.transparent),
-            labelStyle: TextStyle(color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface),
+            backgroundColor:
+                theme.colorScheme.onSurface.withValues(alpha: 0.05),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            side: BorderSide(
+                color: isSelected
+                    ? theme.colorScheme.primary
+                    : Colors.transparent),
+            labelStyle: TextStyle(
+                color: isSelected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface),
             onSelected: (_) => onSelectCategory(cat['name']!),
           );
         },
@@ -123,7 +135,11 @@ class StorefrontBodyLayout extends StatelessWidget {
               ? Column(
                   children: [
                     AutoResumeBanner(db: db, audioService: audioService),
-                    Expanded(child: LibraryView(db: db, audioService: audioService, onGoToDiscover: onGoToDiscover)),
+                    Expanded(
+                        child: LibraryView(
+                            db: db,
+                            audioService: audioService,
+                            onGoToDiscover: onGoToDiscover)),
                   ],
                 )
               : buildDiscoverContent(),
@@ -146,7 +162,11 @@ class StorefrontBodyLayout extends StatelessWidget {
                   ? Column(
                       children: [
                         AutoResumeBanner(db: db, audioService: audioService),
-                        Expanded(child: LibraryView(db: db, audioService: audioService, onGoToDiscover: onGoToDiscover)),
+                        Expanded(
+                            child: LibraryView(
+                                db: db,
+                                audioService: audioService,
+                                onGoToDiscover: onGoToDiscover)),
                       ],
                     )
                   : buildDiscoverContent(),
@@ -168,7 +188,8 @@ class StorefrontBodyLayout extends StatelessWidget {
                       db: db,
                     )
                   : const Center(
-                      child: Text('Select an audiobook to view details', style: TextStyle(color: Colors.grey)),
+                      child: Text('Select an audiobook to view details',
+                          style: TextStyle(color: Colors.grey)),
                     ),
             ),
           ),

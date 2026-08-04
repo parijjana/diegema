@@ -55,7 +55,11 @@ class NowPlayingControls extends StatelessWidget {
                   ValueListenableBuilder<double>(
                     valueListenable: audioService.speedNotifier,
                     builder: (context, speed, child) {
-                      return Text('${speed}x', style: TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 11));
+                      return Text('${speed}x',
+                          style: TextStyle(
+                              color: primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11));
                     },
                   ),
                   Icon(Icons.arrow_drop_down, color: primary, size: 16),
@@ -85,11 +89,17 @@ class NowPlayingControls extends StatelessWidget {
                   const PopupMenuItem(value: 60, child: Text('60 Minutes')),
                 ],
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isTimerActive ? primary.withValues(alpha: 0.25) : onSurface.withValues(alpha: 0.05),
+                    color: isTimerActive
+                        ? primary.withValues(alpha: 0.25)
+                        : onSurface.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: isTimerActive ? primary : onSurface.withValues(alpha: 0.15)),
+                    border: Border.all(
+                        color: isTimerActive
+                            ? primary
+                            : onSurface.withValues(alpha: 0.15)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -97,13 +107,19 @@ class NowPlayingControls extends StatelessWidget {
                       Icon(
                         Icons.bedtime_rounded,
                         size: 14,
-                        color: isTimerActive ? primary : onSurface.withValues(alpha: 0.7),
+                        color: isTimerActive
+                            ? primary
+                            : onSurface.withValues(alpha: 0.7),
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        isTimerActive ? _formatDuration(remainingTimer) : 'Timer',
+                        isTimerActive
+                            ? _formatDuration(remainingTimer)
+                            : 'Timer',
                         style: TextStyle(
-                          color: isTimerActive ? primary : onSurface.withValues(alpha: 0.7),
+                          color: isTimerActive
+                              ? primary
+                              : onSurface.withValues(alpha: 0.7),
                           fontWeight: FontWeight.bold,
                           fontSize: 11,
                         ),
@@ -120,7 +136,8 @@ class NowPlayingControls extends StatelessWidget {
             onPressed: () {
               final currentIdx = audioService.chapterIndexNotifier.value;
               if (currentIdx > 0) {
-                audioService.loadBook(book, initialChapterIndex: currentIdx - 1);
+                audioService.loadBook(book,
+                    initialChapterIndex: currentIdx - 1);
               }
             },
             icon: Container(
@@ -131,7 +148,8 @@ class NowPlayingControls extends StatelessWidget {
                 color: onSurface.withValues(alpha: 0.05),
                 border: Border.all(color: onSurface.withValues(alpha: 0.15)),
               ),
-              child: Icon(Icons.skip_previous_rounded, size: 22, color: onSurface),
+              child:
+                  Icon(Icons.skip_previous_rounded, size: 22, color: onSurface),
             ),
           ),
           const SizedBox(width: 8),
@@ -177,9 +195,13 @@ class NowPlayingControls extends StatelessWidget {
                     ],
                   ),
                   child: state == PlaybackState.loading
-                      ? const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 3))
                       : Icon(
-                          isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
                           color: Colors.white,
                           size: 42,
                         ),
@@ -208,7 +230,8 @@ class NowPlayingControls extends StatelessWidget {
             onPressed: () {
               final currentIdx = audioService.chapterIndexNotifier.value;
               if (currentIdx < book.chapters.length - 1) {
-                audioService.loadBook(book, initialChapterIndex: currentIdx + 1);
+                audioService.loadBook(book,
+                    initialChapterIndex: currentIdx + 1);
               }
             },
             icon: Container(
@@ -234,7 +257,8 @@ class NowPlayingControls extends StatelessWidget {
                 color: primary.withValues(alpha: 0.1),
                 border: Border.all(color: primary.withValues(alpha: 0.3)),
               ),
-              child: Icon(Icons.bookmark_add_outlined, size: 20, color: primary),
+              child:
+                  Icon(Icons.bookmark_add_outlined, size: 20, color: primary),
             ),
           ),
         ],

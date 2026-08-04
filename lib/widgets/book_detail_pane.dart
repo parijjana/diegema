@@ -73,7 +73,8 @@ class _BookDetailPaneState extends State<BookDetailPane> {
 
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      final savePath = p.join(appDir.path, 'unamedaudiobookplayer', 'downloads');
+      final savePath =
+          p.join(appDir.path, 'unamedaudiobookplayer', 'downloads');
 
       final extractedFiles = await widget.downloader.downloadAndExtractZip(
         widget.book,
@@ -89,13 +90,15 @@ class _BookDetailPaneState extends State<BookDetailPane> {
       for (int i = 0; i < extractedFiles.length; i++) {
         final filePath = extractedFiles[i];
         final filename = p.basename(filePath);
-        chapters.add(AudiobookChapter(
-          id: '${widget.book.id}_local_$i',
-          title: filename.replaceAll('.mp3', ''),
-          audioPathOrUrl: filePath,
-          durationSeconds: 0,
-          isStream: false,
-        ));
+        chapters.add(
+          AudiobookChapter(
+            id: '${widget.book.id}_local_$i',
+            title: filename.replaceAll('.mp3', ''),
+            audioPathOrUrl: filePath,
+            durationSeconds: 0,
+            isStream: false,
+          ),
+        );
       }
 
       final downloadedBook = UnifiedAudiobook(
@@ -117,7 +120,9 @@ class _BookDetailPaneState extends State<BookDetailPane> {
           _isDownloaded = true;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Downloaded ${extractedFiles.length} chapters to local storage & saved to Library!')),
+          SnackBar(
+              content: Text(
+                  'Downloaded ${extractedFiles.length} chapters to local storage & saved to Library!')),
         );
       }
     } catch (e) {
@@ -159,18 +164,26 @@ class _BookDetailPaneState extends State<BookDetailPane> {
                 children: [
                   Text(
                     widget.book.title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Author: ${widget.book.authorNames}',
-                    style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600),
                   ),
                   if (widget.book.narrators.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       'Narrated by: ${widget.book.narrators.join(', ')}',
-                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
+                      style: TextStyle(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6),
+                          fontSize: 12),
                     ),
                   ],
                 ],
@@ -183,16 +196,24 @@ class _BookDetailPaneState extends State<BookDetailPane> {
           width: double.infinity,
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isDownloaded ? Colors.teal : theme.colorScheme.secondary,
+              backgroundColor:
+                  _isDownloaded ? Colors.teal : theme.colorScheme.secondary,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            icon: Icon(_isDownloading ? Icons.downloading : (_isDownloaded ? Icons.check_circle : Icons.download_rounded)),
+            icon: Icon(_isDownloading
+                ? Icons.downloading
+                : (_isDownloaded
+                    ? Icons.check_circle
+                    : Icons.download_rounded)),
             label: Text(
               _isDownloading
                   ? 'Downloading (${(_downloadProgress * 100).toStringAsFixed(0)}%)...'
-                  : (_isDownloaded ? 'Downloaded to Local Storage' : 'Download Full Audiobook (ZIP)'),
+                  : (_isDownloaded
+                      ? 'Downloaded to Local Storage'
+                      : 'Download Full Audiobook (ZIP)'),
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
             onPressed: _isDownloading ? null : _downloadBook,
@@ -202,12 +223,19 @@ class _BookDetailPaneState extends State<BookDetailPane> {
         GlassCard(
           title: 'Description',
           borderRadius: BorderRadius.circular(10),
-          child: Text(widget.book.description, style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.85), height: 1.5, fontSize: 13)),
+          child: Text(widget.book.description,
+              style: TextStyle(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
+                  height: 1.5,
+                  fontSize: 13)),
         ),
         const SizedBox(height: 20),
         Text(
           'Chapters (${_streamableBook?.chapters.length ?? 0})',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         if (_streamableBook != null)
@@ -218,16 +246,23 @@ class _BookDetailPaneState extends State<BookDetailPane> {
               padding: const EdgeInsets.only(bottom: 6),
               child: GlassCard(
                 borderRadius: BorderRadius.circular(8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: Material(
                   color: Colors.transparent,
                   child: ListTile(
                     dense: true,
-                    leading: Icon(Icons.play_circle_fill, color: theme.colorScheme.primary, size: 26),
-                    title: Text(ch.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    subtitle: Text('${(ch.durationSeconds / 60).toStringAsFixed(1)} mins', style: const TextStyle(fontSize: 10)),
+                    leading: Icon(Icons.play_circle_fill,
+                        color: theme.colorScheme.primary, size: 26),
+                    title: Text(ch.title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 12)),
+                    subtitle: Text(
+                        '${(ch.durationSeconds / 60).toStringAsFixed(1)} mins',
+                        style: const TextStyle(fontSize: 10)),
                     onTap: () async {
-                      await widget.audioService.loadBook(_streamableBook!, initialChapterIndex: idx);
+                      await widget.audioService
+                          .loadBook(_streamableBook!, initialChapterIndex: idx);
                     },
                   ),
                 ),

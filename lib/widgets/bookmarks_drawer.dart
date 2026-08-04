@@ -77,15 +77,21 @@ class BookmarksDrawer extends StatelessWidget {
                           backgroundColor: Colors.amber.withValues(alpha: 0.15),
                           child: Text(
                             'Ch ${bm.chapterIndex + 1}',
-                            style: const TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.amber,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
-                        title: Text(bm.note, maxLines: 2, overflow: TextOverflow.ellipsis),
+                        title: Text(bm.note,
+                            maxLines: 2, overflow: TextOverflow.ellipsis),
                         subtitle: Text(
                           'Timestamp: ${_formatDuration(dur)}',
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          style:
+                              const TextStyle(fontSize: 11, color: Colors.grey),
                         ),
-                        trailing: const Icon(Icons.play_arrow, color: Colors.amber),
+                        trailing:
+                            const Icon(Icons.play_arrow, color: Colors.amber),
                         onTap: () async {
                           Navigator.pop(context);
                           final book = audioService.currentBookNotifier.value;

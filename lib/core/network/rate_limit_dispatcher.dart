@@ -14,7 +14,8 @@ class RateLimitDispatcher {
     Duration? cooldown,
   }) {
     final completer = Completer<T>();
-    final effectiveCooldown = cooldown ?? defaultCooldowns[apiId] ?? const Duration(seconds: 1);
+    final effectiveCooldown =
+        cooldown ?? defaultCooldowns[apiId] ?? const Duration(seconds: 1);
 
     final previousFuture = _queues[apiId] ?? Future.value();
 

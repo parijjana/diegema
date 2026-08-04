@@ -51,7 +51,10 @@ class LibriVoxShelfView extends StatelessWidget {
                   ),
                   child: Text(
                     'SEE ALL',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary),
                   ),
                 ),
             ],

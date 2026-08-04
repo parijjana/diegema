@@ -13,9 +13,11 @@ class LibriVoxBookItem extends StatelessWidget {
     required this.onTap,
   });
 
-  BoxDecoration _buildCoverDecoration(ThemeData theme, double hue, bool isSelected) {
+  BoxDecoration _buildCoverDecoration(
+      ThemeData theme, double hue, bool isSelected) {
     final startColor = HSLColor.fromAHSL(1.0, hue, 0.65, 0.22).toColor();
-    final endColor = HSLColor.fromAHSL(1.0, (hue + 40) % 360, 0.75, 0.12).toColor();
+    final endColor =
+        HSLColor.fromAHSL(1.0, (hue + 40) % 360, 0.75, 0.12).toColor();
     final accentColor = HSLColor.fromAHSL(1.0, hue, 0.9, 0.6).toColor();
 
     return BoxDecoration(
@@ -54,7 +56,8 @@ class LibriVoxBookItem extends StatelessWidget {
     final theme = Theme.of(context);
     final hash = book.title.hashCode;
     final double hue = (hash.abs() % 360).toDouble();
-    final String firstLetter = book.title.isNotEmpty ? book.title[0].toUpperCase() : '';
+    final String firstLetter =
+        book.title.isNotEmpty ? book.title[0].toUpperCase() : '';
     final String coverUrl = book.coverArtUrl;
 
     final Widget proceduralCover = AnimatedContainer(
@@ -91,11 +94,16 @@ class LibriVoxBookItem extends StatelessWidget {
             height: 3,
             child: Container(
               decoration: BoxDecoration(
-                color: HSLColor.fromAHSL(1.0, hue, 0.9, 0.6).toColor().withValues(alpha: 0.6),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(2)),
+                color: HSLColor.fromAHSL(1.0, hue, 0.9, 0.6)
+                    .toColor()
+                    .withValues(alpha: 0.6),
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(2)),
                 boxShadow: [
                   BoxShadow(
-                    color: HSLColor.fromAHSL(1.0, hue, 0.9, 0.6).toColor().withValues(alpha: 0.4),
+                    color: HSLColor.fromAHSL(1.0, hue, 0.9, 0.6)
+                        .toColor()
+                        .withValues(alpha: 0.4),
                     blurRadius: 4,
                   ),
                 ],
@@ -180,7 +188,9 @@ class LibriVoxBookItem extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: isSelected ? theme.colorScheme.primary : Colors.white.withValues(alpha: 0.15),
+                  color: isSelected
+                      ? theme.colorScheme.primary
+                      : Colors.white.withValues(alpha: 0.15),
                   width: isSelected ? 2.5 : 1,
                 ),
                 borderRadius: const BorderRadius.only(

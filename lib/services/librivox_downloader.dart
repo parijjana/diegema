@@ -23,7 +23,8 @@ class LibriVoxStreamAndDownloader {
 
     if (book.urlRss.isNotEmpty) {
       try {
-        final response = await _client.get(Uri.parse(book.urlRss), headers: _headers);
+        final response =
+            await _client.get(Uri.parse(book.urlRss), headers: _headers);
         if (response.statusCode == 200) {
           final rss = RssFeed.parse(response.body);
           int index = 0;
@@ -34,13 +35,15 @@ class LibriVoxStreamAndDownloader {
             final durationSecs = item.itunes?.duration?.inSeconds ?? 0;
             final trackTitle = item.title ?? 'Section ${index + 1}';
 
-            chapters.add(AudiobookChapter(
-              id: '${book.id}_stream_$index',
-              title: trackTitle,
-              audioPathOrUrl: streamUrl,
-              durationSeconds: durationSecs,
-              isStream: true,
-            ));
+            chapters.add(
+              AudiobookChapter(
+                id: '${book.id}_stream_$index',
+                title: trackTitle,
+                audioPathOrUrl: streamUrl,
+                durationSeconds: durationSecs,
+                isStream: true,
+              ),
+            );
             index++;
           }
         }
@@ -64,7 +67,8 @@ class LibriVoxStreamAndDownloader {
     required String saveDirectoryPath,
     void Function(double progress)? onProgress,
   }) async {
-    final sanitizeName = book.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+    final sanitizeName =
+        book.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
     final bookDir = Directory(p.join(saveDirectoryPath, sanitizeName));
     if (!await bookDir.exists()) {
       await bookDir.create(recursive: true);

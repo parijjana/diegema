@@ -15,7 +15,8 @@ void main() {
   });
 
   group('AppDatabase Persistence Unit Tests', () {
-    test('saveAudiobook and getAudiobook persist book and chapters correctly', () async {
+    test('saveAudiobook and getAudiobook persist book and chapters correctly',
+        () async {
       final book = UnifiedAudiobook(
         id: 'book_001',
         title: 'Sherlock Holmes',
@@ -78,7 +79,8 @@ void main() {
       expect(all.map((b) => b.title), containsAll(['Book A', 'Book B']));
     });
 
-    test('saveProgress and getProgress update timestamp and position', () async {
+    test('saveProgress and getProgress update timestamp and position',
+        () async {
       await db.saveProgress(
         audiobookId: 'book_001',
         chapterIndex: 2,
@@ -91,7 +93,8 @@ void main() {
       expect(progress.positionSeconds, equals(145));
     });
 
-    test('getMostRecentProgress returns the most recently updated progress', () async {
+    test('getMostRecentProgress returns the most recently updated progress',
+        () async {
       final now = DateTime.now();
       await db.saveProgress(
         audiobookId: 'book_old',

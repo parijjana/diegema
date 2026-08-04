@@ -73,7 +73,9 @@ class _AutoResumeBannerState extends State<AutoResumeBanner> {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final chIdx = _progress!.chapterIndex;
-    final chTitle = (chIdx < _resumeBook!.chapters.length) ? _resumeBook!.chapters[chIdx].title : 'Chapter ${chIdx + 1}';
+    final chTitle = (chIdx < _resumeBook!.chapters.length)
+        ? _resumeBook!.chapters[chIdx].title
+        : 'Chapter ${chIdx + 1}';
     final timestampText = _formatDuration(_progress!.positionSeconds);
 
     return Padding(
@@ -110,7 +112,10 @@ class _AutoResumeBannerState extends State<AutoResumeBanner> {
                       const SizedBox(width: 6),
                       Text(
                         '• $timestampText',
-                        style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.6)),
                       ),
                     ],
                   ),
@@ -119,13 +124,17 @@ class _AutoResumeBannerState extends State<AutoResumeBanner> {
                     _resumeBook!.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   Text(
                     chTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                    style: TextStyle(
+                        fontSize: 11,
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                   ),
                 ],
               ),
@@ -135,23 +144,32 @@ class _AutoResumeBannerState extends State<AutoResumeBanner> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
               icon: const Icon(Icons.play_arrow_rounded, size: 18),
-              label: const Text('RESUME ▶', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8)),
+              label: const Text('RESUME ▶',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      letterSpacing: 0.8)),
               onPressed: () async {
                 await widget.audioService.loadBook(
                   _resumeBook!,
                   initialChapterIndex: chIdx,
-                  initialPosition: Duration(seconds: _progress!.positionSeconds),
+                  initialPosition:
+                      Duration(seconds: _progress!.positionSeconds),
                 );
                 setState(() => _dismissed = true);
               },
             ),
             const SizedBox(width: 4),
             IconButton(
-              icon: Icon(Icons.close_rounded, size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+              icon: Icon(Icons.close_rounded,
+                  size: 18,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
               tooltip: 'Dismiss',
               onPressed: () => setState(() => _dismissed = true),
             ),

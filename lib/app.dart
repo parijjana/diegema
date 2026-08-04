@@ -73,7 +73,8 @@ class _AudiobookAppState extends State<AudiobookApp> {
         ),
         cardTheme: CardThemeData(
           color: const Color(0xFF181C20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     }

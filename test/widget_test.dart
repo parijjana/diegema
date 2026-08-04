@@ -7,7 +7,8 @@ import 'package:unamedaudiobookplayer/database/app_database.dart';
 import 'package:unamedaudiobookplayer/services/librivox_service.dart';
 
 void main() {
-  testWidgets('AudiobookApp renders main header and navigation tabs', (WidgetTester tester) async {
+  testWidgets('AudiobookApp renders main header and navigation tabs',
+      (WidgetTester tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
@@ -16,7 +17,8 @@ void main() {
     // so the widget test is deterministic and works with no network access.
     final mockClient = MockClient((request) async {
       if (request.url.host == 'librivox.org') {
-        return http.Response('{"books": []}', 200, headers: {'content-type': 'application/json'});
+        return http.Response('{"books": []}', 200,
+            headers: {'content-type': 'application/json'});
       }
       if (request.url.host == 'archive.org') {
         return http.Response(
@@ -28,10 +30,12 @@ void main() {
       return http.Response('Not Found', 404);
     });
 
-    await tester.pumpWidget(AudiobookApp(
-      database: db,
-      libriVoxService: LibriVoxService(client: mockClient),
-    ));
+    await tester.pumpWidget(
+      AudiobookApp(
+        database: db,
+        libriVoxService: LibriVoxService(client: mockClient),
+      ),
+    );
     // Bounded pumps rather than pumpAndSettle: some chrome in this app
     // (e.g. a spinner) animates indefinitely while loading, which would
     // make pumpAndSettle hang forever waiting for animations to stop.

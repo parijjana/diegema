@@ -38,13 +38,16 @@ void main() {
       expect(book.authorNames, equals('Unknown Author'));
     });
 
-    test('coverArtUrl resolves Internet Archive image URL from urlIarchive', () {
+    test('coverArtUrl resolves Internet Archive image URL from urlIarchive',
+        () {
       final book = LibriVoxBook(
         id: '999',
         title: 'Moby Dick',
         description: 'Whale tale.',
         totalTimeSecs: 7200,
-        authors: [LibriVoxAuthor(id: '3', firstName: 'Herman', lastName: 'Melville')],
+        authors: [
+          LibriVoxAuthor(id: '3', firstName: 'Herman', lastName: 'Melville')
+        ],
         urlRss: '',
         urlZipFile: '',
         urlIarchive: 'http://www.archive.org/details/moby_dick_librivox',
@@ -52,7 +55,8 @@ void main() {
         narrators: [],
       );
 
-      expect(book.coverArtUrl, equals('https://archive.org/services/img/moby_dick_librivox'));
+      expect(book.coverArtUrl,
+          equals('https://archive.org/services/img/moby_dick_librivox'));
     });
 
     test('coverArtUrl resolves string ID identifier', () {
@@ -61,14 +65,17 @@ void main() {
         title: 'War and Peace',
         description: 'Epic story.',
         totalTimeSecs: 10000,
-        authors: [LibriVoxAuthor(id: '4', firstName: 'Leo', lastName: 'Tolstoy')],
+        authors: [
+          LibriVoxAuthor(id: '4', firstName: 'Leo', lastName: 'Tolstoy')
+        ],
         urlRss: '',
         urlZipFile: '',
         language: 'English',
         narrators: [],
       );
 
-      expect(book.coverArtUrl, equals('https://archive.org/services/img/war_and_peace_librivox'));
+      expect(book.coverArtUrl,
+          equals('https://archive.org/services/img/war_and_peace_librivox'));
     });
 
     test('fromJson and toJson roundtrip correctly', () {
@@ -78,7 +85,7 @@ void main() {
         'description': 'Description text',
         'totaltimesecs': '1200',
         'authors': [
-          {'id': '10', 'first_name': 'First', 'last_name': 'Last'}
+          {'id': '10', 'first_name': 'First', 'last_name': 'Last'},
         ],
         'url_rss': 'https://example.com/rss',
         'url_zip_file': 'https://example.com/zip',
@@ -87,17 +94,18 @@ void main() {
         'sections': [
           {
             'readers': [
-              {'display_name': 'Reader One'}
-            ]
+              {'display_name': 'Reader One'},
+            ],
           }
-        ]
+        ],
       };
 
       final book = LibriVoxBook.fromJson(jsonMap);
       expect(book.id, equals('555'));
       expect(book.title, equals('Test Book'));
       expect(book.narrators, contains('Reader One'));
-      expect(book.coverArtUrl, equals('https://archive.org/services/img/test_book'));
+      expect(book.coverArtUrl,
+          equals('https://archive.org/services/img/test_book'));
     });
   });
 }

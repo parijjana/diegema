@@ -56,12 +56,14 @@ class Bookmarks extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [
-  Audiobooks,
-  Chapters,
-  PlaybackProgress,
-  Bookmarks,
-])
+@DriftDatabase(
+  tables: [
+    Audiobooks,
+    Chapters,
+    PlaybackProgress,
+    Bookmarks,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
@@ -108,7 +110,8 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<domain.UnifiedAudiobook?> getAudiobook(String id) async {
-    final bookRow = await (select(audiobooks)..where((a) => a.id.equals(id))).getSingleOrNull();
+    final bookRow = await (select(audiobooks)..where((a) => a.id.equals(id)))
+        .getSingleOrNull();
     if (bookRow == null) return null;
 
     final chapterRows = await (select(chapters)
@@ -117,13 +120,15 @@ class AppDatabase extends _$AppDatabase {
         .get();
 
     final domainChapters = chapterRows
-        .map((c) => domain.AudiobookChapter(
-              id: c.id,
-              title: c.title,
-              audioPathOrUrl: c.audioPathOrUrl,
-              durationSeconds: c.durationSeconds,
-              isStream: c.isStream,
-            ))
+        .map(
+          (c) => domain.AudiobookChapter(
+            id: c.id,
+            title: c.title,
+            audioPathOrUrl: c.audioPathOrUrl,
+            durationSeconds: c.durationSeconds,
+            isStream: c.isStream,
+          ),
+        )
         .toList();
 
     return domain.UnifiedAudiobook(
@@ -166,12 +171,17 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<PlaybackProgressData?> getProgress(String audiobookId) async {
-    return (select(playbackProgress)..where((p) => p.audiobookId.equals(audiobookId))).getSingleOrNull();
+    return (select(playbackProgress)
+          ..where((p) => p.audiobookId.equals(audiobookId)))
+        .getSingleOrNull();
   }
 
   Future<PlaybackProgressData?> getMostRecentProgress() async {
     return (select(playbackProgress)
-          ..orderBy([(p) => OrderingTerm(expression: p.updatedAt, mode: OrderingMode.desc)])
+          ..orderBy([
+            (p) =>
+                OrderingTerm(expression: p.updatedAt, mode: OrderingMode.desc)
+          ])
           ..limit(1))
         .getSingleOrNull();
   }
@@ -198,7 +208,10 @@ class AppDatabase extends _$AppDatabase {
   Future<List<Bookmark>> getBookmarks(String audiobookId) async {
     return (select(bookmarks)
           ..where((b) => b.audiobookId.equals(audiobookId))
-          ..orderBy([(b) => OrderingTerm(expression: b.createdAt, mode: OrderingMode.desc)]))
+          ..orderBy([
+            (b) =>
+                OrderingTerm(expression: b.createdAt, mode: OrderingMode.desc)
+          ]))
         .get();
   }
 }

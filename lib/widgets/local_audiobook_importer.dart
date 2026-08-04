@@ -6,7 +6,8 @@ import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 
 class LocalAudiobookImporter {
-  static Future<void> importFolder(BuildContext context, AppDatabase db, VoidCallback onSuccess) async {
+  static Future<void> importFolder(
+      BuildContext context, AppDatabase db, VoidCallback onSuccess) async {
     try {
       final selectedDirectory = await FilePicker.getDirectoryPath(
         dialogTitle: 'Select Audiobook Directory',
@@ -22,17 +23,18 @@ class LocalAudiobookImporter {
           .where((entity) => entity is File)
           .cast<File>()
           .where((f) {
-            final ext = p.extension(f.path).toLowerCase();
-            return ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg'].contains(ext);
-          })
-          .toList();
+        final ext = p.extension(f.path).toLowerCase();
+        return ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg'].contains(ext);
+      }).toList();
 
       files.sort((a, b) => a.path.compareTo(b.path));
 
       if (files.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No audio files (.mp3, .m4a, etc.) found in selected folder.')),
+            const SnackBar(
+                content: Text(
+                    'No audio files (.mp3, .m4a, etc.) found in selected folder.')),
           );
         }
         return;
@@ -67,7 +69,9 @@ class LocalAudiobookImporter {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Imported "${book.title}" (${chapters.length} chapters)!')),
+          SnackBar(
+              content: Text(
+                  'Imported "${book.title}" (${chapters.length} chapters)!')),
         );
       }
     } catch (e) {
@@ -79,7 +83,8 @@ class LocalAudiobookImporter {
     }
   }
 
-  static Future<void> importFiles(BuildContext context, AppDatabase db, VoidCallback onSuccess) async {
+  static Future<void> importFiles(
+      BuildContext context, AppDatabase db, VoidCallback onSuccess) async {
     try {
       final result = await FilePicker.pickFiles(
         allowMultiple: true,
@@ -100,7 +105,9 @@ class LocalAudiobookImporter {
 
       final firstFile = paths.first;
       final parentFolder = p.basename(p.dirname(firstFile));
-      final defaultTitle = parentFolder.isNotEmpty && parentFolder != '.' ? parentFolder : 'Imported Audiobook';
+      final defaultTitle = parentFolder.isNotEmpty && parentFolder != '.'
+          ? parentFolder
+          : 'Imported Audiobook';
 
       final bookId = 'imported_files_${paths.join().hashCode.abs()}';
       final chapters = paths.asMap().entries.map((entry) {
@@ -131,7 +138,9 @@ class LocalAudiobookImporter {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Imported "${book.title}" (${paths.length} files)!')),
+          SnackBar(
+              content:
+                  Text('Imported "${book.title}" (${paths.length} files)!')),
         );
       }
     } catch (e) {
@@ -143,7 +152,8 @@ class LocalAudiobookImporter {
     }
   }
 
-  static void showOptionsModal(BuildContext context, AppDatabase db, VoidCallback onSuccess) {
+  static void showOptionsModal(
+      BuildContext context, AppDatabase db, VoidCallback onSuccess) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
 
@@ -171,8 +181,11 @@ class LocalAudiobookImporter {
             const SizedBox(height: 16),
             ListTile(
               leading: Icon(Icons.folder_open_rounded, color: primary),
-              title: const Text('Import Audiobook Folder', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              subtitle: const Text('Select a directory containing MP3, M4A, or FLAC chapters', style: TextStyle(fontSize: 11)),
+              title: const Text('Import Audiobook Folder',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text(
+                  'Select a directory containing MP3, M4A, or FLAC chapters',
+                  style: TextStyle(fontSize: 11)),
               onTap: () {
                 Navigator.pop(context);
                 importFolder(context, db, onSuccess);
@@ -181,8 +194,11 @@ class LocalAudiobookImporter {
             const Divider(),
             ListTile(
               leading: Icon(Icons.audio_file_rounded, color: primary),
-              title: const Text('Import Audio Files', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              subtitle: const Text('Select individual audio files to group into an audiobook', style: TextStyle(fontSize: 11)),
+              title: const Text('Import Audio Files',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text(
+                  'Select individual audio files to group into an audiobook',
+                  style: TextStyle(fontSize: 11)),
               onTap: () {
                 Navigator.pop(context);
                 importFiles(context, db, onSuccess);

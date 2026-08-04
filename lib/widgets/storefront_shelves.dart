@@ -24,7 +24,8 @@ class StorefrontShelves extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (isLoading && categoryResults.isEmpty) {
-      return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
+      return Center(
+          child: CircularProgressIndicator(color: theme.colorScheme.primary));
     }
 
     return ListView(
@@ -70,7 +71,8 @@ class SearchResultsGrid extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (isLoading) {
-      return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
+      return Center(
+          child: CircularProgressIndicator(color: theme.colorScheme.primary));
     }
 
     if (searchResults.isEmpty) {

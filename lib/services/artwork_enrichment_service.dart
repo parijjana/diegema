@@ -11,14 +11,17 @@ import '../domain/models/librivox_book.dart';
 class ArtworkEnrichmentService {
   final http.Client _client;
 
-  ArtworkEnrichmentService({http.Client? client}) : _client = client ?? http.Client();
+  ArtworkEnrichmentService({http.Client? client})
+      : _client = client ?? http.Client();
 
   Future<String?> resolveCoverArtUrl(LibriVoxBook book) async {
     final url = book.coverArtUrl;
     if (url.isEmpty) return null;
 
     try {
-      final response = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final response = await _client
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
       final contentType = response.headers['content-type'] ?? '';
       if (response.statusCode == 200 && contentType.startsWith('image/')) {
         return url;

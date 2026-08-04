@@ -48,6 +48,13 @@ class LibriVoxBook {
   final String language;
   final List<String> narrators;
 
+  /// True (the default) for every book from the real LibriVox/archive.org
+  /// APIs. Only the canned web demo's curated catalog ever sets this to
+  /// false, to mark a browse-only preview entry whose audio was not
+  /// bundled with the demo. See rework_plan.md: "Every non-playable entry
+  /// must be visibly marked in the UI."
+  final bool demoPlayable;
+
   LibriVoxBook({
     required this.id,
     required this.title,
@@ -59,6 +66,7 @@ class LibriVoxBook {
     this.urlIarchive = '',
     required this.language,
     required this.narrators,
+    this.demoPlayable = true,
   });
 
   String get authorNames {

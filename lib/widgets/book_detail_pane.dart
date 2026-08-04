@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import '../core/demo_mode.dart';
 import '../database/app_database.dart';
 import '../domain/models/librivox_book.dart';
 import '../domain/models/audiobook.dart';
@@ -186,40 +187,73 @@ class _BookDetailPaneState extends State<BookDetailPane> {
                           fontSize: 12),
                     ),
                   ],
+                  if (!widget.book.demoPlayable) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock_rounded,
+                              size: 12, color: Colors.white70),
+                          SizedBox(width: 5),
+                          Text(
+                            'PREVIEW ONLY — not streamable in this demo',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.3,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  _isDownloaded ? Colors.teal : theme.colorScheme.secondary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            icon: Icon(_isDownloading
-                ? Icons.downloading
-                : (_isDownloaded
-                    ? Icons.check_circle
-                    : Icons.download_rounded)),
-            label: Text(
-              _isDownloading
-                  ? 'Downloading (${(_downloadProgress * 100).toStringAsFixed(0)}%)...'
+        // Full-book ZIP download is never available in the web demo (it is
+        // streaming-only, see rework_plan.md); hide the control entirely
+        // rather than showing a button that would fail.
+        if (!kDemoMode)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    _isDownloaded ? Colors.teal : theme.colorScheme.secondary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              icon: Icon(_isDownloading
+                  ? Icons.downloading
                   : (_isDownloaded
-                      ? 'Downloaded to Local Storage'
-                      : 'Download Full Audiobook (ZIP)'),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ? Icons.check_circle
+                      : Icons.download_rounded)),
+              label: Text(
+                _isDownloading
+                    ? 'Downloading (${(_downloadProgress * 100).toStringAsFixed(0)}%)...'
+                    : (_isDownloaded
+                        ? 'Downloaded to Local Storage'
+                        : 'Download Full Audiobook (ZIP)'),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              onPressed: _isDownloading ? null : _downloadBook,
             ),
-            onPressed: _isDownloading ? null : _downloadBook,
           ),
-        ),
-        const SizedBox(height: 20),
+        if (!kDemoMode) const SizedBox(height: 20),
         GlassCard(
           title: 'Description',
           borderRadius: BorderRadius.circular(10),
@@ -242,6 +276,9 @@ class _BookDetailPaneState extends State<BookDetailPane> {
           ..._streamableBook!.chapters.asMap().entries.map((entry) {
             final idx = entry.key;
             final ch = entry.value;
+            final playable = widget.book.demoPlayable;
+            final disabledColor =
+                theme.colorScheme.onSurface.withValues(alpha: 0.35);
             return Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: GlassCard(
@@ -252,18 +289,30 @@ class _BookDetailPaneState extends State<BookDetailPane> {
                   color: Colors.transparent,
                   child: ListTile(
                     dense: true,
-                    leading: Icon(Icons.play_circle_fill,
-                        color: theme.colorScheme.primary, size: 26),
+                    leading: Icon(
+                      playable ? Icons.play_circle_fill : Icons.lock_rounded,
+                      color: playable ? theme.colorScheme.primary : disabledColor,
+                      size: playable ? 26 : 20,
+                    ),
                     title: Text(ch.title,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 12)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: playable ? null : disabledColor)),
                     subtitle: Text(
-                        '${(ch.durationSeconds / 60).toStringAsFixed(1)} mins',
-                        style: const TextStyle(fontSize: 10)),
-                    onTap: () async {
-                      await widget.audioService
-                          .loadBook(_streamableBook!, initialChapterIndex: idx);
-                    },
+                        playable
+                            ? '${(ch.durationSeconds / 60).toStringAsFixed(1)} mins'
+                            : 'Preview only — not streamable in this demo',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: playable ? null : disabledColor)),
+                    onTap: playable
+                        ? () async {
+                            await widget.audioService.loadBook(
+                                _streamableBook!,
+                                initialChapterIndex: idx);
+                          }
+                        : null,
                   ),
                 ),
               ),

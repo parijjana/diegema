@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Web demo audio — downloaded locally by scripts/fetch_demo_audio.sh for
+# manual review before the user uploads it to their own hosting. Never
+# committed: LibriVox audio is public domain, but there's no reason to
+# carry MP3s in git history.
+/demo_audio/

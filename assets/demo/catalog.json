@@ -1,0 +1,839 @@
+{
+  "books": [
+    {
+      "id": "gettysburg_address_librivox",
+      "title": "The Gettysburg Address",
+      "author": "Abraham Lincoln",
+      "description": "The Dedication of the National Cemetery at Gettysburg, in November, 1863, followed a few short months after the roiling, acrid clouds of gun smoke dissipated, leaving a little crossroads town in Pennsylvania heir to the human tragedy of over 7,000 corpses and 21,000 men suffering wounds. It was a most unnatural disaster. On November 19, the chief executive made the trip to the still-dazed, shot-torn community to deliver, almost as an afterthought (for he was not the keynote speaker), an...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "history",
+      "playable": true,
+      "coverUrl": "https://archive.org/services/img/gettysburg_address_librivox",
+      "chapters": [
+        {
+          "title": "The Gettysburg Address",
+          "filename": "gettysburg_address_lincoln_64kb.mp3",
+          "durationSeconds": 161
+        }
+      ]
+    },
+    {
+      "id": "sonnet_23_librivox",
+      "title": "Sonnet 23 by William Shakespeare",
+      "author": "William Shakespeare",
+      "description": "Librivox's weekly poetry project for the week of November 27, 2005: Sonnet 23 by William Shakespeare. Read by: Annie Cori Samuel Gord MacKenzie Hugh McGuire Kristen McQuillin Kara Shallenberg Mtl3p Scott Monroe For further information, including links to online text, reader information, RSS feeds, CD cover or other formats (if available), please go to the LibriVox catalog page for this recording. For more free audiobooks and to find out how to become a volunteer reader, please visit Librivox...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "poetry",
+      "playable": true,
+      "coverUrl": "https://archive.org/services/img/sonnet_23_librivox",
+      "chapters": [
+        {
+          "title": "sonnet_23",
+          "filename": "sonnet_23_shakespeare_ac_64kb.mp3",
+          "durationSeconds": 87
+        }
+      ]
+    },
+    {
+      "id": "pride_and_prejudice_librivox",
+      "title": "Pride and Prejudice",
+      "author": "Jane Austen",
+      "description": "Librivox recording of Pride and Prejudice , by Jane Austen. For more information on our readers, see our catalog page: http://librivox.org/pride-and-prejudice-by-jane-austen/ Pride and Prejudice is the most famous of Jane Austen's novels, and its opening is one of the most famous lines in English literature - \"It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.\" Its manuscript was first written between 1796 and 1797, and was...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "fiction",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/pride_and_prejudice_librivox",
+      "chapters": [
+        {
+          "title": "Chapters 1-3",
+          "filename": "prideandprejudice_01-03_austen_64kb.mp3",
+          "durationSeconds": 1132
+        },
+        {
+          "title": "Chapters 4-5",
+          "filename": "prideandprejudice_04-05_austen_64kb.mp3",
+          "durationSeconds": 865
+        },
+        {
+          "title": "Chapter 6",
+          "filename": "prideandprejudice_06_austen_64kb.mp3",
+          "durationSeconds": 777
+        },
+        {
+          "title": "Chapter 7",
+          "filename": "prideandprejudice_07_austen_64kb.mp3",
+          "durationSeconds": 638
+        },
+        {
+          "title": "Chapter 8",
+          "filename": "prideandprejudice_08_austen_64kb.mp3",
+          "durationSeconds": 819
+        },
+        {
+          "title": "Chapter 9",
+          "filename": "prideandprejudice_09_austen_64kb.mp3",
+          "durationSeconds": 701
+        },
+        {
+          "title": "Chapters 10-11",
+          "filename": "prideandprejudice_10-11_austen_64kb.mp3",
+          "durationSeconds": 1563
+        },
+        {
+          "title": "Chapters 12-13",
+          "filename": "prideandprejudice_12-13_austen_64kb.mp3",
+          "durationSeconds": 901
+        }
+      ]
+    },
+    {
+      "id": "adventures_sherlockholmes_1007_librivox",
+      "title": "The Adventures of Sherlock Holmes",
+      "author": "Sir Arthur Conan Doyle",
+      "description": "LibriVox recording of The Adventures of Sherlock Holmes, by Sir Arthur Conan Doyle. Read by Mark F. Smith. Dr. Watson chronicles here some of the more interesting detective cases that he and his good friend, Mr. Sherlock Holmes, have encountered during their association. We see the cases unfold as he does, scratch our heads as does he while the evidence is collected, and then marvel at the impeccable observations, remarkable insight, and doggedness which Holmes displays as he teases apart...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "fiction",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/adventures_sherlockholmes_1007_librivox",
+      "chapters": [
+        {
+          "title": "01 - A Scandal in Bohemia",
+          "filename": "adventuresherlockholmes_01_doyle_64kb.mp3",
+          "durationSeconds": 3474
+        },
+        {
+          "title": "02 - The Red-Headed League",
+          "filename": "adventuresherlockholmes_02_doyle_64kb.mp3",
+          "durationSeconds": 3600
+        },
+        {
+          "title": "03 - A Case of Identity",
+          "filename": "adventuresherlockholmes_03_doyle_64kb.mp3",
+          "durationSeconds": 2717
+        },
+        {
+          "title": "04 - The Bascombe Valley Mystery",
+          "filename": "adventuresherlockholmes_04_doyle_64kb.mp3",
+          "durationSeconds": 3778
+        },
+        {
+          "title": "05 - The Five Orange Pips",
+          "filename": "adventuresherlockholmes_05_doyle_64kb.mp3",
+          "durationSeconds": 2810
+        },
+        {
+          "title": "06 - The Man With the Twisted Lip",
+          "filename": "adventuresherlockholmes_06_doyle_64kb.mp3",
+          "durationSeconds": 3584
+        },
+        {
+          "title": "07 - The Adventure of the Blue Carbuncle",
+          "filename": "adventuresherlockholmes_07_doyle_64kb.mp3",
+          "durationSeconds": 3101
+        },
+        {
+          "title": "08 - The Adventure of the Speckled Band",
+          "filename": "adventuresherlockholmes_08_doyle_64kb.mp3",
+          "durationSeconds": 3767
+        }
+      ]
+    },
+    {
+      "id": "frankenstein_cs_librivox",
+      "title": "Frankenstein; or, The Modern Prometheus (1818)",
+      "author": "Mary Wollstonecraft Shelley",
+      "description": "LibriVox recording of Frankenstein; or, The Modern Prometheus, by Mary Wollstonecraft Shelley. Read by Cori Samuel. Frankenstein; or, The Modern Prometheus is a novel written by the British author Mary Shelley. Shelley wrote the novel when she was 18 years old. The first edition was published anonymously in London in 1818, and this audiobook is read from that text. Shelley's name appeared on the revised third edition, published in 1831. The title of the novel refers to the scientist, Victor...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "science fiction",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/frankenstein_cs_librivox",
+      "chapters": [
+        {
+          "title": "01 - Dedication and Preface",
+          "filename": "frankenstein_01_shelley_64kb.mp3",
+          "durationSeconds": 276
+        },
+        {
+          "title": "02 - Vol. I, Letter I",
+          "filename": "frankenstein_02_shelley_64kb.mp3",
+          "durationSeconds": 472
+        },
+        {
+          "title": "03 - Vol. I, Letter II",
+          "filename": "frankenstein_03_shelley_64kb.mp3",
+          "durationSeconds": 410
+        },
+        {
+          "title": "04 - Vol. I, Letter III",
+          "filename": "frankenstein_04_shelley_64kb.mp3",
+          "durationSeconds": 110
+        },
+        {
+          "title": "05 - Vol. I, Letter IV",
+          "filename": "frankenstein_05_shelley_64kb.mp3",
+          "durationSeconds": 885
+        },
+        {
+          "title": "06 - Vol. I, Chapter I",
+          "filename": "frankenstein_06_shelley_64kb.mp3",
+          "durationSeconds": 1201
+        },
+        {
+          "title": "07 - Vol. I, Chapter II",
+          "filename": "frankenstein_07_shelley_64kb.mp3",
+          "durationSeconds": 917
+        },
+        {
+          "title": "08 - Vol. I, Chapter III",
+          "filename": "frankenstein_08_shelley_64kb.mp3",
+          "durationSeconds": 1044
+        }
+      ]
+    },
+    {
+      "id": "war_of_the_worlds_librivox",
+      "title": "The War of the Worlds",
+      "author": "H. G. Wells",
+      "description": "Librivox recording of The War of the Worlds , by H. G. Wells. For more information on our readers, see our catalog page: http://librivox.org/the-war-of-the-worlds-by-h-g-wells-group/ H. G. Wells wrote The War of the Worlds in 1898, when there was much speculation about life on the planet Mars. The book is considered to be one of the first science fiction novels. In the story, an English gentleman narrates the events of a violent and fast paced Martian invasion. The frightening images of...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "science fiction",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/war_of_the_worlds_librivox",
+      "chapters": [
+        {
+          "title": "The War of the Worlds - Book 1 - Chapter 01",
+          "filename": "war_of_the_worlds_01_wells_64kb.mp3",
+          "durationSeconds": 832
+        },
+        {
+          "title": "The War of the Worlds - Book 1 - Chapter 02",
+          "filename": "war_of_the_worlds_02_wells_64kb.mp3",
+          "durationSeconds": 501
+        },
+        {
+          "title": "The War of the Worlds - Book 1 - Chapter 03",
+          "filename": "war_of_the_worlds_03_wells_64kb.mp3",
+          "durationSeconds": 411
+        },
+        {
+          "title": "The War of the Worlds - Book 1 - Chapter 04",
+          "filename": "war_of_the_worlds_04_wells_64kb.mp3",
+          "durationSeconds": 379
+        },
+        {
+          "title": "The War of the Worlds - Book 1 - Chapter 05",
+          "filename": "war_of_the_worlds_05_wells_64kb.mp3",
+          "durationSeconds": 622
+        },
+        {
+          "title": "The War of the Worlds - Book 1 - Chapter 06",
+          "filename": "war_of_the_worlds_06_wells_64kb.mp3",
+          "durationSeconds": 396
+        },
+        {
+          "title": "The War of the Worlds - Book 1 - Chapter 07",
+          "filename": "war_of_the_worlds_07_wells_64kb.mp3",
+          "durationSeconds": 609
+        },
+        {
+          "title": "The War of the Worlds - Book 1 - Chapter 08",
+          "filename": "war_of_the_worlds_08_wells_64kb.mp3",
+          "durationSeconds": 420
+        }
+      ]
+    },
+    {
+      "id": "dracula_librivox",
+      "title": "Dracula",
+      "author": "Bram Stoker",
+      "description": "LibriVox recording of Dracula, by Bram Stoker. The classic vampire story by Bram Stoker revolves around a struggle between good and evil, tradition and modernity, and lust versus chastity. The author didn't invent vampires, but his novel has so captured the public's imagination that he is rightly considered their popularizer. Listen and you will meet not only the Count himself, but heroes Jonathan Harker and Abraham Van Helsing, plus an array of madmen, psychiatrists, and fair maidens who...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "fiction",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/dracula_librivox",
+      "chapters": [
+        {
+          "title": "Chapter 01",
+          "filename": "dracula_01_stoker_64kb.mp3",
+          "durationSeconds": 2218
+        },
+        {
+          "title": "Chapter 02",
+          "filename": "dracula_02_stoker_64kb.mp3",
+          "durationSeconds": 1796
+        },
+        {
+          "title": "Chapter 03",
+          "filename": "dracula_03_stoker_64kb.mp3",
+          "durationSeconds": 2825
+        },
+        {
+          "title": "Chapter 04",
+          "filename": "dracula_04_stoker_64kb.mp3",
+          "durationSeconds": 2176
+        },
+        {
+          "title": "Chapter 05",
+          "filename": "dracula_05_stoker_64kb.mp3",
+          "durationSeconds": 1101
+        },
+        {
+          "title": "Chapter 06",
+          "filename": "dracula_06_stoker_64kb.mp3",
+          "durationSeconds": 1910
+        },
+        {
+          "title": "Chapter 07",
+          "filename": "dracula_07_stoker_64kb.mp3",
+          "durationSeconds": 2507
+        },
+        {
+          "title": "Chapter 08",
+          "filename": "dracula_08_stoker_64kb.mp3",
+          "durationSeconds": 2317
+        }
+      ]
+    },
+    {
+      "id": "call_of_the_wild",
+      "title": "The Call of the Wild",
+      "author": "Jack London",
+      "description": "LibriVox recording of Call of the Wild, by Jack London. In this novel (often mistakenly classified a children’s book) the main protagonist Buck, a St. Bernard/Collie mix, is abducted and sold to a trainer of sled dogs in Alaska. He adapts to the brutal conditions and is finally acquired by a loving man. When this new owner is killed, Buck follows the ‘call of the wild’ and joins a pack of wolves. (Summary written by Gesine) For further information, including links to online text, reader...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "fiction",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/call_of_the_wild",
+      "chapters": [
+        {
+          "title": "Chapter 1",
+          "filename": "call_of_the_wild_1_london_64kb.mp3",
+          "durationSeconds": 1446
+        },
+        {
+          "title": "Chapter 2",
+          "filename": "call_of_the_wild_2_london_64kb.mp3",
+          "durationSeconds": 1345
+        },
+        {
+          "title": "Chapter 3",
+          "filename": "call_of_the_wild_3_london_64kb.mp3",
+          "durationSeconds": 1728
+        },
+        {
+          "title": "Chapter 4",
+          "filename": "call_of_the_wild_4_london_64kb.mp3",
+          "durationSeconds": 1027
+        },
+        {
+          "title": "Chapters 5 and 6",
+          "filename": "call_of_the_wild_5-6_london_64kb.mp3",
+          "durationSeconds": 3709
+        },
+        {
+          "title": "Chapter 7",
+          "filename": "call_of_the_wild_7_london_64kb.mp3",
+          "durationSeconds": 2969
+        }
+      ]
+    },
+    {
+      "id": "moby_dick_librivox",
+      "title": "Moby Dick, or the Whale",
+      "author": "Herman Melville",
+      "description": "Librivox recording of Moby Dick, or the Whale, by Herman Melville. Read by Stewart Wills Few things, even in literature, can really be said to be unique -- but Moby Dick is truly unlike anything written before or since. The novel is nominally about the obsessive hunt by the crazed Captain Ahab of the book's eponymous white whale. But interspersed in that story are digressions, paradoxes, philosophical riffs on whaling and life, and a display of techniques so advanced for its time that some...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "fiction",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/moby_dick_librivox",
+      "chapters": [
+        {
+          "title": "Chapter 000: Etymology and Extracts",
+          "filename": "mobydick_000_melville_64kb.mp3",
+          "durationSeconds": 1753
+        },
+        {
+          "title": "Chapter 001-002",
+          "filename": "mobydick_001_002_melville_64kb.mp3",
+          "durationSeconds": 1436
+        },
+        {
+          "title": "Chapter 003",
+          "filename": "mobydick_003_melville_64kb.mp3",
+          "durationSeconds": 2093
+        },
+        {
+          "title": "Chapter 004-007",
+          "filename": "mobydick_004_007_melville_64kb.mp3",
+          "durationSeconds": 1630
+        },
+        {
+          "title": "Chapter 008-009",
+          "filename": "mobydick_008_009_melville_64kb.mp3",
+          "durationSeconds": 1776
+        },
+        {
+          "title": "Chapter 010-012",
+          "filename": "mobydick_010_012_melville_64kb.mp3",
+          "durationSeconds": 1168
+        },
+        {
+          "title": "Chapter 013-015",
+          "filename": "mobydick_013_015_melville_64kb.mp3",
+          "durationSeconds": 1388
+        },
+        {
+          "title": "Chapter 016",
+          "filename": "mobydick_016_melville_64kb.mp3",
+          "durationSeconds": 2118
+        }
+      ]
+    },
+    {
+      "id": "peter_pan_0707_librivox",
+      "title": "Peter Pan",
+      "author": "J. M. Barrie",
+      "description": "Librivox recording of Peter Pan by J. M. Barrie. Read by Librivox volunteers. Peter Pan is the well-loved story of three children and their adventures in Neverland with the boy who refuses to grow up. Swashbuckling, fairy dust, and flight; mermaid lagoons, ticking crocodiles, and Princess Tiger Lily; second to the right and then straight on till morning. You know the story... and if you don't, please start listening immediately! (summary by Meredith Hughes) For further information, including...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "children",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/peter_pan_0707_librivox",
+      "chapters": [
+        {
+          "title": "01 - Peter Breaks Through",
+          "filename": "peterpan_01_barrie_64kb.mp3",
+          "durationSeconds": 1070
+        },
+        {
+          "title": "02 - The Shadow",
+          "filename": "peterpan_02_barrie_64kb.mp3",
+          "durationSeconds": 1292
+        },
+        {
+          "title": "03 - Come Away, Come Away!",
+          "filename": "peterpan_03_barrie_64kb.mp3",
+          "durationSeconds": 1532
+        },
+        {
+          "title": "04 - The Flight",
+          "filename": "peterpan_04_barrie_64kb.mp3",
+          "durationSeconds": 1140
+        },
+        {
+          "title": "05 - The Island Come True",
+          "filename": "peterpan_05_barrie_64kb.mp3",
+          "durationSeconds": 1462
+        },
+        {
+          "title": "06 - The Little House",
+          "filename": "peterpan_06_barrie_64kb.mp3",
+          "durationSeconds": 820
+        },
+        {
+          "title": "07 - The Home Under the Ground",
+          "filename": "peterpan_07_barrie_64kb.mp3",
+          "durationSeconds": 1052
+        },
+        {
+          "title": "08 - The Mermaid's Lagoon",
+          "filename": "peterpan_08_barrie_64kb.mp3",
+          "durationSeconds": 1438
+        }
+      ]
+    },
+    {
+      "id": "christmascarol_librivox",
+      "title": "A Christmas Carol",
+      "author": "Charles Dickens",
+      "description": "A Christmas Carol (full title: A Christmas Carol in Prose, Being a Ghost Story of Christmas ) is a Victorian morality tale of an old and bitter miser, Ebenezer Scrooge, who undergoes a profound experience of redemption over the course of one evening. (Summary from Wikipedia) Read by Glen Hallstrom. For further information, including links to online text, reader information, RSS feeds, CD cover or other formats (if available), please go to the LibriVox catalog page for this recording. For...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "fiction",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/christmascarol_librivox",
+      "chapters": [
+        {
+          "title": "A Christmas Carol - Stave 1",
+          "filename": "christmas_carol_stave01_dickens_gmh_64kb.mp3",
+          "durationSeconds": 2315
+        },
+        {
+          "title": "A Christmas Carol - Stave 2",
+          "filename": "christmas_carol_stave02_dickens_gmh_64kb.mp3",
+          "durationSeconds": 2112
+        },
+        {
+          "title": "A Christmas Carol - Stave 3",
+          "filename": "christmas_carol_stave03_dickens_gmh_64kb.mp3",
+          "durationSeconds": 2762
+        },
+        {
+          "title": "A Christmas Carol - Stave 4",
+          "filename": "christmas_carol_stave04_dickens_gmh_64kb.mp3",
+          "durationSeconds": 1882
+        },
+        {
+          "title": "A Christmas Carol - Stave 5",
+          "filename": "christmas_carol_stave05_dickens_gmh_64kb.mp3",
+          "durationSeconds": 754
+        }
+      ]
+    },
+    {
+      "id": "wizard_of_oz",
+      "title": "The Wonderful Wizard of Oz",
+      "author": "L. Frank Baum",
+      "description": "Librivox recording of The Wonderful Wizard of Oz. The timeless story of the Wizard Of Oz. Follow Dorothy as she leaves Kansas for Oz on a cyclone. She meets many strange, and wonderful people and creatures along the way. Enjoy it again with your children and family. Summary by J. Hall For further information, including links to online text, reader information, RSS feeds, CD cover or other formats (if available), please go to the LibriVox catalog page for this recording. For more free...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "children",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/wizard_of_oz",
+      "chapters": [
+        {
+          "title": "00 - Introduction",
+          "filename": "wizardofoz_00_baum_64kb.mp3",
+          "durationSeconds": 94
+        },
+        {
+          "title": "01 - TheCyclone",
+          "filename": "wizardofoz_01_baum_64kb.mp3",
+          "durationSeconds": 384
+        },
+        {
+          "title": "02 - The Council with the Munchkins",
+          "filename": "wizardofoz_02_baum_64kb.mp3",
+          "durationSeconds": 702
+        },
+        {
+          "title": "03 - How Dorothy Saved the Scarecrow",
+          "filename": "wizardofoz_03_baum_64kb.mp3",
+          "durationSeconds": 682
+        },
+        {
+          "title": "04 - The Road Through the Forest",
+          "filename": "wizardofoz_04_baum_64kb.mp3",
+          "durationSeconds": 478
+        },
+        {
+          "title": "05 - The Rescue of the Tin Woodman",
+          "filename": "wizardofoz_05_baum_64kb.mp3",
+          "durationSeconds": 679
+        },
+        {
+          "title": "06 - The Cowardly Lion",
+          "filename": "wizardofoz_06_baum_64kb.mp3",
+          "durationSeconds": 527
+        },
+        {
+          "title": "07 - The Journey to the Great Oz",
+          "filename": "wizardofoz_07_baum_64kb.mp3",
+          "durationSeconds": 608
+        }
+      ]
+    },
+    {
+      "id": "grimms_english_librivox",
+      "title": "Grimms' Fairy Tales",
+      "author": "Jacob and Wilhelm Grimm",
+      "description": "Librivox recording of Fairy Tales by the Brother Grimm. A classic collection of oral German folklore, brought together for posterity by the scholarly brothers Grimm in the 1800s, this epitome of fairy tales includes many of the world's best known stories. In these dark foreboding woods, you will find: Rapunzel, Hansel and Gretel, Rumpelstiltskin, Lily and the Lion (better known as Beauty and the Beast), and Snow White and Rose Red, among other timeless works. These tales were later heavily...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "children",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/grimms_english_librivox",
+      "chapters": [
+        {
+          "title": "01 - The Golden Bird",
+          "filename": "grimm_01_goldenbird_64kb.mp3",
+          "durationSeconds": 950
+        },
+        {
+          "title": "02 - Hans in Luck",
+          "filename": "grimm_02_hans_in_luck_64kb.mp3",
+          "durationSeconds": 989
+        },
+        {
+          "title": "03 - Jorinda and Jorindel",
+          "filename": "grimm_03_jorindajorindel_64kb.mp3",
+          "durationSeconds": 439
+        },
+        {
+          "title": "04 - The Travelling Musicians",
+          "filename": "grimm_04_travellingmusicians_64kb.mp3",
+          "durationSeconds": 526
+        },
+        {
+          "title": "05 - Old Sultan",
+          "filename": "grimm_05_oldsultan_64kb.mp3",
+          "durationSeconds": 300
+        },
+        {
+          "title": "06 - The Straw, the Coal, and the Bean",
+          "filename": "grimm_06_thestraw_64kb.mp3",
+          "durationSeconds": 171
+        },
+        {
+          "title": "07 - Briar Rose",
+          "filename": "grimm_07_briarrose_64kb.mp3",
+          "durationSeconds": 511
+        },
+        {
+          "title": "08 - The Dog and the Sparrow",
+          "filename": "grimm_08_dogandsparrow_64kb.mp3",
+          "durationSeconds": 476
+        }
+      ]
+    },
+    {
+      "id": "frederick-douglass_jf_librivox",
+      "title": "Narrative of the Life of Frederick Douglass",
+      "author": "Frederick Douglass",
+      "description": "LibriVox recording of the Narrative of the Life of Frederick Douglass. Read by Jeanette Ferguson. Narrative of the Life of Frederick Douglass is a memoir and treatise on abolition written by famous orator and ex-slave, Frederick Douglass. It is generally held to be the most famous of a number of narratives written by former slaves during the same period. In factual detail, the text describes the events of his life and is considered to be one of the most influential pieces of literature to...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "biography",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/frederick-douglass_jf_librivox",
+      "chapters": [
+        {
+          "title": "01 - Preface",
+          "filename": "narrative_00-1_douglass_64kb.mp3",
+          "durationSeconds": 1224
+        },
+        {
+          "title": "02 - Letter",
+          "filename": "narrative_00-2_douglass_64kb.mp3",
+          "durationSeconds": 422
+        },
+        {
+          "title": "03 - Chapter 1",
+          "filename": "narrative_01_douglass_64kb.mp3",
+          "durationSeconds": 711
+        },
+        {
+          "title": "04 - Chapter 2",
+          "filename": "narrative_02_douglass_64kb.mp3",
+          "durationSeconds": 717
+        },
+        {
+          "title": "05 - Chapter 3",
+          "filename": "narrative_03_douglass_64kb.mp3",
+          "durationSeconds": 517
+        },
+        {
+          "title": "06 - Chapter 4",
+          "filename": "narrative_04_douglass_64kb.mp3",
+          "durationSeconds": 561
+        },
+        {
+          "title": "07 - Chapter 5",
+          "filename": "narrative_05_douglass_64kb.mp3",
+          "durationSeconds": 565
+        },
+        {
+          "title": "08 - Chapter 6",
+          "filename": "narrative_06_douglass_64kb.mp3",
+          "durationSeconds": 462
+        }
+      ]
+    },
+    {
+      "id": "declaration_of_independence_librivox",
+      "title": "The Declaration of Independence of the United States of America",
+      "author": "United States of America",
+      "description": "Librivox recording of The Declaration of Independence, by the United States of America. Read by Jim Cadwell . For further information, including links to online text, reader information, RSS feeds, CD cover or other formats (if available), please go to the LibriVox catalog page for this recording. For more free audiobooks or to become a volunteer reader, please visit librivox.org Download M4B (4MB)",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "history",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/declaration_of_independence_librivox",
+      "chapters": [
+        {
+          "title": "The Declaration of Independence",
+          "filename": "declaration_of_independence_usa_64kb.mp3",
+          "durationSeconds": 611
+        }
+      ]
+    },
+    {
+      "id": "jekyll_and_hyde_klh_0904_librivox",
+      "title": "The Strange Case of Dr. Jekyll and Mr. Hyde",
+      "author": "Robert Louis Stevenson",
+      "description": "LibriVox recording of The Strange Case of Dr. Jekyll and Mr. Hyde , by Robert Louis Stevenson. Read by Kristin Hughes. After hearing Mr. Enfield's account of a distressing event involving Edward Hyde, the heir of his friend, Henry Jekyll, John Utterson is convinced that Jekyll's relationship with Hyde is built on something sinister. Utterson's concern for his friend is not unfounded but the reasons aren't quite what he, at first, believes. (Summary by Kristin Hughes) For further information,...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "fiction",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/jekyll_and_hyde_klh_0904_librivox",
+      "chapters": [
+        {
+          "title": "01 - Story of the Door",
+          "filename": "jekyll_01_stevenson_64kb.mp3",
+          "durationSeconds": 855
+        },
+        {
+          "title": "02 - Search for Mr. Hyde",
+          "filename": "jekyll_02_stevenson_64kb.mp3",
+          "durationSeconds": 1158
+        },
+        {
+          "title": "03 - Dr. Jekyll Was Quite At Ease",
+          "filename": "jekyll_03_stevenson_64kb.mp3",
+          "durationSeconds": 335
+        },
+        {
+          "title": "04 - The Carew Murder Case",
+          "filename": "jekyll_04_stevenson_64kb.mp3",
+          "durationSeconds": 641
+        },
+        {
+          "title": "05 - Incident of the Letter",
+          "filename": "jekyll_05_stevenson_64kb.mp3",
+          "durationSeconds": 643
+        },
+        {
+          "title": "06 - Incident of Dr. Lanyon",
+          "filename": "jekyll_06_stevenson_64kb.mp3",
+          "durationSeconds": 597
+        },
+        {
+          "title": "07 - Incident at the Window",
+          "filename": "jekyll_07_stevenson_64kb.mp3",
+          "durationSeconds": 246
+        },
+        {
+          "title": "08 - The Last Night",
+          "filename": "jekyll_08_stevenson_64kb.mp3",
+          "durationSeconds": 1786
+        }
+      ]
+    },
+    {
+      "id": "little_women_0711_librivox",
+      "title": "Little Women",
+      "author": "Louisa May Alcott",
+      "description": "LibriVox recording of Little Women , by Louisa May Alcott. Little Women is the classic story of the March family, which consists of Mr. and Mrs. March and their four girls--practical, yet fashion conscious, Meg, who longs for the nice things they used to have. Rambunctious, book worm, Jo, who wants to become a writer and wishes she were born a boy. Shy and quiet, home-loving Beth, who loves to play the piano and play with her kitties. Finally, the youngest, artistic Amy, who longs for an...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "fiction",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/little_women_0711_librivox",
+      "chapters": [
+        {
+          "title": "01 - Playing Pilgrims",
+          "filename": "littlewomen_01_alcott_64kb.mp3",
+          "durationSeconds": 1225
+        },
+        {
+          "title": "02 - A Merry Christmas",
+          "filename": "littlewomen_02_alcott_64kb.mp3",
+          "durationSeconds": 1282
+        },
+        {
+          "title": "03 - The Laurence Boy",
+          "filename": "littlewomen_03_alcott_64kb.mp3",
+          "durationSeconds": 1173
+        },
+        {
+          "title": "04 - Burdens",
+          "filename": "littlewomen_04_alcott_64kb.mp3",
+          "durationSeconds": 1931
+        },
+        {
+          "title": "05 - Being Neighborly",
+          "filename": "littlewomen_05_alcott_64kb.mp3",
+          "durationSeconds": 1414
+        },
+        {
+          "title": "06 - Beth Finds the Palace Beautiful",
+          "filename": "littlewomen_06_alcott_64kb.mp3",
+          "durationSeconds": 904
+        },
+        {
+          "title": "07 - Amy's Valley of Humiliation",
+          "filename": "littlewomen_07_alcott_64kb.mp3",
+          "durationSeconds": 864
+        },
+        {
+          "title": "08 - Jo Meets Apollyon",
+          "filename": "littlewomen_08_alcott_64kb.mp3",
+          "durationSeconds": 1277
+        }
+      ]
+    },
+    {
+      "id": "being_earnest_librivox",
+      "title": "The Importance of Being Earnest",
+      "author": "Oscar Wilde",
+      "description": "Librivox public domain recording of Oscar Wilde's The Importance of Being Earnest . The Importance of Being Earnest is a classic comedy of manners, in which two flippant young men, in order to impress their respected beloveds, pretend that their names are \"Ernest,\" which both young ladies believe confers magical qualities on the possessor. It was first performed for the public on February 14, 1895 at the St. James' Theatre in London, and is regarded by many critics and scholars as being the...",
+      "language": "English",
+      "narrators": [
+        "LibriVox Volunteers"
+      ],
+      "category": "drama",
+      "playable": false,
+      "coverUrl": "https://archive.org/services/img/being_earnest_librivox",
+      "chapters": [
+        {
+          "title": "Act 1",
+          "filename": "Earnest_Act_1_64kb.mp3",
+          "durationSeconds": 3053
+        },
+        {
+          "title": "Act 2",
+          "filename": "Earnest_Act_2_64kb.mp3",
+          "durationSeconds": 3401
+        },
+        {
+          "title": "Act 3",
+          "filename": "Earnest_Act_3_64kb.mp3",
+          "durationSeconds": 1826
+        }
+      ]
+    }
+  ]
+}

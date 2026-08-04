@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'app.dart';
+import 'core/demo_mode.dart';
 import 'database/app_database.dart';
 import 'services/librivox_service.dart';
 import 'services/artwork_enrichment_service.dart';
 import 'services/librivox_downloader.dart';
+import 'services/demo_librivox_service.dart';
+import 'services/demo_downloader.dart';
+import 'services/demo_artwork_service.dart';
 import 'domain/models/librivox_book.dart';
 import 'domain/models/audiobook.dart';
 import 'services/audio_playback_service.dart';
@@ -12,10 +16,19 @@ import 'widgets/book_detail_pane.dart';
 import 'widgets/persistent_player_bar.dart';
 import 'widgets/app_header.dart';
 import 'widgets/storefront_navigation.dart';
+import 'widgets/demo_banner.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const AudiobookApp());
+  runApp(AudiobookApp(
+    // Wire the canned web demo's stub, network-free catalog services when
+    // built with --dart-define=DEMO_MODE=true; every other build keeps
+    // using the real LibriVox/archive.org-backed services (the null
+    // defaults below). See core/demo_mode.dart and rework_plan.md.
+    libriVoxService: kDemoMode ? DemoLibriVoxService() : null,
+    downloader: kDemoMode ? DemoDownloader() : null,
+    artworkService: kDemoMode ? DemoArtworkService() : null,
+  ));
 }
 
 class HomeScreen extends StatefulWidget {
@@ -24,10 +37,18 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onToggleTheme;
 
   /// Optional injected LibriVoxService, used by tests to avoid live HTTP
-  /// calls during the initial category-shelf load in initState. Defaults
-  /// to a real LibriVoxService (which makes real network requests) when
+  /// calls during the initial category-shelf load in initState, and by the
+  /// canned web demo to serve its bundled catalog instead. Defaults to a
+  /// real LibriVoxService (which makes real network requests) when
   /// omitted.
   final LibriVoxService? libriVoxService;
+
+  /// Optional injected downloader/artwork services — same seam as
+  /// [libriVoxService], used by the web demo to avoid any LibriVox RSS
+  /// fetch or archive.org image HEAD check. Defaults to the real
+  /// network-backed services when omitted.
+  final LibriVoxStreamAndDownloader? downloader;
+  final ArtworkEnrichmentService? artworkService;
 
   const HomeScreen({
     super.key,
@@ -35,6 +56,8 @@ class HomeScreen extends StatefulWidget {
     required this.isDarkMode,
     required this.onToggleTheme,
     this.libriVoxService,
+    this.downloader,
+    this.artworkService,
   });
 
   @override
@@ -75,8 +98,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _libriVoxService = widget.libriVoxService ?? LibriVoxService();
-    _artworkService = ArtworkEnrichmentService();
-    _downloader = LibriVoxStreamAndDownloader();
+    _artworkService = widget.artworkService ?? ArtworkEnrichmentService();
+    _downloader = widget.downloader ?? LibriVoxStreamAndDownloader();
     _audioService = AudioPlaybackService(db: widget.db);
 
     _loadCategoryShelves();
@@ -241,6 +264,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             _scaffoldKey.currentState?.openEndDrawer(),
                       ),
                       const SizedBox(height: 8),
+                      if (kDemoMode)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: DemoBanner(),
+                        ),
                       if (_activeNavTab == 1) ...[
                         CategorySubBar(
                           categories: _categories,

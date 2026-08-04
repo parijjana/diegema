@@ -1,17 +1,30 @@
 import 'package:flutter/material.dart';
 import 'database/app_database.dart';
 import 'main.dart';
+import 'services/artwork_enrichment_service.dart';
+import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
 
-/// Root widget. [database] and [libriVoxService] are optional injection
-/// points so tests can supply an in-memory database and a mocked HTTP
-/// client instead of the real path_provider-backed database and live
-/// librivox.org network calls that the defaults use.
+/// Root widget. [database], [libriVoxService], [downloader], and
+/// [artworkService] are optional injection points so tests can supply an
+/// in-memory database and a mocked HTTP client instead of the real
+/// path_provider-backed database and live librivox.org network calls that
+/// the defaults use — and so the canned web demo (`DEMO_MODE=true`, see
+/// `core/demo_mode.dart`) can supply its stub, network-free catalog
+/// services without forking any widget.
 class AudiobookApp extends StatefulWidget {
   final AppDatabase? database;
   final LibriVoxService? libriVoxService;
+  final LibriVoxStreamAndDownloader? downloader;
+  final ArtworkEnrichmentService? artworkService;
 
-  const AudiobookApp({super.key, this.database, this.libriVoxService});
+  const AudiobookApp({
+    super.key,
+    this.database,
+    this.libriVoxService,
+    this.downloader,
+    this.artworkService,
+  });
 
   @override
   State<AudiobookApp> createState() => _AudiobookAppState();
@@ -91,6 +104,8 @@ class _AudiobookAppState extends State<AudiobookApp> {
         isDarkMode: _isDarkMode,
         onToggleTheme: () => setState(() => _isDarkMode = !_isDarkMode),
         libriVoxService: widget.libriVoxService,
+        downloader: widget.downloader,
+        artworkService: widget.artworkService,
       ),
     );
   }

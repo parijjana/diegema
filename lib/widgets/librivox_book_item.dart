@@ -218,15 +218,61 @@ class LibriVoxBookItem extends StatelessWidget {
           SizedBox(
             height: 145,
             width: 110,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(3),
-                bottomLeft: Radius.circular(3),
-                topRight: Radius.circular(8),
-                bottomRight: Radius.circular(8),
-              ),
-              child: coverWidget,
+            child: Stack(
+              children: [
+                InkWell(
+                  onTap: onTap,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(3),
+                    bottomLeft: Radius.circular(3),
+                    topRight: Radius.circular(8),
+                    bottomRight: Radius.circular(8),
+                  ),
+                  child: coverWidget,
+                ),
+                // Non-playable demo entries must be unmistakably marked —
+                // nobody should think they were shown a working app that
+                // isn't (rework_plan.md). Every real (non-demo) book keeps
+                // demoPlayable == true, so this never shows outside the
+                // canned web demo.
+                if (!book.demoPlayable)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: IgnorePointer(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 3),
+                        decoration: const BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.only(
+                            bottomLeft: Radius.circular(3),
+                            bottomRight: Radius.circular(8),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.lock_rounded,
+                                size: 9, color: Colors.white70),
+                            const SizedBox(width: 3),
+                            Text(
+                              'PREVIEW ONLY',
+                              style: TextStyle(
+                                fontSize: 7,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.4,
+                                color: Colors.white.withValues(alpha: 0.9),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 6),

@@ -91,6 +91,29 @@ void main() {
       expect(progress.positionSeconds, equals(145));
     });
 
+    test('getMostRecentProgress returns the most recently updated progress', () async {
+      final now = DateTime.now();
+      await db.saveProgress(
+        audiobookId: 'book_old',
+        chapterIndex: 0,
+        positionSeconds: 50,
+        updatedAt: now.subtract(const Duration(minutes: 10)),
+      );
+
+      await db.saveProgress(
+        audiobookId: 'book_recent',
+        chapterIndex: 1,
+        positionSeconds: 300,
+        updatedAt: now,
+      );
+
+      final recent = await db.getMostRecentProgress();
+      expect(recent, isNotNull);
+      expect(recent!.audiobookId, equals('book_recent'));
+      expect(recent.chapterIndex, equals(1));
+      expect(recent.positionSeconds, equals(300));
+    });
+
     test('addBookmark and getBookmarks persist timestamp notes', () async {
       await db.addBookmark(
         id: 'bm_1',

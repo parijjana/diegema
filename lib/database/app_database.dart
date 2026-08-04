@@ -168,19 +168,27 @@ class AppDatabase extends _$AppDatabase {
     required String audiobookId,
     required int chapterIndex,
     required int positionSeconds,
+    DateTime? updatedAt,
   }) async {
     await into(playbackProgress).insertOnConflictUpdate(
       PlaybackProgressCompanion.insert(
         audiobookId: audiobookId,
         chapterIndex: chapterIndex,
         positionSeconds: positionSeconds,
-        updatedAt: Value(DateTime.now()),
+        updatedAt: Value(updatedAt ?? DateTime.now()),
       ),
     );
   }
 
   Future<PlaybackProgressData?> getProgress(String audiobookId) async {
     return (select(playbackProgress)..where((p) => p.audiobookId.equals(audiobookId))).getSingleOrNull();
+  }
+
+  Future<PlaybackProgressData?> getMostRecentProgress() async {
+    return (select(playbackProgress)
+          ..orderBy([(p) => OrderingTerm(expression: p.updatedAt, mode: OrderingMode.desc)])
+          ..limit(1))
+        .getSingleOrNull();
   }
 
   // --- Bookmarks ---

@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import '../core/utils/book_identity.dart';
 import '../domain/models/audiobook.dart' as domain;
 
 part 'app_database_io.g.dart';
@@ -13,8 +14,39 @@ class Audiobooks extends Table {
   TextColumn get author => text()();
   TextColumn get description => text()();
   TextColumn get source => text().withDefault(const Constant('Local'))();
+
+  /// Where the book came from: `'librivox'` or `'local'`. See
+  /// `core/utils/book_identity.dart`. Added in schema v2; defaults to
+  /// `'local'` for both fresh installs and the v1->v2 backfill of rows
+  /// whose true origin cannot be inferred.
+  TextColumn get origin =>
+      text().withDefault(const Constant(BookIdentity.originLocal))();
+
   TextColumn get coverUrl => text().nullable()();
+
+  /// User-supplied cover art path (schema v2). Takes precedence over
+  /// [coverUrl] / the procedural cover whenever set — see
+  /// `ui_redesign_plan.md` Screen 2. Nothing writes this column yet; the
+  /// column and DAO methods exist ahead of the UI that sets it.
+  TextColumn get userCoverPath => text().nullable()();
+
   BoolColumn get isDownloaded => boolean().withDefault(const Constant(true))();
+
+  /// Pinned to the "Now Playing" default screen (schema v2). Max 5,
+  /// enforced in [AppDatabase.pinBook] — never silently evicted.
+  BoolColumn get isPinned => boolean().withDefault(const Constant(false))();
+
+  /// Stable sort key among pinned books, ascending. `null` when not
+  /// pinned. Not a dense 0..4 sequence — gaps are fine, only relative
+  /// order matters — so unpinning never has to renumber siblings.
+  IntColumn get pinOrder => integer().nullable()();
+
+  /// Dismissed from the "continue listening" surface (schema v2). Does
+  /// NOT delete the book or its [PlaybackProgress] row; it only affects
+  /// [AppDatabase.getContinueListening]'s WHERE clause.
+  BoolColumn get hiddenFromContinue =>
+      boolean().withDefault(const Constant(false))();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
@@ -44,17 +76,49 @@ class PlaybackProgress extends Table {
   Set<Column> get primaryKey => {audiobookId};
 }
 
+/// Bookmarks and audio clips share one table (Aulos port — see
+/// `design_features/bookmarks_system.md` and `ui_redesign_plan.md`'s
+/// "Bookmarks & audio clips" section). A row with `endPositionSeconds ==
+/// null` is a plain point bookmark; a row with it set is a bounded clip
+/// (`positionSeconds` = start, `endPositionSeconds` = end).
 class Bookmarks extends Table {
   TextColumn get id => text()();
   TextColumn get audiobookId => text()();
   IntColumn get chapterIndex => integer()();
   IntColumn get positionSeconds => integer()();
+
+  /// Clip end, in seconds. `null` means this row is a point bookmark, not
+  /// a clip (schema v2).
+  IntColumn get endPositionSeconds => integer().nullable()();
+
+  /// Short user-given name, distinct from the free-text [note] (schema
+  /// v2). Defaults to `''` so existing/legacy rows never have a null
+  /// title to render.
+  TextColumn get title => text().withDefault(const Constant(''))();
+
   TextColumn get note => text()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
   Set<Column> get primaryKey => {id};
 }
+
+/// Thrown by [AppDatabase.pinBook] when the caller tries to pin a 6th
+/// book. The UI is expected to catch this and show a message — pinning
+/// never silently evicts an existing pin (ui_redesign_plan.md: "reject
+/// with a message, or evict the oldest" was decided as reject).
+class PinLimitExceededException implements Exception {
+  final int limit;
+  const PinLimitExceededException(this.limit);
+
+  @override
+  String toString() =>
+      'PinLimitExceededException: cannot pin more than $limit books';
+}
+
+/// Result of a pin attempt, so callers that prefer a typed result over a
+/// try/catch can use [AppDatabase.tryPinBook] instead.
+enum PinResult { pinned, alreadyPinned, limitExceeded, notFound }
 
 @DriftDatabase(
   tables: [
@@ -67,8 +131,128 @@ class Bookmarks extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
+  /// Maximum number of books that may be pinned to the "Now Playing"
+  /// default screen at once (ui_redesign_plan.md Screen 1).
+  static const int maxPinnedBooks = 5;
+
+  /// A book counts as "in progress" (continue-listening eligible) once
+  /// its saved position passes this many seconds — filters out a book
+  /// opened by accident or sampled for a few seconds.
+  static const int continueListeningMinPositionSeconds = 30;
+
+  /// ...and stops counting once position reaches this fraction of the
+  /// book's total known runtime — filters out books that are
+  /// effectively finished. See [getContinueListening] for how this is
+  /// applied when the runtime is unknown (0), which is common for local
+  /// content whose chapter durations were never probed.
+  static const double continueListeningMaxProgressFraction = 0.95;
+
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (Migrator m) async {
+          await m.createAll();
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 2) {
+            await m.addColumn(audiobooks, audiobooks.origin);
+            await m.addColumn(audiobooks, audiobooks.userCoverPath);
+            await m.addColumn(audiobooks, audiobooks.isPinned);
+            await m.addColumn(audiobooks, audiobooks.pinOrder);
+            await m.addColumn(audiobooks, audiobooks.hiddenFromContinue);
+            await m.addColumn(bookmarks, bookmarks.endPositionSeconds);
+            await m.addColumn(bookmarks, bookmarks.title);
+
+            // No real users exist yet (see rework_plan.md), so this is a
+            // clean deterministic re-key rather than a data-preserving
+            // migration in the strictest sense — but it is written to
+            // behave correctly on a populated DB from here on, since the
+            // next release onward that will matter. It must not throw on
+            // an empty or partially-populated DB (no chapters for a
+            // legacy row, no audiobooks at all, etc).
+            await _rekeyLegacyLocalIds();
+            await _backfillOrigin();
+          }
+        },
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON');
+          // `validateDatabaseSchema` (drift_dev's schema verifier) is
+          // deliberately NOT called here: it lives in `drift_dev`, a
+          // dev_dependency not shipped in release builds, and it exists
+          // to be driven from migration *tests* against a captured
+          // schema snapshot (see drift_schemas/ and
+          // test/database/migration_test.dart), not from production
+          // startup code. `beforeOpen` only needs the pragma above.
+        },
+      );
+
+  /// Rewrites any pre-v2 `hashCode`-derived local ids
+  /// (`local_<hash>`, `imported_folder_<hash>`, `imported_files_<hash>`)
+  /// to the new sha256-of-path scheme (see `core/utils/book_identity.dart`).
+  ///
+  /// The original absolute path is not stored anywhere for these legacy
+  /// rows — only the hash was ever persisted — so it cannot be recovered
+  /// from the id itself. What *is* recoverable is each chapter's
+  /// `audioPathOrUrl`, which is a real filesystem path. The new id is
+  /// derived from the first chapter's path, which is exactly what
+  /// [BookIdentity.localIdForPath] would have produced had the current
+  /// scheme been used at import time for a single-folder import.
+  ///
+  /// A legacy row with zero chapters (a partially-populated DB, or one
+  /// where import failed after the book row was written) has nothing to
+  /// derive a stable id from; it is left as-is rather than crashing the
+  /// migration.
+  Future<void> _rekeyLegacyLocalIds() async {
+    final allBooks = await select(audiobooks).get();
+    for (final book in allBooks) {
+      if (!BookIdentity.isLegacyLocalId(book.id)) continue;
+
+      final chapterRows = await (select(chapters)
+            ..where((c) => c.audiobookId.equals(book.id))
+            ..orderBy([(c) => OrderingTerm(expression: c.chapterIndex)]))
+          .get();
+      if (chapterRows.isEmpty) continue;
+
+      final newId = BookIdentity.localIdForPath(chapterRows.first.audioPathOrUrl);
+      if (newId == book.id) continue;
+
+      final oldId = book.id;
+      await transaction(() async {
+        await (update(audiobooks)..where((a) => a.id.equals(oldId)))
+            .write(AudiobooksCompanion(id: Value(newId)));
+        await (update(chapters)..where((c) => c.audiobookId.equals(oldId)))
+            .write(ChaptersCompanion(audiobookId: Value(newId)));
+        await (update(playbackProgress)
+              ..where((p) => p.audiobookId.equals(oldId)))
+            .write(PlaybackProgressCompanion(audiobookId: Value(newId)));
+        await (update(bookmarks)..where((b) => b.audiobookId.equals(oldId)))
+            .write(BookmarksCompanion(audiobookId: Value(newId)));
+      });
+    }
+  }
+
+  /// Backfills [Audiobooks.origin] for rows written before the column
+  /// existed, from the free-text `source` label they were saved with.
+  /// Heuristic, not authoritative — acceptable because, as of this
+  /// migration landing, no real users exist to have accumulated
+  /// ambiguous rows. Every row written going forward sets `origin`
+  /// explicitly at the call site (see `core/utils/book_identity.dart`
+  /// usages).
+  Future<void> _backfillOrigin() async {
+    final allBooks = await select(audiobooks).get();
+    for (final book in allBooks) {
+      final sourceLower = (book.source).toLowerCase();
+      final looksLikeLibrivox =
+          sourceLower.contains('librivox') || sourceLower.contains('download');
+      final origin = looksLikeLibrivox
+          ? BookIdentity.originLibrivox
+          : BookIdentity.originLocal;
+      await (update(audiobooks)..where((a) => a.id.equals(book.id)))
+          .write(AudiobooksCompanion(origin: Value(origin)));
+    }
+  }
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
@@ -87,6 +271,7 @@ class AppDatabase extends _$AppDatabase {
         author: book.author,
         description: book.description,
         source: Value(book.source ?? 'Local'),
+        origin: Value(book.origin),
         coverUrl: Value(book.coverArtUrlOrPath),
         isDownloaded: Value(book.isDownloaded),
       ),
@@ -137,7 +322,8 @@ class AppDatabase extends _$AppDatabase {
       author: bookRow.author,
       description: bookRow.description,
       source: bookRow.source,
-      coverArtUrlOrPath: bookRow.coverUrl,
+      origin: bookRow.origin,
+      coverArtUrlOrPath: bookRow.userCoverPath ?? bookRow.coverUrl,
       chapters: domainChapters,
       isDownloaded: bookRow.isDownloaded,
     );
@@ -186,13 +372,209 @@ class AppDatabase extends _$AppDatabase {
         .getSingleOrNull();
   }
 
-  // --- Bookmarks ---
+  /// Sum of all known chapter durations for [audiobookId] — the book's
+  /// "total known runtime". `0` when nothing is known yet (common for
+  /// local content: the local scanner/importer never probes real audio
+  /// duration, so every local chapter's `durationSeconds` is `0` — see
+  /// rework_plan.md item 14). Callers must not divide by this without
+  /// checking for zero; see [getContinueListening].
+  Future<int> _totalKnownRuntimeSeconds(String audiobookId) async {
+    final durationSum = chapters.durationSeconds.sum();
+    final query = selectOnly(chapters)
+      ..addColumns([durationSum])
+      ..where(chapters.audiobookId.equals(audiobookId));
+    final row = await query.getSingleOrNull();
+    return row?.read(durationSum) ?? 0;
+  }
+
+  /// Books with an in-progress [PlaybackProgress] row, most-recently
+  /// updated first, for the "Now Playing" idle-state shortlist
+  /// (ui_redesign_plan.md Screen 1).
+  ///
+  /// "In progress" means:
+  /// - `positionSeconds > continueListeningMinPositionSeconds` (not just
+  ///   sampled for a few seconds), AND
+  /// - `hiddenFromContinue == false` (dismissed books never resurface
+  ///   here — but their progress row and the book itself are untouched;
+  ///   see [hideFromContinue]), AND
+  /// - the book is not "effectively finished": `positionSeconds <
+  ///   totalKnownRuntime * continueListeningMaxProgressFraction`.
+  ///
+  /// **Unknown-runtime rule**: when a book's total known runtime is `0`
+  /// (all local chapters have `durationSeconds == 0` — nothing has been
+  /// probed), the 95%-complete check is skipped entirely rather than
+  /// dividing by zero or treating `0 as 95% of 0` (which would wrongly
+  /// exclude every local book the instant it has *any* progress, since
+  /// `position < 0` is never true). The book stays eligible for
+  /// continue-listening for as long as it has an in-progress row; only
+  /// the explicit dismiss action removes it. This is deliberately
+  /// permissive — a false "still in progress" for an unprobed local book
+  /// is a much smaller annoyance than a book disappearing from the list
+  /// the moment it is opened.
+  Future<List<domain.UnifiedAudiobook>> getContinueListening({
+    int limit = 5,
+  }) async {
+    final progressQuery = select(playbackProgress)
+      ..where((p) => p.positionSeconds.isBiggerThanValue(
+          continueListeningMinPositionSeconds))
+      ..orderBy([
+        (p) =>
+            OrderingTerm(expression: p.updatedAt, mode: OrderingMode.desc)
+      ]);
+    final progressRows = await progressQuery.get();
+
+    final List<domain.UnifiedAudiobook> results = [];
+    for (final progress in progressRows) {
+      if (results.length >= limit) break;
+
+      final bookRow = await (select(audiobooks)
+            ..where((a) => a.id.equals(progress.audiobookId)))
+          .getSingleOrNull();
+      if (bookRow == null) continue;
+      if (bookRow.hiddenFromContinue) continue;
+
+      final totalRuntime = await _totalKnownRuntimeSeconds(progress.audiobookId);
+      if (totalRuntime > 0) {
+        final threshold = totalRuntime * continueListeningMaxProgressFraction;
+        if (progress.positionSeconds >= threshold) continue;
+      }
+      // totalRuntime == 0: unknown runtime, see doc comment above — the
+      // book stays eligible.
+
+      final book = await getAudiobook(progress.audiobookId);
+      if (book != null) results.add(book);
+    }
+    return results;
+  }
+
+  // --- Pinning ---
+
+  /// Pins [audiobookId] to the "Now Playing" default screen. Throws
+  /// [PinLimitExceededException] when [maxPinnedBooks] are already
+  /// pinned — pinning never silently evicts an existing pin. No-op (does
+  /// not throw) if the book is already pinned. Assigns the next
+  /// `pinOrder` so newly pinned books sort last.
+  Future<void> pinBook(String audiobookId) async {
+    final book = await (select(audiobooks)
+          ..where((a) => a.id.equals(audiobookId)))
+        .getSingleOrNull();
+    if (book == null) return;
+    if (book.isPinned) return;
+
+    final pinnedCount = await _pinnedCount();
+    if (pinnedCount >= maxPinnedBooks) {
+      throw const PinLimitExceededException(maxPinnedBooks);
+    }
+
+    final nextOrder = await _nextPinOrder();
+    await (update(audiobooks)..where((a) => a.id.equals(audiobookId))).write(
+      AudiobooksCompanion(
+        isPinned: const Value(true),
+        pinOrder: Value(nextOrder),
+      ),
+    );
+  }
+
+  /// Same as [pinBook] but returns a [PinResult] instead of throwing, for
+  /// callers that prefer to branch on a value.
+  Future<PinResult> tryPinBook(String audiobookId) async {
+    final book = await (select(audiobooks)
+          ..where((a) => a.id.equals(audiobookId)))
+        .getSingleOrNull();
+    if (book == null) return PinResult.notFound;
+    if (book.isPinned) return PinResult.alreadyPinned;
+
+    try {
+      await pinBook(audiobookId);
+      return PinResult.pinned;
+    } on PinLimitExceededException {
+      return PinResult.limitExceeded;
+    }
+  }
+
+  Future<void> unpinBook(String audiobookId) async {
+    await (update(audiobooks)..where((a) => a.id.equals(audiobookId))).write(
+      const AudiobooksCompanion(
+        isPinned: Value(false),
+        pinOrder: Value(null),
+      ),
+    );
+  }
+
+  /// Pinned books in stable, user-meaningful order (ascending `pinOrder`
+  /// — the order they were pinned in).
+  Future<List<domain.UnifiedAudiobook>> getPinnedBooks() async {
+    final rows = await (select(audiobooks)
+          ..where((a) => a.isPinned.equals(true))
+          ..orderBy([(a) => OrderingTerm(expression: a.pinOrder)]))
+        .get();
+    final List<domain.UnifiedAudiobook> results = [];
+    for (final row in rows) {
+      final book = await getAudiobook(row.id);
+      if (book != null) results.add(book);
+    }
+    return results;
+  }
+
+  Future<int> _pinnedCount() async {
+    final countExp = audiobooks.id.count();
+    final query = selectOnly(audiobooks)
+      ..addColumns([countExp])
+      ..where(audiobooks.isPinned.equals(true));
+    final row = await query.getSingle();
+    return row.read(countExp) ?? 0;
+  }
+
+  Future<int> _nextPinOrder() async {
+    final maxExp = audiobooks.pinOrder.max();
+    final query = selectOnly(audiobooks)..addColumns([maxExp]);
+    final row = await query.getSingle();
+    final currentMax = row.read(maxExp);
+    return (currentMax ?? -1) + 1;
+  }
+
+  // --- Hidden-from-continue ---
+
+  /// Hides [audiobookId] from [getContinueListening]. Does NOT delete the
+  /// book or its [PlaybackProgress] row — only affects that one surface.
+  Future<void> hideFromContinue(String audiobookId) async {
+    await (update(audiobooks)..where((a) => a.id.equals(audiobookId)))
+        .write(const AudiobooksCompanion(hiddenFromContinue: Value(true)));
+  }
+
+  Future<void> unhideFromContinue(String audiobookId) async {
+    await (update(audiobooks)..where((a) => a.id.equals(audiobookId)))
+        .write(const AudiobooksCompanion(hiddenFromContinue: Value(false)));
+  }
+
+  // --- User-supplied cover art ---
+
+  /// Sets a user-supplied cover for [audiobookId]. Takes precedence over
+  /// the network/procedural cover wherever a cover is resolved — see
+  /// [getAudiobook], which returns `userCoverPath ?? coverUrl`.
+  Future<void> setUserCover(String audiobookId, String coverPath) async {
+    await (update(audiobooks)..where((a) => a.id.equals(audiobookId)))
+        .write(AudiobooksCompanion(userCoverPath: Value(coverPath)));
+  }
+
+  Future<void> clearUserCover(String audiobookId) async {
+    await (update(audiobooks)..where((a) => a.id.equals(audiobookId)))
+        .write(const AudiobooksCompanion(userCoverPath: Value(null)));
+  }
+
+  // --- Bookmarks / audio clips ---
+
+  /// Creates a bookmark or clip. A `null` [endPositionSeconds] (the
+  /// default) is a point bookmark; passing a value makes it a bounded
+  /// clip (Aulos port — see `design_features/bookmarks_system.md`).
   Future<void> addBookmark({
     required String id,
     required String audiobookId,
     required int chapterIndex,
     required int positionSeconds,
     required String note,
+    int? endPositionSeconds,
+    String title = '',
   }) async {
     await into(bookmarks).insertOnConflictUpdate(
       BookmarksCompanion.insert(
@@ -200,6 +582,8 @@ class AppDatabase extends _$AppDatabase {
         audiobookId: audiobookId,
         chapterIndex: chapterIndex,
         positionSeconds: positionSeconds,
+        endPositionSeconds: Value(endPositionSeconds),
+        title: Value(title),
         note: note,
       ),
     );
@@ -213,5 +597,38 @@ class AppDatabase extends _$AppDatabase {
                 OrderingTerm(expression: b.createdAt, mode: OrderingMode.desc)
           ]))
         .get();
+  }
+
+  /// Clips are bookmarks with a non-null [Bookmarks.endPositionSeconds].
+  /// Convenience filter over [getBookmarks] for the future saved-clips
+  /// view (ui_redesign_plan.md's "Book view").
+  Future<List<Bookmark>> getClips(String audiobookId) async {
+    final all = await getBookmarks(audiobookId);
+    return all.where((b) => b.endPositionSeconds != null).toList();
+  }
+
+  Future<void> updateBookmark({
+    required String id,
+    String? note,
+    String? title,
+    int? positionSeconds,
+    int? endPositionSeconds,
+  }) async {
+    await (update(bookmarks)..where((b) => b.id.equals(id))).write(
+      BookmarksCompanion(
+        note: note != null ? Value(note) : const Value.absent(),
+        title: title != null ? Value(title) : const Value.absent(),
+        positionSeconds: positionSeconds != null
+            ? Value(positionSeconds)
+            : const Value.absent(),
+        endPositionSeconds: endPositionSeconds != null
+            ? Value(endPositionSeconds)
+            : const Value.absent(),
+      ),
+    );
+  }
+
+  Future<void> deleteBookmark(String id) async {
+    await (delete(bookmarks)..where((b) => b.id.equals(id))).go();
   }
 }

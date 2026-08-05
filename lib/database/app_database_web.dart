@@ -8,11 +8,27 @@ import '../domain/models/audiobook.dart' as domain;
 ///
 /// Its public surface intentionally mirrors `app_database_io.dart` (the
 /// real drift-backed implementation) method-for-method, so every widget
-/// that takes an `AppDatabase` works unmodified on both platforms.
+/// that takes an `AppDatabase` works unmodified on both platforms. There
+/// is no migration concern here — an in-memory store has no schema
+/// version to upgrade — so this file only needs to track the *current*
+/// shape of a book/bookmark row, not its history.
 class AppDatabase {
   final Map<String, domain.UnifiedAudiobook> _audiobooks = {};
   final Map<String, PlaybackProgressData> _progress = {};
   final List<Bookmark> _bookmarks = [];
+
+  /// Mirrors `Audiobooks.isPinned` / `pinOrder`.
+  final Map<String, int> _pinOrder = {};
+
+  /// Mirrors `Audiobooks.hiddenFromContinue`.
+  final Set<String> _hiddenFromContinue = {};
+
+  /// Mirrors `Audiobooks.userCoverPath`.
+  final Map<String, String> _userCoverPaths = {};
+
+  static const int maxPinnedBooks = 5;
+  static const int continueListeningMinPositionSeconds = 30;
+  static const double continueListeningMaxProgressFraction = 0.95;
 
   AppDatabase();
 
@@ -21,7 +37,22 @@ class AppDatabase {
   }
 
   Future<domain.UnifiedAudiobook?> getAudiobook(String id) async {
-    return _audiobooks[id];
+    final book = _audiobooks[id];
+    if (book == null) return null;
+    final userCover = _userCoverPaths[id];
+    if (userCover == null) return book;
+    return domain.UnifiedAudiobook(
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      description: book.description,
+      coverArtUrlOrPath: userCover,
+      source: book.source,
+      origin: book.origin,
+      narrators: book.narrators,
+      chapters: book.chapters,
+      isDownloaded: book.isDownloaded,
+    );
   }
 
   Future<List<domain.UnifiedAudiobook>> getAllAudiobooks() async {
@@ -53,18 +84,107 @@ class AppDatabase {
     return values.first;
   }
 
+  /// See `AppDatabase.getContinueListening` in `app_database_io.dart` for
+  /// the full rationale (identical rule set, applied in-memory here).
+  Future<List<domain.UnifiedAudiobook>> getContinueListening({
+    int limit = 5,
+  }) async {
+    final entries = _progress.values
+        .where((p) => p.positionSeconds > continueListeningMinPositionSeconds)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    final List<domain.UnifiedAudiobook> results = [];
+    for (final progress in entries) {
+      if (results.length >= limit) break;
+      if (_hiddenFromContinue.contains(progress.audiobookId)) continue;
+
+      final book = _audiobooks[progress.audiobookId];
+      if (book == null) continue;
+
+      final totalRuntime =
+          book.chapters.fold<int>(0, (sum, c) => sum + c.durationSeconds);
+      if (totalRuntime > 0) {
+        final threshold = totalRuntime * continueListeningMaxProgressFraction;
+        if (progress.positionSeconds >= threshold) continue;
+      }
+
+      final resolved = await getAudiobook(progress.audiobookId);
+      if (resolved != null) results.add(resolved);
+    }
+    return results;
+  }
+
+  Future<void> pinBook(String audiobookId) async {
+    if (!_audiobooks.containsKey(audiobookId)) return;
+    if (_pinOrder.containsKey(audiobookId)) return;
+    if (_pinOrder.length >= maxPinnedBooks) {
+      throw const PinLimitExceededException(maxPinnedBooks);
+    }
+    final nextOrder =
+        _pinOrder.values.fold<int>(-1, (m, v) => v > m ? v : m) + 1;
+    _pinOrder[audiobookId] = nextOrder;
+  }
+
+  Future<PinResult> tryPinBook(String audiobookId) async {
+    if (!_audiobooks.containsKey(audiobookId)) return PinResult.notFound;
+    if (_pinOrder.containsKey(audiobookId)) return PinResult.alreadyPinned;
+    try {
+      await pinBook(audiobookId);
+      return PinResult.pinned;
+    } on PinLimitExceededException {
+      return PinResult.limitExceeded;
+    }
+  }
+
+  Future<void> unpinBook(String audiobookId) async {
+    _pinOrder.remove(audiobookId);
+  }
+
+  Future<List<domain.UnifiedAudiobook>> getPinnedBooks() async {
+    final ids = _pinOrder.keys.toList()
+      ..sort((a, b) => _pinOrder[a]!.compareTo(_pinOrder[b]!));
+    final List<domain.UnifiedAudiobook> results = [];
+    for (final id in ids) {
+      final book = await getAudiobook(id);
+      if (book != null) results.add(book);
+    }
+    return results;
+  }
+
+  Future<void> hideFromContinue(String audiobookId) async {
+    _hiddenFromContinue.add(audiobookId);
+  }
+
+  Future<void> unhideFromContinue(String audiobookId) async {
+    _hiddenFromContinue.remove(audiobookId);
+  }
+
+  Future<void> setUserCover(String audiobookId, String coverPath) async {
+    _userCoverPaths[audiobookId] = coverPath;
+  }
+
+  Future<void> clearUserCover(String audiobookId) async {
+    _userCoverPaths.remove(audiobookId);
+  }
+
   Future<void> addBookmark({
     required String id,
     required String audiobookId,
     required int chapterIndex,
     required int positionSeconds,
     required String note,
+    int? endPositionSeconds,
+    String title = '',
   }) async {
+    _bookmarks.removeWhere((b) => b.id == id);
     _bookmarks.add(Bookmark(
       id: id,
       audiobookId: audiobookId,
       chapterIndex: chapterIndex,
       positionSeconds: positionSeconds,
+      endPositionSeconds: endPositionSeconds,
+      title: title,
       note: note,
       createdAt: DateTime.now(),
     ));
@@ -77,8 +197,52 @@ class AppDatabase {
     return matches;
   }
 
+  Future<List<Bookmark>> getClips(String audiobookId) async {
+    final all = await getBookmarks(audiobookId);
+    return all.where((b) => b.endPositionSeconds != null).toList();
+  }
+
+  Future<void> updateBookmark({
+    required String id,
+    String? note,
+    String? title,
+    int? positionSeconds,
+    int? endPositionSeconds,
+  }) async {
+    final index = _bookmarks.indexWhere((b) => b.id == id);
+    if (index == -1) return;
+    final existing = _bookmarks[index];
+    _bookmarks[index] = Bookmark(
+      id: existing.id,
+      audiobookId: existing.audiobookId,
+      chapterIndex: existing.chapterIndex,
+      positionSeconds: positionSeconds ?? existing.positionSeconds,
+      endPositionSeconds: endPositionSeconds ?? existing.endPositionSeconds,
+      title: title ?? existing.title,
+      note: note ?? existing.note,
+      createdAt: existing.createdAt,
+    );
+  }
+
+  Future<void> deleteBookmark(String id) async {
+    _bookmarks.removeWhere((b) => b.id == id);
+  }
+
   Future<void> close() async {}
 }
+
+/// Thrown by [AppDatabase.pinBook] when 5 books are already pinned.
+/// Mirrors `app_database_io.dart`'s exception of the same name.
+class PinLimitExceededException implements Exception {
+  final int limit;
+  const PinLimitExceededException(this.limit);
+
+  @override
+  String toString() =>
+      'PinLimitExceededException: cannot pin more than $limit books';
+}
+
+enum PinResult { pinned, alreadyPinned, limitExceeded, notFound }
 
 /// Plain-Dart stand-in for drift's generated `PlaybackProgressData`.
 class PlaybackProgressData {
@@ -101,6 +265,8 @@ class Bookmark {
   final String audiobookId;
   final int chapterIndex;
   final int positionSeconds;
+  final int? endPositionSeconds;
+  final String title;
   final String note;
   final DateTime createdAt;
 
@@ -109,6 +275,8 @@ class Bookmark {
     required this.audiobookId,
     required this.chapterIndex,
     required this.positionSeconds,
+    this.endPositionSeconds,
+    this.title = '',
     required this.note,
     required this.createdAt,
   });

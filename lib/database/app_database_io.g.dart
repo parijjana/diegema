@@ -37,11 +37,24 @@ class $AudiobooksTable extends Audiobooks
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       defaultValue: const Constant('Local'));
+  static const VerificationMeta _originMeta = const VerificationMeta('origin');
+  @override
+  late final GeneratedColumn<String> origin = GeneratedColumn<String>(
+      'origin', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(BookIdentity.originLocal));
   static const VerificationMeta _coverUrlMeta =
       const VerificationMeta('coverUrl');
   @override
   late final GeneratedColumn<String> coverUrl = GeneratedColumn<String>(
       'cover_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _userCoverPathMeta =
+      const VerificationMeta('userCoverPath');
+  @override
+  late final GeneratedColumn<String> userCoverPath = GeneratedColumn<String>(
+      'user_cover_path', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _isDownloadedMeta =
       const VerificationMeta('isDownloaded');
@@ -53,6 +66,32 @@ class $AudiobooksTable extends Audiobooks
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("is_downloaded" IN (0, 1))'),
       defaultValue: const Constant(true));
+  static const VerificationMeta _isPinnedMeta =
+      const VerificationMeta('isPinned');
+  @override
+  late final GeneratedColumn<bool> isPinned = GeneratedColumn<bool>(
+      'is_pinned', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_pinned" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _pinOrderMeta =
+      const VerificationMeta('pinOrder');
+  @override
+  late final GeneratedColumn<int> pinOrder = GeneratedColumn<int>(
+      'pin_order', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _hiddenFromContinueMeta =
+      const VerificationMeta('hiddenFromContinue');
+  @override
+  late final GeneratedColumn<bool> hiddenFromContinue = GeneratedColumn<bool>(
+      'hidden_from_continue', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("hidden_from_continue" IN (0, 1))'),
+      defaultValue: const Constant(false));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -68,8 +107,13 @@ class $AudiobooksTable extends Audiobooks
         author,
         description,
         source,
+        origin,
         coverUrl,
+        userCoverPath,
         isDownloaded,
+        isPinned,
+        pinOrder,
+        hiddenFromContinue,
         createdAt
       ];
   @override
@@ -111,15 +155,39 @@ class $AudiobooksTable extends Audiobooks
       context.handle(_sourceMeta,
           source.isAcceptableOrUnknown(data['source']!, _sourceMeta));
     }
+    if (data.containsKey('origin')) {
+      context.handle(_originMeta,
+          origin.isAcceptableOrUnknown(data['origin']!, _originMeta));
+    }
     if (data.containsKey('cover_url')) {
       context.handle(_coverUrlMeta,
           coverUrl.isAcceptableOrUnknown(data['cover_url']!, _coverUrlMeta));
+    }
+    if (data.containsKey('user_cover_path')) {
+      context.handle(
+          _userCoverPathMeta,
+          userCoverPath.isAcceptableOrUnknown(
+              data['user_cover_path']!, _userCoverPathMeta));
     }
     if (data.containsKey('is_downloaded')) {
       context.handle(
           _isDownloadedMeta,
           isDownloaded.isAcceptableOrUnknown(
               data['is_downloaded']!, _isDownloadedMeta));
+    }
+    if (data.containsKey('is_pinned')) {
+      context.handle(_isPinnedMeta,
+          isPinned.isAcceptableOrUnknown(data['is_pinned']!, _isPinnedMeta));
+    }
+    if (data.containsKey('pin_order')) {
+      context.handle(_pinOrderMeta,
+          pinOrder.isAcceptableOrUnknown(data['pin_order']!, _pinOrderMeta));
+    }
+    if (data.containsKey('hidden_from_continue')) {
+      context.handle(
+          _hiddenFromContinueMeta,
+          hiddenFromContinue.isAcceptableOrUnknown(
+              data['hidden_from_continue']!, _hiddenFromContinueMeta));
     }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
@@ -144,10 +212,20 @@ class $AudiobooksTable extends Audiobooks
           .read(DriftSqlType.string, data['${effectivePrefix}description'])!,
       source: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}source'])!,
+      origin: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}origin'])!,
       coverUrl: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}cover_url']),
+      userCoverPath: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}user_cover_path']),
       isDownloaded: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_downloaded'])!,
+      isPinned: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_pinned'])!,
+      pinOrder: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}pin_order']),
+      hiddenFromContinue: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}hidden_from_continue'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
     );
@@ -165,8 +243,34 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
   final String author;
   final String description;
   final String source;
+
+  /// Where the book came from: `'librivox'` or `'local'`. See
+  /// `core/utils/book_identity.dart`. Added in schema v2; defaults to
+  /// `'local'` for both fresh installs and the v1->v2 backfill of rows
+  /// whose true origin cannot be inferred.
+  final String origin;
   final String? coverUrl;
+
+  /// User-supplied cover art path (schema v2). Takes precedence over
+  /// [coverUrl] / the procedural cover whenever set — see
+  /// `ui_redesign_plan.md` Screen 2. Nothing writes this column yet; the
+  /// column and DAO methods exist ahead of the UI that sets it.
+  final String? userCoverPath;
   final bool isDownloaded;
+
+  /// Pinned to the "Now Playing" default screen (schema v2). Max 5,
+  /// enforced in [AppDatabase.pinBook] — never silently evicted.
+  final bool isPinned;
+
+  /// Stable sort key among pinned books, ascending. `null` when not
+  /// pinned. Not a dense 0..4 sequence — gaps are fine, only relative
+  /// order matters — so unpinning never has to renumber siblings.
+  final int? pinOrder;
+
+  /// Dismissed from the "continue listening" surface (schema v2). Does
+  /// NOT delete the book or its [PlaybackProgress] row; it only affects
+  /// [AppDatabase.getContinueListening]'s WHERE clause.
+  final bool hiddenFromContinue;
   final DateTime createdAt;
   const Audiobook(
       {required this.id,
@@ -174,8 +278,13 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       required this.author,
       required this.description,
       required this.source,
+      required this.origin,
       this.coverUrl,
+      this.userCoverPath,
       required this.isDownloaded,
+      required this.isPinned,
+      this.pinOrder,
+      required this.hiddenFromContinue,
       required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -185,10 +294,19 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
     map['author'] = Variable<String>(author);
     map['description'] = Variable<String>(description);
     map['source'] = Variable<String>(source);
+    map['origin'] = Variable<String>(origin);
     if (!nullToAbsent || coverUrl != null) {
       map['cover_url'] = Variable<String>(coverUrl);
     }
+    if (!nullToAbsent || userCoverPath != null) {
+      map['user_cover_path'] = Variable<String>(userCoverPath);
+    }
     map['is_downloaded'] = Variable<bool>(isDownloaded);
+    map['is_pinned'] = Variable<bool>(isPinned);
+    if (!nullToAbsent || pinOrder != null) {
+      map['pin_order'] = Variable<int>(pinOrder);
+    }
+    map['hidden_from_continue'] = Variable<bool>(hiddenFromContinue);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -200,10 +318,19 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       author: Value(author),
       description: Value(description),
       source: Value(source),
+      origin: Value(origin),
       coverUrl: coverUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(coverUrl),
+      userCoverPath: userCoverPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(userCoverPath),
       isDownloaded: Value(isDownloaded),
+      isPinned: Value(isPinned),
+      pinOrder: pinOrder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pinOrder),
+      hiddenFromContinue: Value(hiddenFromContinue),
       createdAt: Value(createdAt),
     );
   }
@@ -217,8 +344,13 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       author: serializer.fromJson<String>(json['author']),
       description: serializer.fromJson<String>(json['description']),
       source: serializer.fromJson<String>(json['source']),
+      origin: serializer.fromJson<String>(json['origin']),
       coverUrl: serializer.fromJson<String?>(json['coverUrl']),
+      userCoverPath: serializer.fromJson<String?>(json['userCoverPath']),
       isDownloaded: serializer.fromJson<bool>(json['isDownloaded']),
+      isPinned: serializer.fromJson<bool>(json['isPinned']),
+      pinOrder: serializer.fromJson<int?>(json['pinOrder']),
+      hiddenFromContinue: serializer.fromJson<bool>(json['hiddenFromContinue']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -231,8 +363,13 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       'author': serializer.toJson<String>(author),
       'description': serializer.toJson<String>(description),
       'source': serializer.toJson<String>(source),
+      'origin': serializer.toJson<String>(origin),
       'coverUrl': serializer.toJson<String?>(coverUrl),
+      'userCoverPath': serializer.toJson<String?>(userCoverPath),
       'isDownloaded': serializer.toJson<bool>(isDownloaded),
+      'isPinned': serializer.toJson<bool>(isPinned),
+      'pinOrder': serializer.toJson<int?>(pinOrder),
+      'hiddenFromContinue': serializer.toJson<bool>(hiddenFromContinue),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -243,8 +380,13 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           String? author,
           String? description,
           String? source,
+          String? origin,
           Value<String?> coverUrl = const Value.absent(),
+          Value<String?> userCoverPath = const Value.absent(),
           bool? isDownloaded,
+          bool? isPinned,
+          Value<int?> pinOrder = const Value.absent(),
+          bool? hiddenFromContinue,
           DateTime? createdAt}) =>
       Audiobook(
         id: id ?? this.id,
@@ -252,8 +394,14 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
         author: author ?? this.author,
         description: description ?? this.description,
         source: source ?? this.source,
+        origin: origin ?? this.origin,
         coverUrl: coverUrl.present ? coverUrl.value : this.coverUrl,
+        userCoverPath:
+            userCoverPath.present ? userCoverPath.value : this.userCoverPath,
         isDownloaded: isDownloaded ?? this.isDownloaded,
+        isPinned: isPinned ?? this.isPinned,
+        pinOrder: pinOrder.present ? pinOrder.value : this.pinOrder,
+        hiddenFromContinue: hiddenFromContinue ?? this.hiddenFromContinue,
         createdAt: createdAt ?? this.createdAt,
       );
   Audiobook copyWithCompanion(AudiobooksCompanion data) {
@@ -264,10 +412,19 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       description:
           data.description.present ? data.description.value : this.description,
       source: data.source.present ? data.source.value : this.source,
+      origin: data.origin.present ? data.origin.value : this.origin,
       coverUrl: data.coverUrl.present ? data.coverUrl.value : this.coverUrl,
+      userCoverPath: data.userCoverPath.present
+          ? data.userCoverPath.value
+          : this.userCoverPath,
       isDownloaded: data.isDownloaded.present
           ? data.isDownloaded.value
           : this.isDownloaded,
+      isPinned: data.isPinned.present ? data.isPinned.value : this.isPinned,
+      pinOrder: data.pinOrder.present ? data.pinOrder.value : this.pinOrder,
+      hiddenFromContinue: data.hiddenFromContinue.present
+          ? data.hiddenFromContinue.value
+          : this.hiddenFromContinue,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -280,16 +437,33 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           ..write('author: $author, ')
           ..write('description: $description, ')
           ..write('source: $source, ')
+          ..write('origin: $origin, ')
           ..write('coverUrl: $coverUrl, ')
+          ..write('userCoverPath: $userCoverPath, ')
           ..write('isDownloaded: $isDownloaded, ')
+          ..write('isPinned: $isPinned, ')
+          ..write('pinOrder: $pinOrder, ')
+          ..write('hiddenFromContinue: $hiddenFromContinue, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, title, author, description, source,
-      coverUrl, isDownloaded, createdAt);
+  int get hashCode => Object.hash(
+      id,
+      title,
+      author,
+      description,
+      source,
+      origin,
+      coverUrl,
+      userCoverPath,
+      isDownloaded,
+      isPinned,
+      pinOrder,
+      hiddenFromContinue,
+      createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -299,8 +473,13 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           other.author == this.author &&
           other.description == this.description &&
           other.source == this.source &&
+          other.origin == this.origin &&
           other.coverUrl == this.coverUrl &&
+          other.userCoverPath == this.userCoverPath &&
           other.isDownloaded == this.isDownloaded &&
+          other.isPinned == this.isPinned &&
+          other.pinOrder == this.pinOrder &&
+          other.hiddenFromContinue == this.hiddenFromContinue &&
           other.createdAt == this.createdAt);
 }
 
@@ -310,8 +489,13 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
   final Value<String> author;
   final Value<String> description;
   final Value<String> source;
+  final Value<String> origin;
   final Value<String?> coverUrl;
+  final Value<String?> userCoverPath;
   final Value<bool> isDownloaded;
+  final Value<bool> isPinned;
+  final Value<int?> pinOrder;
+  final Value<bool> hiddenFromContinue;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const AudiobooksCompanion({
@@ -320,8 +504,13 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     this.author = const Value.absent(),
     this.description = const Value.absent(),
     this.source = const Value.absent(),
+    this.origin = const Value.absent(),
     this.coverUrl = const Value.absent(),
+    this.userCoverPath = const Value.absent(),
     this.isDownloaded = const Value.absent(),
+    this.isPinned = const Value.absent(),
+    this.pinOrder = const Value.absent(),
+    this.hiddenFromContinue = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -331,8 +520,13 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     required String author,
     required String description,
     this.source = const Value.absent(),
+    this.origin = const Value.absent(),
     this.coverUrl = const Value.absent(),
+    this.userCoverPath = const Value.absent(),
     this.isDownloaded = const Value.absent(),
+    this.isPinned = const Value.absent(),
+    this.pinOrder = const Value.absent(),
+    this.hiddenFromContinue = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -345,8 +539,13 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     Expression<String>? author,
     Expression<String>? description,
     Expression<String>? source,
+    Expression<String>? origin,
     Expression<String>? coverUrl,
+    Expression<String>? userCoverPath,
     Expression<bool>? isDownloaded,
+    Expression<bool>? isPinned,
+    Expression<int>? pinOrder,
+    Expression<bool>? hiddenFromContinue,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -356,8 +555,14 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
       if (author != null) 'author': author,
       if (description != null) 'description': description,
       if (source != null) 'source': source,
+      if (origin != null) 'origin': origin,
       if (coverUrl != null) 'cover_url': coverUrl,
+      if (userCoverPath != null) 'user_cover_path': userCoverPath,
       if (isDownloaded != null) 'is_downloaded': isDownloaded,
+      if (isPinned != null) 'is_pinned': isPinned,
+      if (pinOrder != null) 'pin_order': pinOrder,
+      if (hiddenFromContinue != null)
+        'hidden_from_continue': hiddenFromContinue,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -369,8 +574,13 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
       Value<String>? author,
       Value<String>? description,
       Value<String>? source,
+      Value<String>? origin,
       Value<String?>? coverUrl,
+      Value<String?>? userCoverPath,
       Value<bool>? isDownloaded,
+      Value<bool>? isPinned,
+      Value<int?>? pinOrder,
+      Value<bool>? hiddenFromContinue,
       Value<DateTime>? createdAt,
       Value<int>? rowid}) {
     return AudiobooksCompanion(
@@ -379,8 +589,13 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
       author: author ?? this.author,
       description: description ?? this.description,
       source: source ?? this.source,
+      origin: origin ?? this.origin,
       coverUrl: coverUrl ?? this.coverUrl,
+      userCoverPath: userCoverPath ?? this.userCoverPath,
       isDownloaded: isDownloaded ?? this.isDownloaded,
+      isPinned: isPinned ?? this.isPinned,
+      pinOrder: pinOrder ?? this.pinOrder,
+      hiddenFromContinue: hiddenFromContinue ?? this.hiddenFromContinue,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -404,11 +619,26 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     if (source.present) {
       map['source'] = Variable<String>(source.value);
     }
+    if (origin.present) {
+      map['origin'] = Variable<String>(origin.value);
+    }
     if (coverUrl.present) {
       map['cover_url'] = Variable<String>(coverUrl.value);
     }
+    if (userCoverPath.present) {
+      map['user_cover_path'] = Variable<String>(userCoverPath.value);
+    }
     if (isDownloaded.present) {
       map['is_downloaded'] = Variable<bool>(isDownloaded.value);
+    }
+    if (isPinned.present) {
+      map['is_pinned'] = Variable<bool>(isPinned.value);
+    }
+    if (pinOrder.present) {
+      map['pin_order'] = Variable<int>(pinOrder.value);
+    }
+    if (hiddenFromContinue.present) {
+      map['hidden_from_continue'] = Variable<bool>(hiddenFromContinue.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -427,8 +657,13 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
           ..write('author: $author, ')
           ..write('description: $description, ')
           ..write('source: $source, ')
+          ..write('origin: $origin, ')
           ..write('coverUrl: $coverUrl, ')
+          ..write('userCoverPath: $userCoverPath, ')
           ..write('isDownloaded: $isDownloaded, ')
+          ..write('isPinned: $isPinned, ')
+          ..write('pinOrder: $pinOrder, ')
+          ..write('hiddenFromContinue: $hiddenFromContinue, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1156,6 +1391,19 @@ class $BookmarksTable extends Bookmarks
   late final GeneratedColumn<int> positionSeconds = GeneratedColumn<int>(
       'position_seconds', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _endPositionSecondsMeta =
+      const VerificationMeta('endPositionSeconds');
+  @override
+  late final GeneratedColumn<int> endPositionSeconds = GeneratedColumn<int>(
+      'end_position_seconds', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
   static const VerificationMeta _noteMeta = const VerificationMeta('note');
   @override
   late final GeneratedColumn<String> note = GeneratedColumn<String>(
@@ -1170,8 +1418,16 @@ class $BookmarksTable extends Bookmarks
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, audiobookId, chapterIndex, positionSeconds, note, createdAt];
+  List<GeneratedColumn> get $columns => [
+        id,
+        audiobookId,
+        chapterIndex,
+        positionSeconds,
+        endPositionSeconds,
+        title,
+        note,
+        createdAt
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1211,6 +1467,16 @@ class $BookmarksTable extends Bookmarks
     } else if (isInserting) {
       context.missing(_positionSecondsMeta);
     }
+    if (data.containsKey('end_position_seconds')) {
+      context.handle(
+          _endPositionSecondsMeta,
+          endPositionSeconds.isAcceptableOrUnknown(
+              data['end_position_seconds']!, _endPositionSecondsMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    }
     if (data.containsKey('note')) {
       context.handle(
           _noteMeta, note.isAcceptableOrUnknown(data['note']!, _noteMeta));
@@ -1238,6 +1504,10 @@ class $BookmarksTable extends Bookmarks
           .read(DriftSqlType.int, data['${effectivePrefix}chapter_index'])!,
       positionSeconds: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}position_seconds'])!,
+      endPositionSeconds: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}end_position_seconds']),
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
       note: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}note'])!,
       createdAt: attachedDatabase.typeMapping
@@ -1256,6 +1526,15 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
   final String audiobookId;
   final int chapterIndex;
   final int positionSeconds;
+
+  /// Clip end, in seconds. `null` means this row is a point bookmark, not
+  /// a clip (schema v2).
+  final int? endPositionSeconds;
+
+  /// Short user-given name, distinct from the free-text [note] (schema
+  /// v2). Defaults to `''` so existing/legacy rows never have a null
+  /// title to render.
+  final String title;
   final String note;
   final DateTime createdAt;
   const Bookmark(
@@ -1263,6 +1542,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       required this.audiobookId,
       required this.chapterIndex,
       required this.positionSeconds,
+      this.endPositionSeconds,
+      required this.title,
       required this.note,
       required this.createdAt});
   @override
@@ -1272,6 +1553,10 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     map['audiobook_id'] = Variable<String>(audiobookId);
     map['chapter_index'] = Variable<int>(chapterIndex);
     map['position_seconds'] = Variable<int>(positionSeconds);
+    if (!nullToAbsent || endPositionSeconds != null) {
+      map['end_position_seconds'] = Variable<int>(endPositionSeconds);
+    }
+    map['title'] = Variable<String>(title);
     map['note'] = Variable<String>(note);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -1283,6 +1568,10 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       audiobookId: Value(audiobookId),
       chapterIndex: Value(chapterIndex),
       positionSeconds: Value(positionSeconds),
+      endPositionSeconds: endPositionSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endPositionSeconds),
+      title: Value(title),
       note: Value(note),
       createdAt: Value(createdAt),
     );
@@ -1296,6 +1585,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       audiobookId: serializer.fromJson<String>(json['audiobookId']),
       chapterIndex: serializer.fromJson<int>(json['chapterIndex']),
       positionSeconds: serializer.fromJson<int>(json['positionSeconds']),
+      endPositionSeconds: serializer.fromJson<int?>(json['endPositionSeconds']),
+      title: serializer.fromJson<String>(json['title']),
       note: serializer.fromJson<String>(json['note']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
@@ -1308,6 +1599,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       'audiobookId': serializer.toJson<String>(audiobookId),
       'chapterIndex': serializer.toJson<int>(chapterIndex),
       'positionSeconds': serializer.toJson<int>(positionSeconds),
+      'endPositionSeconds': serializer.toJson<int?>(endPositionSeconds),
+      'title': serializer.toJson<String>(title),
       'note': serializer.toJson<String>(note),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
@@ -1318,6 +1611,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
           String? audiobookId,
           int? chapterIndex,
           int? positionSeconds,
+          Value<int?> endPositionSeconds = const Value.absent(),
+          String? title,
           String? note,
           DateTime? createdAt}) =>
       Bookmark(
@@ -1325,6 +1620,10 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
         audiobookId: audiobookId ?? this.audiobookId,
         chapterIndex: chapterIndex ?? this.chapterIndex,
         positionSeconds: positionSeconds ?? this.positionSeconds,
+        endPositionSeconds: endPositionSeconds.present
+            ? endPositionSeconds.value
+            : this.endPositionSeconds,
+        title: title ?? this.title,
         note: note ?? this.note,
         createdAt: createdAt ?? this.createdAt,
       );
@@ -1339,6 +1638,10 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       positionSeconds: data.positionSeconds.present
           ? data.positionSeconds.value
           : this.positionSeconds,
+      endPositionSeconds: data.endPositionSeconds.present
+          ? data.endPositionSeconds.value
+          : this.endPositionSeconds,
+      title: data.title.present ? data.title.value : this.title,
       note: data.note.present ? data.note.value : this.note,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
@@ -1351,6 +1654,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
           ..write('audiobookId: $audiobookId, ')
           ..write('chapterIndex: $chapterIndex, ')
           ..write('positionSeconds: $positionSeconds, ')
+          ..write('endPositionSeconds: $endPositionSeconds, ')
+          ..write('title: $title, ')
           ..write('note: $note, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
@@ -1358,8 +1663,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, audiobookId, chapterIndex, positionSeconds, note, createdAt);
+  int get hashCode => Object.hash(id, audiobookId, chapterIndex,
+      positionSeconds, endPositionSeconds, title, note, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1368,6 +1673,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
           other.audiobookId == this.audiobookId &&
           other.chapterIndex == this.chapterIndex &&
           other.positionSeconds == this.positionSeconds &&
+          other.endPositionSeconds == this.endPositionSeconds &&
+          other.title == this.title &&
           other.note == this.note &&
           other.createdAt == this.createdAt);
 }
@@ -1377,6 +1684,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
   final Value<String> audiobookId;
   final Value<int> chapterIndex;
   final Value<int> positionSeconds;
+  final Value<int?> endPositionSeconds;
+  final Value<String> title;
   final Value<String> note;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
@@ -1385,6 +1694,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     this.audiobookId = const Value.absent(),
     this.chapterIndex = const Value.absent(),
     this.positionSeconds = const Value.absent(),
+    this.endPositionSeconds = const Value.absent(),
+    this.title = const Value.absent(),
     this.note = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1394,6 +1705,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     required String audiobookId,
     required int chapterIndex,
     required int positionSeconds,
+    this.endPositionSeconds = const Value.absent(),
+    this.title = const Value.absent(),
     required String note,
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1407,6 +1720,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     Expression<String>? audiobookId,
     Expression<int>? chapterIndex,
     Expression<int>? positionSeconds,
+    Expression<int>? endPositionSeconds,
+    Expression<String>? title,
     Expression<String>? note,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
@@ -1416,6 +1731,9 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
       if (audiobookId != null) 'audiobook_id': audiobookId,
       if (chapterIndex != null) 'chapter_index': chapterIndex,
       if (positionSeconds != null) 'position_seconds': positionSeconds,
+      if (endPositionSeconds != null)
+        'end_position_seconds': endPositionSeconds,
+      if (title != null) 'title': title,
       if (note != null) 'note': note,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
@@ -1427,6 +1745,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
       Value<String>? audiobookId,
       Value<int>? chapterIndex,
       Value<int>? positionSeconds,
+      Value<int?>? endPositionSeconds,
+      Value<String>? title,
       Value<String>? note,
       Value<DateTime>? createdAt,
       Value<int>? rowid}) {
@@ -1435,6 +1755,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
       audiobookId: audiobookId ?? this.audiobookId,
       chapterIndex: chapterIndex ?? this.chapterIndex,
       positionSeconds: positionSeconds ?? this.positionSeconds,
+      endPositionSeconds: endPositionSeconds ?? this.endPositionSeconds,
+      title: title ?? this.title,
       note: note ?? this.note,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
@@ -1456,6 +1778,12 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     if (positionSeconds.present) {
       map['position_seconds'] = Variable<int>(positionSeconds.value);
     }
+    if (endPositionSeconds.present) {
+      map['end_position_seconds'] = Variable<int>(endPositionSeconds.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
     if (note.present) {
       map['note'] = Variable<String>(note.value);
     }
@@ -1475,6 +1803,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
           ..write('audiobookId: $audiobookId, ')
           ..write('chapterIndex: $chapterIndex, ')
           ..write('positionSeconds: $positionSeconds, ')
+          ..write('endPositionSeconds: $endPositionSeconds, ')
+          ..write('title: $title, ')
           ..write('note: $note, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
@@ -1505,8 +1835,13 @@ typedef $$AudiobooksTableCreateCompanionBuilder = AudiobooksCompanion Function({
   required String author,
   required String description,
   Value<String> source,
+  Value<String> origin,
   Value<String?> coverUrl,
+  Value<String?> userCoverPath,
   Value<bool> isDownloaded,
+  Value<bool> isPinned,
+  Value<int?> pinOrder,
+  Value<bool> hiddenFromContinue,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -1516,8 +1851,13 @@ typedef $$AudiobooksTableUpdateCompanionBuilder = AudiobooksCompanion Function({
   Value<String> author,
   Value<String> description,
   Value<String> source,
+  Value<String> origin,
   Value<String?> coverUrl,
+  Value<String?> userCoverPath,
   Value<bool> isDownloaded,
+  Value<bool> isPinned,
+  Value<int?> pinOrder,
+  Value<bool> hiddenFromContinue,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -1546,11 +1886,27 @@ class $$AudiobooksTableFilterComposer
   ColumnFilters<String> get source => $composableBuilder(
       column: $table.source, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get origin => $composableBuilder(
+      column: $table.origin, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<String> get coverUrl => $composableBuilder(
       column: $table.coverUrl, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get userCoverPath => $composableBuilder(
+      column: $table.userCoverPath, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<bool> get isDownloaded => $composableBuilder(
       column: $table.isDownloaded, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isPinned => $composableBuilder(
+      column: $table.isPinned, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pinOrder => $composableBuilder(
+      column: $table.pinOrder, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get hiddenFromContinue => $composableBuilder(
+      column: $table.hiddenFromContinue,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -1580,11 +1936,28 @@ class $$AudiobooksTableOrderingComposer
   ColumnOrderings<String> get source => $composableBuilder(
       column: $table.source, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get origin => $composableBuilder(
+      column: $table.origin, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get coverUrl => $composableBuilder(
       column: $table.coverUrl, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get userCoverPath => $composableBuilder(
+      column: $table.userCoverPath,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get isDownloaded => $composableBuilder(
       column: $table.isDownloaded,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isPinned => $composableBuilder(
+      column: $table.isPinned, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pinOrder => $composableBuilder(
+      column: $table.pinOrder, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get hiddenFromContinue => $composableBuilder(
+      column: $table.hiddenFromContinue,
       builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
@@ -1615,11 +1988,26 @@ class $$AudiobooksTableAnnotationComposer
   GeneratedColumn<String> get source =>
       $composableBuilder(column: $table.source, builder: (column) => column);
 
+  GeneratedColumn<String> get origin =>
+      $composableBuilder(column: $table.origin, builder: (column) => column);
+
   GeneratedColumn<String> get coverUrl =>
       $composableBuilder(column: $table.coverUrl, builder: (column) => column);
 
+  GeneratedColumn<String> get userCoverPath => $composableBuilder(
+      column: $table.userCoverPath, builder: (column) => column);
+
   GeneratedColumn<bool> get isDownloaded => $composableBuilder(
       column: $table.isDownloaded, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPinned =>
+      $composableBuilder(column: $table.isPinned, builder: (column) => column);
+
+  GeneratedColumn<int> get pinOrder =>
+      $composableBuilder(column: $table.pinOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get hiddenFromContinue => $composableBuilder(
+      column: $table.hiddenFromContinue, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1653,8 +2041,13 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             Value<String> author = const Value.absent(),
             Value<String> description = const Value.absent(),
             Value<String> source = const Value.absent(),
+            Value<String> origin = const Value.absent(),
             Value<String?> coverUrl = const Value.absent(),
+            Value<String?> userCoverPath = const Value.absent(),
             Value<bool> isDownloaded = const Value.absent(),
+            Value<bool> isPinned = const Value.absent(),
+            Value<int?> pinOrder = const Value.absent(),
+            Value<bool> hiddenFromContinue = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -1664,8 +2057,13 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             author: author,
             description: description,
             source: source,
+            origin: origin,
             coverUrl: coverUrl,
+            userCoverPath: userCoverPath,
             isDownloaded: isDownloaded,
+            isPinned: isPinned,
+            pinOrder: pinOrder,
+            hiddenFromContinue: hiddenFromContinue,
             createdAt: createdAt,
             rowid: rowid,
           ),
@@ -1675,8 +2073,13 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             required String author,
             required String description,
             Value<String> source = const Value.absent(),
+            Value<String> origin = const Value.absent(),
             Value<String?> coverUrl = const Value.absent(),
+            Value<String?> userCoverPath = const Value.absent(),
             Value<bool> isDownloaded = const Value.absent(),
+            Value<bool> isPinned = const Value.absent(),
+            Value<int?> pinOrder = const Value.absent(),
+            Value<bool> hiddenFromContinue = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -1686,8 +2089,13 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             author: author,
             description: description,
             source: source,
+            origin: origin,
             coverUrl: coverUrl,
+            userCoverPath: userCoverPath,
             isDownloaded: isDownloaded,
+            isPinned: isPinned,
+            pinOrder: pinOrder,
+            hiddenFromContinue: hiddenFromContinue,
             createdAt: createdAt,
             rowid: rowid,
           ),
@@ -2079,6 +2487,8 @@ typedef $$BookmarksTableCreateCompanionBuilder = BookmarksCompanion Function({
   required String audiobookId,
   required int chapterIndex,
   required int positionSeconds,
+  Value<int?> endPositionSeconds,
+  Value<String> title,
   required String note,
   Value<DateTime> createdAt,
   Value<int> rowid,
@@ -2088,6 +2498,8 @@ typedef $$BookmarksTableUpdateCompanionBuilder = BookmarksCompanion Function({
   Value<String> audiobookId,
   Value<int> chapterIndex,
   Value<int> positionSeconds,
+  Value<int?> endPositionSeconds,
+  Value<String> title,
   Value<String> note,
   Value<DateTime> createdAt,
   Value<int> rowid,
@@ -2114,6 +2526,13 @@ class $$BookmarksTableFilterComposer
   ColumnFilters<int> get positionSeconds => $composableBuilder(
       column: $table.positionSeconds,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get endPositionSeconds => $composableBuilder(
+      column: $table.endPositionSeconds,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get note => $composableBuilder(
       column: $table.note, builder: (column) => ColumnFilters(column));
@@ -2145,6 +2564,13 @@ class $$BookmarksTableOrderingComposer
       column: $table.positionSeconds,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get endPositionSeconds => $composableBuilder(
+      column: $table.endPositionSeconds,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get note => $composableBuilder(
       column: $table.note, builder: (column) => ColumnOrderings(column));
 
@@ -2172,6 +2598,12 @@ class $$BookmarksTableAnnotationComposer
 
   GeneratedColumn<int> get positionSeconds => $composableBuilder(
       column: $table.positionSeconds, builder: (column) => column);
+
+  GeneratedColumn<int> get endPositionSeconds => $composableBuilder(
+      column: $table.endPositionSeconds, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
 
   GeneratedColumn<String> get note =>
       $composableBuilder(column: $table.note, builder: (column) => column);
@@ -2207,6 +2639,8 @@ class $$BookmarksTableTableManager extends RootTableManager<
             Value<String> audiobookId = const Value.absent(),
             Value<int> chapterIndex = const Value.absent(),
             Value<int> positionSeconds = const Value.absent(),
+            Value<int?> endPositionSeconds = const Value.absent(),
+            Value<String> title = const Value.absent(),
             Value<String> note = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -2216,6 +2650,8 @@ class $$BookmarksTableTableManager extends RootTableManager<
             audiobookId: audiobookId,
             chapterIndex: chapterIndex,
             positionSeconds: positionSeconds,
+            endPositionSeconds: endPositionSeconds,
+            title: title,
             note: note,
             createdAt: createdAt,
             rowid: rowid,
@@ -2225,6 +2661,8 @@ class $$BookmarksTableTableManager extends RootTableManager<
             required String audiobookId,
             required int chapterIndex,
             required int positionSeconds,
+            Value<int?> endPositionSeconds = const Value.absent(),
+            Value<String> title = const Value.absent(),
             required String note,
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -2234,6 +2672,8 @@ class $$BookmarksTableTableManager extends RootTableManager<
             audiobookId: audiobookId,
             chapterIndex: chapterIndex,
             positionSeconds: positionSeconds,
+            endPositionSeconds: endPositionSeconds,
+            title: title,
             note: note,
             createdAt: createdAt,
             rowid: rowid,

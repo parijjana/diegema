@@ -4,6 +4,7 @@ import 'package:dart_rss/dart_rss.dart';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 import '../core/network/user_agent.dart';
+import '../core/utils/book_identity.dart';
 import '../domain/models/librivox_book.dart';
 import '../domain/models/audiobook.dart';
 
@@ -19,6 +20,15 @@ class LibriVoxStreamAndDownloader {
       : _client = client ?? http.Client();
 
   Future<UnifiedAudiobook> parseStreamableBook(LibriVoxBook book) async {
+    // Canonical id: the archive.org identifier, not the LibriVox API id —
+    // see core/utils/book_identity.dart. This is also what
+    // `downloadAndExtractZip`'s caller (BookDetailPane) must reuse when
+    // saving the downloaded copy, so streaming and downloading the same
+    // book resolve to the same database row instead of two.
+    final canonicalId = BookIdentity.archiveIdentifierFor(
+      librivoxApiId: book.id,
+      urlIarchive: book.urlIarchive,
+    );
     final List<AudiobookChapter> chapters = [];
 
     if (book.urlRss.isNotEmpty) {
@@ -37,7 +47,7 @@ class LibriVoxStreamAndDownloader {
 
             chapters.add(
               AudiobookChapter(
-                id: '${book.id}_stream_$index',
+                id: '${canonicalId}_stream_$index',
                 title: trackTitle,
                 audioPathOrUrl: streamUrl,
                 durationSeconds: durationSecs,
@@ -51,11 +61,12 @@ class LibriVoxStreamAndDownloader {
     }
 
     return UnifiedAudiobook(
-      id: book.id,
+      id: canonicalId,
       title: book.title,
       author: book.authorNames,
       description: book.description,
       source: 'LibriVox',
+      origin: BookIdentity.originLibrivox,
       narrators: book.narrators,
       chapters: chapters,
       isDownloaded: false,

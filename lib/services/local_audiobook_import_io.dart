@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
+import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 
@@ -39,7 +40,10 @@ Future<void> importFolder(
       return;
     }
 
-    final bookId = 'imported_folder_${selectedDirectory.hashCode.abs()}';
+    // Deterministic sha256-of-path id — NOT hashCode. See
+    // core/utils/book_identity.dart for why hashCode must never be a
+    // persisted database key.
+    final bookId = BookIdentity.localIdForPath(selectedDirectory);
     final chapters = files.asMap().entries.map((entry) {
       final idx = entry.key;
       final file = entry.value;
@@ -59,6 +63,7 @@ Future<void> importFolder(
       author: 'Local Audiobook',
       description: 'Imported from folder: $selectedDirectory',
       source: 'Local Folder',
+      origin: BookIdentity.originLocal,
       chapters: chapters,
       isDownloaded: true,
     );
@@ -108,7 +113,8 @@ Future<void> importFiles(
         ? parentFolder
         : 'Imported Audiobook';
 
-    final bookId = 'imported_files_${paths.join().hashCode.abs()}';
+    // Deterministic sha256-of-paths id — NOT hashCode.
+    final bookId = BookIdentity.localIdForPaths(paths);
     final chapters = paths.asMap().entries.map((entry) {
       final idx = entry.key;
       final path = entry.value;
@@ -128,6 +134,7 @@ Future<void> importFiles(
       author: 'Local Files',
       description: 'Imported ${paths.length} local audio files.',
       source: 'Local Files',
+      origin: BookIdentity.originLocal,
       chapters: chapters,
       isDownloaded: true,
     );

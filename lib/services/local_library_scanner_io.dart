@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 
@@ -28,7 +29,9 @@ Future<void> scanDownloadedLibrary(AppDatabase db) async {
 
     if (mp3Files.isEmpty) continue;
 
-    final bookId = 'local_${folderName.hashCode.abs()}';
+    // Deterministic sha256-of-path id — NOT hashCode (see
+    // core/utils/book_identity.dart).
+    final bookId = BookIdentity.localIdForPath(entity.path);
     final existing = await db.getAudiobook(bookId);
     if (existing != null) continue;
 
@@ -51,6 +54,7 @@ Future<void> scanDownloadedLibrary(AppDatabase db) async {
       author: 'Downloaded Audiobook',
       description: 'Downloaded to local storage.',
       source: 'Local Storage',
+      origin: BookIdentity.originLocal,
       chapters: chapters,
       isDownloaded: true,
     );

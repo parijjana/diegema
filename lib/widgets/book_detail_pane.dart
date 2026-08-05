@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../core/demo_mode.dart';
+import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/librivox_book.dart';
 import '../domain/models/audiobook.dart';
@@ -88,13 +89,22 @@ class _BookDetailPaneState extends State<BookDetailPane> {
         },
       );
 
+      // Same canonical id as `parseStreamableBook` (both derive from the
+      // archive.org identifier) so downloading a book that was already
+      // being streamed updates the *same* row instead of creating a
+      // second one with separate progress/bookmarks.
+      final canonicalId = BookIdentity.archiveIdentifierFor(
+        librivoxApiId: widget.book.id,
+        urlIarchive: widget.book.urlIarchive,
+      );
+
       final List<AudiobookChapter> chapters = [];
       for (int i = 0; i < extractedFiles.length; i++) {
         final filePath = extractedFiles[i];
         final filename = p.basename(filePath);
         chapters.add(
           AudiobookChapter(
-            id: '${widget.book.id}_local_$i',
+            id: '${canonicalId}_local_$i',
             title: filename.replaceAll('.mp3', ''),
             audioPathOrUrl: filePath,
             durationSeconds: 0,
@@ -104,11 +114,12 @@ class _BookDetailPaneState extends State<BookDetailPane> {
       }
 
       final downloadedBook = UnifiedAudiobook(
-        id: widget.book.id,
+        id: canonicalId,
         title: widget.book.title,
         author: widget.book.authorNames,
         description: widget.book.description,
         source: 'Downloaded',
+        origin: BookIdentity.originLibrivox,
         coverArtUrlOrPath: widget.book.coverArtUrl,
         chapters: chapters,
         isDownloaded: true,

@@ -1,0 +1,979 @@
+import 'package:flutter/material.dart';
+
+import '../core/ui_preferences.dart';
+import '../database/app_database.dart';
+import '../domain/models/audiobook.dart';
+import '../services/audio_playback_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_book_cover.dart';
+import '../widgets/app_state_view.dart';
+import '../widgets/player_scrubber.dart';
+import '../widgets/player_transport.dart';
+
+/// Screen 1 — **Now Playing**, the app's default landing screen.
+///
+/// One screen, two states, no competing panels. This is the main answer to
+/// "too high context":
+///
+/// - **Idle**: a short continue-listening shortlist plus the pinned row.
+/// - **Active**: the list fades away to reveal the player.
+///
+/// ## The fade
+///
+/// A single [AnimationController] (`0` = list, `1` = player) drives both
+/// halves of a cross-dissolve. The two halves are *staggered* rather than
+/// symmetric: the list leaves over the first 60% on the `accel` curve while
+/// drifting up 12px, and the player enters over the last 60% on `decel`
+/// while settling from 0.97 scale. A straight symmetric cross-fade was
+/// tried first and read as a muddy double-exposure at the midpoint —
+/// both layers sat near 50% opacity over each other with nothing legible.
+/// The overlap is kept (20%) so it still reads as one continuous motion
+/// rather than a cut, but at any given frame one layer clearly dominates.
+///
+/// The idle layer is also kept mounted but [IgnorePointer]-ed and
+/// [ExcludeSemantics]-ed once faded out, so a screen reader never
+/// encounters an invisible list, and scroll position survives a round trip.
+///
+/// ## Getting back to the list without stopping playback
+///
+/// [_peekingList] flips the screen back to the idle list while audio keeps
+/// running; a [_PeekPlayerStrip] appears so playback is still reachable and
+/// the way back into the player is obvious. Playback state is never touched
+/// by navigation.
+class NowPlayingScreen extends StatefulWidget {
+  final AppDatabase db;
+  final AudioPlaybackService audioService;
+  final UiPreferences preferences;
+
+  /// Sends the user to Discover — the only sensible action when they own
+  /// nothing yet.
+  final VoidCallback onGoToDiscover;
+
+  const NowPlayingScreen({
+    super.key,
+    required this.db,
+    required this.audioService,
+    required this.onGoToDiscover,
+    this.preferences = const UiPreferences(),
+  });
+
+  @override
+  State<NowPlayingScreen> createState() => _NowPlayingScreenState();
+}
+
+class _NowPlayingScreenState extends State<NowPlayingScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _fade;
+
+  List<UnifiedAudiobook> _continueListening = [];
+  List<UnifiedAudiobook> _pinned = [];
+  Set<String> _pinnedIds = {};
+  bool _pinnedRowVisible = true;
+  bool _loading = true;
+  Object? _loadError;
+
+  /// True while the user has deliberately gone back to the list with audio
+  /// still playing.
+  bool _peekingList = false;
+
+  bool get _playerShouldShow =>
+      widget.audioService.currentBookNotifier.value != null && !_peekingList;
+
+  @override
+  void initState() {
+    super.initState();
+    _fade = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+      value: _playerShouldShow ? 1 : 0,
+    );
+    widget.audioService.currentBookNotifier.addListener(_onCurrentBookChanged);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    widget.audioService.currentBookNotifier
+        .removeListener(_onCurrentBookChanged);
+    _fade.dispose();
+    super.dispose();
+  }
+
+  void _onCurrentBookChanged() {
+    // Starting a new book always reveals the player; the peek is a
+    // transient state, not a sticky preference.
+    if (widget.audioService.currentBookNotifier.value != null) {
+      _peekingList = false;
+    }
+    _syncFade();
+    // The shortlist changes as soon as something is played.
+    _load();
+  }
+
+  void _syncFade() {
+    if (!mounted) return;
+    final target = _playerShouldShow ? 1.0 : 0.0;
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _fade.value = target;
+    } else if (target == 1.0) {
+      _fade.forward();
+    } else {
+      _fade.reverse();
+    }
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() => _loadError = null);
+    try {
+      final continueListening = await widget.db.getContinueListening(limit: 5);
+      final pinned = await widget.db.getPinnedBooks();
+      final visible = await widget.preferences.getPinnedRowVisible();
+      if (!mounted) return;
+      setState(() {
+        _continueListening = continueListening;
+        _pinned = pinned;
+        _pinnedIds = pinned.map((b) => b.id).toSet();
+        _pinnedRowVisible = visible;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _togglePinnedRow() async {
+    final next = !_pinnedRowVisible;
+    setState(() => _pinnedRowVisible = next);
+    await widget.preferences.setPinnedRowVisible(next);
+  }
+
+  /// Hides a book from the continue-listening surface only. The book and
+  /// its progress row are untouched — the undo below simply clears the
+  /// flag again.
+  Future<void> _hide(UnifiedAudiobook book) async {
+    setState(() =>
+        _continueListening = _continueListening.where((b) => b.id != book.id).toList());
+    await widget.db.hideFromContinue(book.id);
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Hid "${book.title}" from Continue listening'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await widget.db.unhideFromContinue(book.id);
+            await _load();
+          },
+        ),
+        duration: const Duration(seconds: 6),
+      ),
+    );
+  }
+
+  Future<void> _togglePin(UnifiedAudiobook book) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (_pinnedIds.contains(book.id)) {
+      await widget.db.unpinBook(book.id);
+      await _load();
+      return;
+    }
+    try {
+      await widget.db.pinBook(book.id);
+      await _load();
+    } on PinLimitExceededException catch (e) {
+      // Surfaced, never swallowed: pinning a 6th book is refused and the
+      // user is told why and what to do about it.
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'You can pin up to ${e.limit} books. Unpin one to make room.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _play(UnifiedAudiobook book) async {
+    await widget.audioService.loadBook(book);
+  }
+
+  void _showList() {
+    setState(() => _peekingList = true);
+    _syncFade();
+  }
+
+  void _showPlayer() {
+    setState(() => _peekingList = false);
+    _syncFade();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final playing = widget.audioService.currentBookNotifier;
+
+    return ValueListenableBuilder<UnifiedAudiobook?>(
+      valueListenable: playing,
+      builder: (context, book, _) {
+        return AnimatedBuilder(
+          animation: _fade,
+          builder: (context, __) {
+            final t = _fade.value;
+
+            // Staggered halves — see the class doc comment. The list owns
+            // 0.0-0.6 of the timeline, the player 0.4-1.0.
+            final listT = (t / 0.6).clamp(0.0, 1.0);
+            final playerT = ((t - 0.4) / 0.6).clamp(0.0, 1.0);
+            final listOpacity = 1 - Motion.accel.transform(listT);
+            final playerOpacity = Motion.decel.transform(playerT);
+
+            final listGone = t >= 1.0;
+            final playerGone = t <= 0.0;
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                if (!listGone)
+                  IgnorePointer(
+                    ignoring: t > 0.5,
+                    child: ExcludeSemantics(
+                      excluding: t > 0.5,
+                      child: Opacity(
+                        opacity: listOpacity,
+                        child: Transform.translate(
+                          offset: Offset(0, -12 * listT),
+                          child: _IdleView(
+                            loading: _loading,
+                            error: _loadError,
+                            continueListening: _continueListening,
+                            pinned: _pinned,
+                            pinnedIds: _pinnedIds,
+                            pinnedRowVisible: _pinnedRowVisible,
+                            onTogglePinnedRow: _togglePinnedRow,
+                            onPlay: _play,
+                            onHide: _hide,
+                            onTogglePin: _togglePin,
+                            onGoToDiscover: widget.onGoToDiscover,
+                            onRetry: _load,
+                            peeking: _peekingList && book != null,
+                            audioService: widget.audioService,
+                            onResumePlayer: _showPlayer,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (!playerGone && book != null)
+                  IgnorePointer(
+                    ignoring: t < 0.5,
+                    child: ExcludeSemantics(
+                      excluding: t < 0.5,
+                      child: Opacity(
+                        opacity: playerOpacity,
+                        child: Transform.scale(
+                          scale: 0.97 + 0.03 * playerT,
+                          child: _ActiveView(
+                            book: book,
+                            audioService: widget.audioService,
+                            onShowList: _showList,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Idle state
+// ---------------------------------------------------------------------------
+
+class _IdleView extends StatelessWidget {
+  final bool loading;
+  final Object? error;
+  final List<UnifiedAudiobook> continueListening;
+  final List<UnifiedAudiobook> pinned;
+  final Set<String> pinnedIds;
+  final bool pinnedRowVisible;
+  final VoidCallback onTogglePinnedRow;
+  final ValueChanged<UnifiedAudiobook> onPlay;
+  final ValueChanged<UnifiedAudiobook> onHide;
+  final ValueChanged<UnifiedAudiobook> onTogglePin;
+  final VoidCallback onGoToDiscover;
+  final VoidCallback onRetry;
+
+  /// True when audio is running but the user has come back to the list.
+  final bool peeking;
+  final AudioPlaybackService audioService;
+  final VoidCallback onResumePlayer;
+
+  const _IdleView({
+    required this.loading,
+    required this.error,
+    required this.continueListening,
+    required this.pinned,
+    required this.pinnedIds,
+    required this.pinnedRowVisible,
+    required this.onTogglePinnedRow,
+    required this.onPlay,
+    required this.onHide,
+    required this.onTogglePin,
+    required this.onGoToDiscover,
+    required this.onRetry,
+    required this.peeking,
+    required this.audioService,
+    required this.onResumePlayer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= Dim.wideBreakpoint;
+        final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
+
+        // A pinned book that is also in progress must appear ONCE. It
+        // stays in Continue listening — the actionable surface — carrying a
+        // pin indicator, and is dropped from the pinned row rather than
+        // being rendered twice.
+        final inProgressIds = continueListening.map((b) => b.id).toSet();
+        final pinnedOnly =
+            pinned.where((b) => !inProgressIds.contains(b.id)).toList();
+
+        final Widget body;
+        if (loading) {
+          body = const AppLoadingView(label: 'Loading your books');
+        } else if (error != null) {
+          body = AppStateView.error(
+            headline: 'Could not load your books',
+            body: 'Something went wrong reading the library. '
+                'Your books and progress are safe.',
+            action: FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+            ),
+          );
+        } else if (continueListening.isEmpty && pinnedOnly.isEmpty) {
+          body = AppStateView.empty(
+            icon: Icons.auto_stories_rounded,
+            headline: 'Nothing in progress',
+            body: 'Books you start appear here so you can pick up where you '
+                'left off. Find something to listen to in Discover.',
+            action: FilledButton.icon(
+              onPressed: onGoToDiscover,
+              icon: const Icon(Icons.explore_rounded),
+              label: const Text('Browse Discover'),
+            ),
+          );
+        } else {
+          body = ListView(
+            padding: EdgeInsets.fromLTRB(gutter, Sp.x2, gutter, Sp.x10),
+            children: [
+              if (pinned.isNotEmpty) ...[
+                _SectionHeader(
+                  title: 'Pinned',
+                  trailing: _PinnedRowToggle(
+                    visible: pinnedRowVisible,
+                    count: pinned.length,
+                    onPressed: onTogglePinnedRow,
+                  ),
+                ),
+                if (pinnedRowVisible)
+                  _PinnedRow(books: pinnedOnly, onPlay: onPlay)
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: Sp.x4),
+                    child: Text(
+                      pinnedOnly.isEmpty
+                          ? '${pinned.length} pinned, all in progress below'
+                          : '${pinned.length} pinned books hidden',
+                      style: AppType.body.copyWith(color: c.textSecondary),
+                    ),
+                  ),
+                const SizedBox(height: Sp.x4),
+              ],
+              _SectionHeader(
+                title: 'Continue listening',
+                trailing: continueListening.isEmpty
+                    ? null
+                    : Text('${continueListening.length}',
+                        style: AppType.tabularBody(c.textSecondary)),
+              ),
+              if (continueListening.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: Sp.x6),
+                  child: Text(
+                    'Nothing in progress yet.',
+                    style: AppType.bodyLg.copyWith(color: c.textSecondary),
+                  ),
+                )
+              else
+                ...continueListening.map(
+                  (book) => Padding(
+                    padding: const EdgeInsets.only(bottom: Sp.listGap),
+                    child: _ContinueListeningItem(
+                      book: book,
+                      isPinned: pinnedIds.contains(book.id),
+                      onPlay: () => onPlay(book),
+                      onHide: () => onHide(book),
+                      onTogglePin: () => onTogglePin(book),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            _ScreenTitleBar(
+              title: 'Now playing',
+              subtitle: peeking ? null : 'Pick up where you left off',
+            ),
+            Expanded(child: body),
+            if (peeking)
+              _PeekPlayerStrip(
+                audioService: audioService,
+                onResumePlayer: onResumePlayer,
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ScreenTitleBar extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  const _ScreenTitleBar({required this.title, this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x5, Sp.x4, Sp.x3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: AppType.serif(AppType.titleLg).copyWith(color: c.text),
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: Sp.x1),
+            Text(subtitle!,
+                style: AppType.bodyLg.copyWith(color: c.textSecondary)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final Widget? trailing;
+  const _SectionHeader({required this.title, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sp.x3),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              header: true,
+              // Sentence case at title-sm. The old build rendered this slot
+              // as `TITLE`.toUpperCase() at 11px with letterSpacing 1.5.
+              child: Text(title,
+                  style: AppType.titleSm.copyWith(color: c.text)),
+            ),
+          ),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+}
+
+class _PinnedRowToggle extends StatelessWidget {
+  final bool visible;
+  final int count;
+  final VoidCallback onPressed;
+  const _PinnedRowToggle({
+    required this.visible,
+    required this.count,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = visible ? 'Hide pinned books' : 'Show $count pinned books';
+    return Semantics(
+      key: const ValueKey('pinned-row-toggle'),
+      button: true,
+      label: label,
+      toggled: visible,
+      excludeSemantics: true,
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: Icon(visible
+            ? Icons.visibility_off_outlined
+            : Icons.visibility_outlined),
+        label: Text(visible ? 'Hide' : 'Show'),
+      ),
+    );
+  }
+}
+
+/// Horizontal row of pinned books (at most five — the DB refuses a sixth).
+class _PinnedRow extends StatelessWidget {
+  final List<UnifiedAudiobook> books;
+  final ValueChanged<UnifiedAudiobook> onPlay;
+  const _PinnedRow({required this.books, required this.onPlay});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    if (books.isEmpty) return const SizedBox.shrink();
+
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    const coverHeight = 148.0;
+    // Two `body` lines at 24px line-height, plus the gap above them and the
+    // list's own vertical padding. Derived rather than a fixed number so
+    // 200% OS text does not clip — the first cut used a flat 148+48 and
+    // overflowed by 16px the moment a title wrapped to two lines.
+    final rowHeight = coverHeight + Sp.x2 + (24 * 2) * textScale + Sp.x2;
+
+    return SizedBox(
+      height: rowHeight,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(vertical: Sp.x1),
+        itemCount: books.length,
+        separatorBuilder: (_, __) => const SizedBox(width: Sp.x3),
+        itemBuilder: (context, i) {
+          final book = books[i];
+          return Semantics(
+            button: true,
+            label: 'Play ${book.title}, pinned',
+            excludeSemantics: true,
+            child: InkWell(
+              onTap: () => onPlay(book),
+              borderRadius: R.md,
+              child: SizedBox(
+                width: 112,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Stack(
+                      children: [
+                        AppBookCover(
+                          bookId: book.id,
+                          title: book.title,
+                          coverUrl: book.coverArtUrlOrPath,
+                          width: 112,
+                          height: coverHeight,
+                        ),
+                        Positioned(
+                          top: Sp.x1,
+                          right: Sp.x1,
+                          child: Container(
+                            padding: const EdgeInsets.all(Sp.x1),
+                            decoration: BoxDecoration(
+                              color: c.accentFill,
+                              borderRadius: R.xs,
+                            ),
+                            child: Icon(Icons.push_pin_rounded,
+                                size: 14, color: c.textOnAccent),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: Sp.x2),
+                    Expanded(
+                      child: Text(
+                        book.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.body.copyWith(
+                            color: c.text, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// One continue-listening row. Dismissible in either direction; dismissing
+/// calls `hideFromContinue`, which touches neither the book nor its
+/// progress row, and the snackbar offers an undo.
+class _ContinueListeningItem extends StatelessWidget {
+  final UnifiedAudiobook book;
+  final bool isPinned;
+  final VoidCallback onPlay;
+  final VoidCallback onHide;
+  final VoidCallback onTogglePin;
+
+  const _ContinueListeningItem({
+    required this.book,
+    required this.isPinned,
+    required this.onPlay,
+    required this.onHide,
+    required this.onTogglePin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+
+    return Dismissible(
+      key: ValueKey('continue-${book.id}'),
+      background: const _DismissBackground(alignment: Alignment.centerLeft),
+      secondaryBackground:
+          const _DismissBackground(alignment: Alignment.centerRight),
+      onDismissed: (_) => onHide(),
+      child: Container(
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: R.md,
+          border: Border.all(color: c.border),
+          boxShadow: c.shadow1,
+        ),
+        padding: const EdgeInsets.all(Sp.x3),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            AppBookCover(
+              bookId: book.id,
+              title: book.title,
+              coverUrl: book.coverArtUrlOrPath,
+              width: 56,
+              height: 74,
+            ),
+            const SizedBox(width: Sp.x3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      if (isPinned) ...[
+                        Semantics(
+                          label: 'Pinned',
+                          child: Icon(Icons.push_pin_rounded,
+                              size: 16, color: c.accentText),
+                        ),
+                        const SizedBox(width: Sp.x1),
+                      ],
+                      Expanded(
+                        child: Text(
+                          book.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.bodyLg.copyWith(
+                              color: c.text, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: Sp.x1),
+                  Text(
+                    book.author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.body.copyWith(color: c.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: Sp.x2),
+            Semantics(
+              key: ValueKey('pin-toggle-${book.id}'),
+              button: true,
+              label: isPinned ? 'Unpin ${book.title}' : 'Pin ${book.title}',
+              toggled: isPinned,
+              excludeSemantics: true,
+              child: IconButton(
+                tooltip: isPinned ? 'Unpin' : 'Pin',
+                onPressed: onTogglePin,
+                icon: Icon(
+                  isPinned
+                      ? Icons.push_pin_rounded
+                      : Icons.push_pin_outlined,
+                  color: isPinned ? c.accentText : c.textSecondary,
+                ),
+              ),
+            ),
+            Semantics(
+              button: true,
+              label: 'Resume ${book.title}',
+              excludeSemantics: true,
+              child: IconButton(
+                tooltip: 'Resume',
+                onPressed: onPlay,
+                icon: Icon(Icons.play_circle_fill_rounded,
+                    size: Dim.iconXl, color: c.accentFill),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DismissBackground extends StatelessWidget {
+  final Alignment alignment;
+  const _DismissBackground({required this.alignment});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      decoration: BoxDecoration(color: c.surfaceSunken, borderRadius: R.md),
+      padding: const EdgeInsets.symmetric(horizontal: Sp.x5),
+      alignment: alignment,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.visibility_off_outlined, color: c.textSecondary),
+          const SizedBox(width: Sp.x2),
+          Text('Hide', style: AppType.label.copyWith(color: c.textSecondary)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown at the bottom of the idle list while audio is still playing, so
+/// coming back to the list never means losing the player.
+class _PeekPlayerStrip extends StatelessWidget {
+  final AudioPlaybackService audioService;
+  final VoidCallback onResumePlayer;
+
+  const _PeekPlayerStrip({
+    required this.audioService,
+    required this.onResumePlayer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ValueListenableBuilder<UnifiedAudiobook?>(
+      valueListenable: audioService.currentBookNotifier,
+      builder: (context, book, _) {
+        if (book == null) return const SizedBox.shrink();
+        return Material(
+          color: c.surfaceRaised,
+          child: InkWell(
+            onTap: onResumePlayer,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: Sp.x4, vertical: Sp.x3),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: c.border)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.graphic_eq_rounded, color: c.accentText),
+                  const SizedBox(width: Sp.x3),
+                  Expanded(
+                    child: Text(
+                      book.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppType.bodyLg.copyWith(color: c.text),
+                    ),
+                  ),
+                  const SizedBox(width: Sp.x2),
+                  Semantics(
+                    button: true,
+                    label: 'Back to player',
+                    excludeSemantics: true,
+                    child: TextButton(
+                      onPressed: onResumePlayer,
+                      child: const Text('Player'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Active state
+// ---------------------------------------------------------------------------
+
+class _ActiveView extends StatelessWidget {
+  final UnifiedAudiobook book;
+  final AudioPlaybackService audioService;
+  final VoidCallback onShowList;
+
+  const _ActiveView({
+    required this.book,
+    required this.audioService,
+    required this.onShowList,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= Dim.wideBreakpoint;
+        final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
+        // Cover is sized from the *smaller* of the two axes so it can never
+        // push the transport off a short window.
+        final coverSize = (constraints.maxHeight * 0.30)
+            .clamp(120.0, wide ? 280.0 : 220.0)
+            .toDouble();
+
+        return Container(
+          color: c.bg,
+          child: Column(
+            children: [
+              // The way back to the list. Never touches playback.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(Sp.x2, Sp.x2, Sp.x4, 0),
+                child: Row(
+                  children: [
+                    Semantics(
+                      button: true,
+                      label: 'Back to continue listening. Playback keeps going.',
+                      excludeSemantics: true,
+                      child: TextButton.icon(
+                        onPressed: onShowList,
+                        icon: const Icon(Icons.expand_more_rounded),
+                        label: const Text('Your list'),
+                      ),
+                    ),
+                    const Spacer(),
+                    ValueListenableBuilder<PlaybackState>(
+                      valueListenable: audioService.stateNotifier,
+                      builder: (context, state, _) {
+                        if (state != PlaybackState.error) {
+                          return const SizedBox.shrink();
+                        }
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error_outline_rounded, color: c.danger),
+                            const SizedBox(width: Sp.x2),
+                            Text('Playback failed',
+                                style:
+                                    AppType.label.copyWith(color: c.danger)),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: gutter),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 640),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppBookCover(
+                            bookId: book.id,
+                            title: book.title,
+                            coverUrl: book.coverArtUrlOrPath,
+                            width: coverSize * 0.76,
+                            height: coverSize,
+                          ),
+                          const SizedBox(height: Sp.x5),
+                          Text(
+                            book.title,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.serif(AppType.titleMd)
+                                .copyWith(color: c.text),
+                          ),
+                          const SizedBox(height: Sp.x1),
+                          ValueListenableBuilder<int>(
+                            valueListenable: audioService.chapterIndexNotifier,
+                            builder: (context, index, _) {
+                              final title = index < book.chapters.length
+                                  ? book.chapters[index].title
+                                  : book.author;
+                              return Text(
+                                title,
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppType.body
+                                    .copyWith(color: c.textSecondary),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: Sp.x5),
+                          PlayerScrubber(audioService: audioService),
+                          const SizedBox(height: Sp.x5),
+                          PlayerTransport(
+                              audioService: audioService, book: book),
+                          const SizedBox(height: Sp.x6),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: Sp.x3,
+                            runSpacing: Sp.x3,
+                            children: [
+                              SpeedSelector(audioService: audioService),
+                              SleepTimerSelector(audioService: audioService),
+                            ],
+                          ),
+                          const SizedBox(height: Sp.x8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}

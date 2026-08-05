@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
+
 import '../domain/models/librivox_book.dart';
+import '../theme/app_theme.dart';
 import 'librivox_book_item.dart';
 
+/// One horizontal shelf of books on Discover.
+///
+/// The heading was `title.toUpperCase()` at 10px with `letterSpacing: 1.5`
+/// and an alpha-composited accent; it is now sentence case at `title-sm` in
+/// an opaque `text` colour. The shelf height is derived from the tile
+/// metrics and the current text scale rather than a fixed 240px that
+/// clipped at large text sizes.
 class LibriVoxShelfView extends StatelessWidget {
   final List<LibriVoxBook> books;
   final String title;
   final LibriVoxBook? selectedBook;
   final void Function(LibriVoxBook book) onSelectBook;
-  final VoidCallback? onSeeAll;
 
   const LibriVoxShelfView({
     super.key,
@@ -15,72 +23,47 @@ class LibriVoxShelfView extends StatelessWidget {
     required this.books,
     this.selectedBook,
     required this.onSelectBook,
-    this.onSeeAll,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
+    final c = context.colors;
     if (books.isEmpty) return const SizedBox.shrink();
+
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final shelfHeight =
+        LibriVoxBookItem.coverHeight + Sp.x2 + (26 * 2 + 18) * textScale;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                  color: theme.colorScheme.primary.withValues(alpha: 0.8),
-                ),
-              ),
-              if (onSeeAll != null)
-                TextButton(
-                  onPressed: onSeeAll,
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    'SEE ALL',
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary),
-                  ),
-                ),
-            ],
+          padding: const EdgeInsets.symmetric(horizontal: Sp.x4),
+          child: Semantics(
+            header: true,
+            child: Text(title,
+                style: AppType.titleSm.copyWith(color: c.text)),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: Sp.x3),
         SizedBox(
-          height: 240,
-          child: ListView.builder(
+          height: shelfHeight,
+          child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: Sp.x4),
             itemCount: books.length,
+            separatorBuilder: (_, __) => const SizedBox(width: Sp.x3),
             itemBuilder: (context, index) {
               final book = books[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: LibriVoxBookItem(
-                  book: book,
-                  isSelected: selectedBook?.id == book.id,
-                  onTap: () => onSelectBook(book),
-                ),
+              return LibriVoxBookItem(
+                book: book,
+                isSelected: selectedBook?.id == book.id,
+                onTap: () => onSelectBook(book),
               );
             },
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: Sp.sectionGap),
       ],
     );
   }

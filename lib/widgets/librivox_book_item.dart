@@ -1,12 +1,29 @@
 import 'package:flutter/material.dart';
-import '../core/demo_mode.dart';
-import '../domain/models/librivox_book.dart';
-import 'book_cover_image.dart';
 
+import '../domain/models/librivox_book.dart';
+import '../theme/app_theme.dart';
+import 'app_book_cover.dart';
+
+/// A book tile on the Discover shelves.
+///
+/// Redesigned onto the token system: 148px wide (was 110), title 16px (was
+/// 10px bold), author 13px `text-secondary` (was 9px at `onSurface` α0.5,
+/// which measured 2.94:1 and failed AA badly). Selection is a 2px accent
+/// outline plus the badge, never colour alone. The neon accent strip, the
+/// glossy sheen and the hue-tinted glow shadow are gone — see
+/// [AppBookCover].
+///
+/// The **preview-only** treatment is unchanged in substance and must stay:
+/// the canned web demo has to mark every entry whose audio was not bundled,
+/// so nobody believes they were shown a working app that isn't one. The
+/// badge text is part of the accessible label, not just a visual.
 class LibriVoxBookItem extends StatelessWidget {
   final LibriVoxBook book;
   final bool isSelected;
   final VoidCallback onTap;
+
+  static const double tileWidth = 148;
+  static const double coverHeight = 196;
 
   const LibriVoxBookItem({
     super.key,
@@ -15,293 +32,101 @@ class LibriVoxBookItem extends StatelessWidget {
     required this.onTap,
   });
 
-  BoxDecoration _buildCoverDecoration(
-      ThemeData theme, double hue, bool isSelected) {
-    final startColor = HSLColor.fromAHSL(1.0, hue, 0.65, 0.22).toColor();
-    final endColor =
-        HSLColor.fromAHSL(1.0, (hue + 40) % 360, 0.75, 0.12).toColor();
-    final accentColor = HSLColor.fromAHSL(1.0, hue, 0.9, 0.6).toColor();
-
-    return BoxDecoration(
-      borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(3),
-        bottomLeft: Radius.circular(3),
-        topRight: Radius.circular(8),
-        bottomRight: Radius.circular(8),
-      ),
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [startColor, endColor],
-      ),
-      border: Border.all(
-        color: isSelected
-            ? theme.colorScheme.primary
-            : accentColor.withValues(alpha: 0.25),
-        width: isSelected ? 2.5 : 1,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.45)
-              : Colors.black.withValues(alpha: 0.35),
-          blurRadius: isSelected ? 16 : 8,
-          spreadRadius: isSelected ? 1 : 0,
-          offset: const Offset(3, 3),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final hash = book.title.hashCode;
-    final double hue = (hash.abs() % 360).toDouble();
-    final String firstLetter =
-        book.title.isNotEmpty ? book.title[0].toUpperCase() : '';
-    final String coverUrl = book.coverArtUrl;
+    final c = context.colors;
+    final isPreviewOnly = !book.demoPlayable;
 
-    final Widget proceduralCover = AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      decoration: _buildCoverDecoration(theme, hue, isSelected),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Book Spine Crease
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 12,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.35),
-                    Colors.black.withValues(alpha: 0.15),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Top Decorative Neon Accent Strip
-          Positioned(
-            top: 0,
-            left: 12,
-            right: 12,
-            height: 3,
-            child: Container(
-              decoration: BoxDecoration(
-                color: HSLColor.fromAHSL(1.0, hue, 0.9, 0.6)
-                    .toColor()
-                    .withValues(alpha: 0.6),
-                borderRadius:
-                    const BorderRadius.vertical(bottom: Radius.circular(2)),
-                boxShadow: [
-                  BoxShadow(
-                    color: HSLColor.fromAHSL(1.0, hue, 0.9, 0.6)
-                        .toColor()
-                        .withValues(alpha: 0.4),
-                    blurRadius: 4,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Glossy Sheen Overlay
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(3),
-                bottomLeft: Radius.circular(3),
-                topRight: Radius.circular(8),
-                bottomRight: Radius.circular(8),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: const Alignment(-0.8, -1.0),
-                    end: const Alignment(0.8, 1.0),
-                    stops: const [0.0, 0.45, 0.5, 0.55, 1.0],
-                    colors: [
-                      Colors.transparent,
-                      Colors.transparent,
-                      Colors.white.withValues(alpha: 0.06),
-                      Colors.transparent,
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Center Decorative Letter Emblem
-          Center(
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  width: 1,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  firstLetter,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'serif',
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Headphone Icon Badge
-          Positioned(
-            bottom: 6,
-            left: 12,
-            child: Icon(
-              Icons.headphones_rounded,
-              size: 14,
-              color: Colors.white.withValues(alpha: 0.35),
-            ),
-          ),
-        ],
-      ),
-    );
+    final semanticLabel = [
+      book.title,
+      'by ${book.authorNames}',
+      if (isPreviewOnly) 'Preview only, not playable',
+      if (isSelected) 'Selected',
+    ].join('. ');
 
-    final Widget coverWidget = (coverUrl.isNotEmpty || kDemoMode)
-        ? ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(3),
-              bottomLeft: Radius.circular(3),
-              topRight: Radius.circular(8),
-              bottomRight: Radius.circular(8),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: isSelected
-                      ? theme.colorScheme.primary
-                      : Colors.white.withValues(alpha: 0.15),
-                  width: isSelected ? 2.5 : 1,
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(3),
-                  bottomLeft: Radius.circular(3),
-                  topRight: Radius.circular(8),
-                  bottomRight: Radius.circular(8),
-                ),
-              ),
-              child: BookCoverImage(
-                bookId: book.id,
-                networkUrl: coverUrl,
-                fit: BoxFit.cover,
-                fallbackBuilder: (_) => proceduralCover,
-              ),
-            ),
-          )
-        : proceduralCover;
-
-    return SizedBox(
-      width: 110,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            height: 145,
-            width: 110,
-            child: Stack(
-              children: [
-                InkWell(
-                  onTap: onTap,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(3),
-                    bottomLeft: Radius.circular(3),
-                    topRight: Radius.circular(8),
-                    bottomRight: Radius.circular(8),
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: R.md,
+        child: SizedBox(
+          width: tileWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                children: [
+                  Opacity(
+                    // Desaturating outright needs a colour matrix; dimming
+                    // reads the same at tile size and costs nothing.
+                    opacity: isPreviewOnly ? 0.72 : 1.0,
+                    child: AppBookCover(
+                      bookId: book.id,
+                      title: book.title,
+                      coverUrl: book.coverArtUrl,
+                      width: tileWidth,
+                      height: coverHeight,
+                      isSelected: isSelected,
+                    ),
                   ),
-                  child: coverWidget,
-                ),
-                // Non-playable demo entries must be unmistakably marked —
-                // nobody should think they were shown a working app that
-                // isn't (rework_plan.md). Every real (non-demo) book keeps
-                // demoPlayable == true, so this never shows outside the
-                // canned web demo.
-                if (!book.demoPlayable)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: IgnorePointer(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 3),
-                        decoration: const BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.only(
-                            bottomLeft: Radius.circular(3),
-                            bottomRight: Radius.circular(8),
+                  if (isPreviewOnly)
+                    Positioned(
+                      left: Sp.x1,
+                      right: Sp.x1,
+                      bottom: Sp.x1,
+                      child: IgnorePointer(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: Sp.x2, vertical: Sp.x1),
+                          decoration: BoxDecoration(
+                            color: c.warning,
+                            borderRadius: R.xs,
                           ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.lock_rounded,
-                                size: 9, color: Colors.white70),
-                            const SizedBox(width: 3),
-                            Text(
-                              'PREVIEW ONLY',
-                              style: TextStyle(
-                                fontSize: 7,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.4,
-                                color: Colors.white.withValues(alpha: 0.9),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.lock_rounded,
+                                  size: 14, color: c.textOnAccent),
+                              const SizedBox(width: Sp.x1),
+                              Flexible(
+                                child: Text(
+                                  'Preview only',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppType.caption
+                                      .copyWith(color: c.textOnAccent),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
+                ],
+              ),
+              const SizedBox(height: Sp.x2),
+              Text(
+                book.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.body
+                    .copyWith(color: c.text, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: Sp.x1),
+              Text(
+                book.authorNames,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.caption.copyWith(color: c.textSecondary),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            book.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 10,
-              height: 1.2,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            book.authorNames,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 9,
-              height: 1.1,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

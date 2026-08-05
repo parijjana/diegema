@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'main.dart';
 import 'services/artwork_enrichment_service.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
+import 'theme/app_theme.dart';
 
 /// Root widget. [database], [libriVoxService], [downloader], and
 /// [artworkService] are optional injection points so tests can supply an
@@ -18,12 +20,22 @@ class AudiobookApp extends StatefulWidget {
   final LibriVoxStreamAndDownloader? downloader;
   final ArtworkEnrichmentService? artworkService;
 
+  /// Injectable UI preference store, so widget tests never need the
+  /// `shared_preferences` platform channel.
+  final UiPreferences preferences;
+
+  /// Which theme the app starts in. Only tests set this; the in-app toggle
+  /// drives it at runtime.
+  final bool initialDarkMode;
+
   const AudiobookApp({
     super.key,
+    this.initialDarkMode = false,
     this.database,
     this.libriVoxService,
     this.downloader,
     this.artworkService,
+    this.preferences = const UiPreferences(),
   });
 
   @override
@@ -32,11 +44,12 @@ class AudiobookApp extends StatefulWidget {
 
 class _AudiobookAppState extends State<AudiobookApp> {
   late final AppDatabase _db;
-  bool _isDarkMode = false;
+  late bool _isDarkMode;
 
   @override
   void initState() {
     super.initState();
+    _isDarkMode = widget.initialDarkMode;
     _db = widget.database ?? AppDatabase();
   }
 
@@ -46,63 +59,24 @@ class _AudiobookAppState extends State<AudiobookApp> {
     super.dispose();
   }
 
-  ThemeData _buildTheme(bool isDark) {
-    if (!isDark) {
-      return ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFF8F8F5),
-        fontFamily: 'Inter',
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF2E6D7D),
-          secondary: Color(0xFFCC4D22),
-          onPrimary: Colors.white,
-          surface: Colors.white,
-          onSurface: Color(0xFF222222),
-          outline: Color(0xFFE0DED6),
-        ),
-        cardTheme: CardThemeData(
-          color: Colors.white,
-          elevation: 1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: Color(0xFFE0DED6)),
-          ),
-        ),
-      );
-    } else {
-      return ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF101417),
-        fontFamily: 'Inter',
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF2E6D7D),
-          secondary: Color(0xFFCC4D22),
-          onPrimary: Colors.white,
-          surface: Color(0xFF181C20),
-          onSurface: Color(0xFFE6E4DF),
-          outline: Color(0xFF2E6D7D),
-        ),
-        cardTheme: CardThemeData(
-          color: const Color(0xFF181C20),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'LibriVox Audiobook Player',
       debugShowCheckedModeBanner: false,
-      theme: _buildTheme(_isDarkMode),
+      // Both themes are supplied so the framework can cross-fade between
+      // them; `themeMode` is what the in-app toggle actually drives. The
+      // two `ThemeData` blocks of raw hex that used to live here are gone —
+      // every value now comes from `lib/theme/`, built from
+      // `design/tokens.css`.
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: HomeScreen(
         db: _db,
         isDarkMode: _isDarkMode,
         onToggleTheme: () => setState(() => _isDarkMode = !_isDarkMode),
+        preferences: widget.preferences,
         libriVoxService: widget.libriVoxService,
         downloader: widget.downloader,
         artworkService: widget.artworkService,

@@ -23,6 +23,11 @@ dependencies:
   sqlite3_flutter_libs: ^0.5.24
   url_launcher: ^6.3.0
   file_picker: ^11.0.3
+  # Persists small UI preferences that must survive a restart but do not
+  # belong in the audiobook schema (e.g. whether the pinned-books row on
+  # the Now Playing screen is shown). Works on web as well as native, so
+  # the DEMO_MODE build keeps the same behaviour.
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

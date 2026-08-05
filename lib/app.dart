@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'main.dart';
+import 'screens/library_screen.dart' show LibraryScanner;
 import 'services/artwork_enrichment_service.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
@@ -24,6 +25,10 @@ class AudiobookApp extends StatefulWidget {
   /// `shared_preferences` platform channel.
   final UiPreferences preferences;
 
+  /// Injectable downloads-folder scan; see [LibraryScanner]. Tests pass a
+  /// stub so no `path_provider` channel is touched.
+  final LibraryScanner? libraryScanner;
+
   /// Which theme the app starts in. Only tests set this; the in-app toggle
   /// drives it at runtime.
   final bool initialDarkMode;
@@ -36,6 +41,7 @@ class AudiobookApp extends StatefulWidget {
     this.downloader,
     this.artworkService,
     this.preferences = const UiPreferences(),
+    this.libraryScanner,
   });
 
   @override
@@ -77,6 +83,7 @@ class _AudiobookAppState extends State<AudiobookApp> {
         isDarkMode: _isDarkMode,
         onToggleTheme: () => setState(() => _isDarkMode = !_isDarkMode),
         preferences: widget.preferences,
+        libraryScanner: widget.libraryScanner,
         libriVoxService: widget.libriVoxService,
         downloader: widget.downloader,
         artworkService: widget.artworkService,

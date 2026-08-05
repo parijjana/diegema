@@ -75,12 +75,12 @@ void main() {
     ));
     await pumpFrames(tester);
 
-    // Left Now Playing, arrived at Library. The library body itself may be
-    // empty or in its error state here (the test binding has no
-    // path_provider channel, so the download scan fails), so the assertion
-    // is on the screen's own header actions rather than one body state.
+    // Left Now Playing, arrived at Library. The download scan no longer
+    // explodes under the test binding (it resolves no documents root and
+    // skips), so the body settles on the honest empty state.
     expect(find.text('Nothing in progress'), findsNothing);
     expect(find.byTooltip('Refresh library'), findsOneWidget);
+    expect(find.text('Your library is empty'), findsOneWidget);
     expect(find.byTooltip('Import a book'), findsOneWidget);
 
     await unmount(tester);

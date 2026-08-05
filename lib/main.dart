@@ -5,6 +5,7 @@ import 'core/demo_mode.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'screens/app_shell.dart';
+import 'screens/library_screen.dart' show LibraryScanner;
 import 'services/artwork_enrichment_service.dart';
 import 'services/demo_artwork_service.dart';
 import 'services/demo_downloader.dart';
@@ -45,6 +46,9 @@ class HomeScreen extends StatelessWidget {
   /// Injectable so widget tests need no `shared_preferences` channel.
   final UiPreferences preferences;
 
+  /// Injectable downloads-folder scan; see [LibraryScanner].
+  final LibraryScanner? libraryScanner;
+
   const HomeScreen({
     super.key,
     required this.db,
@@ -54,6 +58,7 @@ class HomeScreen extends StatelessWidget {
     this.downloader,
     this.artworkService,
     this.preferences = const UiPreferences(),
+    this.libraryScanner,
   });
 
   @override
@@ -66,6 +71,7 @@ class HomeScreen extends StatelessWidget {
       downloader: downloader,
       artworkService: artworkService,
       preferences: preferences,
+      libraryScanner: libraryScanner,
     );
   }
 }

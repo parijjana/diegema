@@ -43,6 +43,10 @@ class AppShell extends StatefulWidget {
   /// `shared_preferences` platform channel.
   final UiPreferences preferences;
 
+  /// Injectable downloads-folder scan for [LibraryScreen]; see
+  /// [LibraryScanner].
+  final LibraryScanner? libraryScanner;
+
   const AppShell({
     super.key,
     required this.db,
@@ -52,6 +56,7 @@ class AppShell extends StatefulWidget {
     this.downloader,
     this.artworkService,
     this.preferences = const UiPreferences(),
+    this.libraryScanner,
   });
 
   @override
@@ -172,6 +177,7 @@ class _AppShellState extends State<AppShell> {
           onGoToDiscover: () => _go(2),
           isDarkMode: widget.isDarkMode,
           onToggleTheme: widget.onToggleTheme,
+          scanLibrary: widget.libraryScanner,
         );
       case 2:
         return DiscoverScreen(

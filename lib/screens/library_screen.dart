@@ -16,12 +16,21 @@ import 'app_shell.dart' show ThemeToggleButton;
 /// This chunk of the redesign restyles the screen onto the token system and
 /// gives it real empty/loading/error states; the pinned-row header and
 /// user-supplied cover art land with the rest of Screen 2's spec.
+
+/// The downloads-folder scan this screen runs before listing books.
+/// Injectable so tests drive a stub (or a temp-directory scan) instead of
+/// the real `path_provider`-backed walk.
+typedef LibraryScanner = Future<void> Function(AppDatabase db);
+
 class LibraryScreen extends StatefulWidget {
   final AppDatabase db;
   final AudioPlaybackService audioService;
   final VoidCallback onGoToDiscover;
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
+
+  /// Defaults to the platform [scanDownloadedLibrary].
+  final LibraryScanner? scanLibrary;
 
   const LibraryScreen({
     super.key,
@@ -30,6 +39,7 @@ class LibraryScreen extends StatefulWidget {
     required this.onGoToDiscover,
     required this.isDarkMode,
     required this.onToggleTheme,
+    this.scanLibrary,
   });
 
   @override
@@ -53,7 +63,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       _error = null;
     });
     try {
-      await scanDownloadedLibrary(widget.db);
+      await (widget.scanLibrary ?? scanDownloadedLibrary)(widget.db);
       final books = await widget.db.getAllAudiobooks();
       if (!mounted) return;
       setState(() {

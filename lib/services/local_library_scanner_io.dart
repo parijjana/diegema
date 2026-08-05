@@ -1,17 +1,42 @@
 import 'dart:io';
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 
-/// Scans `<app documents>/unamedaudiobookplayer/downloads` (the directory
+/// Resolves the directory the app keeps its data in. Returning `null` means
+/// "there is no documents directory here", and the scan is skipped rather
+/// than throwing.
+///
+/// Injectable so the scan itself can be exercised against a temp directory
+/// in tests. The default implementation goes through `path_provider`, whose
+/// platform channel does not exist under `flutter_test` — calling it there
+/// used to throw `MissingPluginException` on every run and print a
+/// "scan failed" line from `LibraryScreen`.
+typedef DocumentsRootResolver = Future<String?> Function();
+
+Future<String?> _platformDocumentsRoot() async {
+  try {
+    return (await getApplicationDocumentsDirectory()).path;
+  } on MissingPluginException {
+    return null;
+  }
+}
+
+/// Scans `<documents root>/unamedaudiobookplayer/downloads` (the directory
 /// `BookDetailPane`'s ZIP downloader writes into) and registers any
 /// not-yet-known book folders in [db].
-Future<void> scanDownloadedLibrary(AppDatabase db) async {
-  final appDir = await getApplicationDocumentsDirectory();
+Future<void> scanDownloadedLibrary(
+  AppDatabase db, {
+  DocumentsRootResolver? documentsRoot,
+}) async {
+  final rootPath = await (documentsRoot ?? _platformDocumentsRoot)();
+  if (rootPath == null) return;
+
   final downloadsDir =
-      Directory(p.join(appDir.path, 'unamedaudiobookplayer', 'downloads'));
+      Directory(p.join(rootPath, 'unamedaudiobookplayer', 'downloads'));
 
   if (!await downloadsDir.exists()) return;
 

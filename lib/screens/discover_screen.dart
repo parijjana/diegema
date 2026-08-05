@@ -29,6 +29,10 @@ class DiscoverScreen extends StatefulWidget {
   final ArtworkEnrichmentService artworkService;
   final LibriVoxStreamAndDownloader downloader;
 
+  /// Rendered in the screen heading on narrow layouts, where there is no
+  /// side rail to hold it. Supplied by the shell.
+  final Widget? headerAction;
+
   const DiscoverScreen({
     super.key,
     required this.db,
@@ -36,6 +40,7 @@ class DiscoverScreen extends StatefulWidget {
     required this.libriVoxService,
     required this.artworkService,
     required this.downloader,
+    this.headerAction,
   });
 
   @override
@@ -257,7 +262,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     onClear: _clearSearch,
                     searching: _searching,
                   ),
-                ),
+                )
+              else if (widget.headerAction != null)
+                widget.headerAction!,
             ],
           ),
         );

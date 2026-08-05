@@ -49,11 +49,16 @@ class NowPlayingScreen extends StatefulWidget {
   /// nothing yet.
   final VoidCallback onGoToDiscover;
 
+  /// Rendered in the screen heading on narrow layouts, where there is no
+  /// side rail to hold it. Supplied by the shell.
+  final Widget? headerAction;
+
   const NowPlayingScreen({
     super.key,
     required this.db,
     required this.audioService,
     required this.onGoToDiscover,
+    this.headerAction,
     this.preferences = const UiPreferences(),
   });
 
@@ -263,6 +268,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             onTogglePin: _togglePin,
                             onGoToDiscover: widget.onGoToDiscover,
                             onRetry: _load,
+                            headerAction: widget.headerAction,
                             peeking: _peekingList && book != null,
                             audioService: widget.audioService,
                             onResumePlayer: _showPlayer,
@@ -315,6 +321,7 @@ class _IdleView extends StatelessWidget {
   final ValueChanged<UnifiedAudiobook> onTogglePin;
   final VoidCallback onGoToDiscover;
   final VoidCallback onRetry;
+  final Widget? headerAction;
 
   /// True when audio is running but the user has come back to the list.
   final bool peeking;
@@ -334,6 +341,7 @@ class _IdleView extends StatelessWidget {
     required this.onTogglePin,
     required this.onGoToDiscover,
     required this.onRetry,
+    required this.headerAction,
     required this.peeking,
     required this.audioService,
     required this.onResumePlayer,
@@ -446,6 +454,7 @@ class _IdleView extends StatelessWidget {
             _ScreenTitleBar(
               title: 'Now playing',
               subtitle: peeking ? null : 'Pick up where you left off',
+              action: wide ? null : headerAction,
             ),
             Expanded(child: body),
             if (peeking)
@@ -463,28 +472,38 @@ class _IdleView extends StatelessWidget {
 class _ScreenTitleBar extends StatelessWidget {
   final String title;
   final String? subtitle;
-  const _ScreenTitleBar({required this.title, this.subtitle});
+  final Widget? action;
+  const _ScreenTitleBar({required this.title, this.subtitle, this.action});
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
       padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x5, Sp.x4, Sp.x3),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Semantics(
-            header: true,
-            child: Text(
-              title,
-              style: AppType.serif(AppType.titleLg).copyWith(color: c.text),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    title,
+                    style:
+                        AppType.serif(AppType.titleLg).copyWith(color: c.text),
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: Sp.x1),
+                  Text(subtitle!,
+                      style: AppType.bodyLg.copyWith(color: c.textSecondary)),
+                ],
+              ],
             ),
           ),
-          if (subtitle != null) ...[
-            const SizedBox(height: Sp.x1),
-            Text(subtitle!,
-                style: AppType.bodyLg.copyWith(color: c.textSecondary)),
-          ],
+          if (action != null) action!,
         ],
       ),
     );

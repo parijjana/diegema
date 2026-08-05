@@ -157,6 +157,13 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _screenFor(int index) {
+    // On narrow layouts there is no side rail, so each screen's heading
+    // carries the theme toggle instead. Nothing is hover-only and nothing
+    // is reachable from only one screen.
+    final headerAction = ThemeToggleButton(
+      isDarkMode: widget.isDarkMode,
+      onToggle: widget.onToggleTheme,
+    );
     switch (index) {
       case 1:
         return LibraryScreen(
@@ -173,6 +180,7 @@ class _AppShellState extends State<AppShell> {
           libriVoxService: _libriVoxService,
           artworkService: _artworkService,
           downloader: _downloader,
+          headerAction: headerAction,
         );
       default:
         return NowPlayingScreen(
@@ -180,6 +188,7 @@ class _AppShellState extends State<AppShell> {
           audioService: _audioService,
           preferences: widget.preferences,
           onGoToDiscover: () => _go(2),
+          headerAction: headerAction,
         );
     }
   }

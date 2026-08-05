@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../core/demo_mode.dart';
 import '../domain/models/librivox_book.dart';
+import 'book_cover_image.dart';
 
 class LibriVoxBookItem extends StatelessWidget {
   final LibriVoxBook book;
@@ -177,7 +179,7 @@ class LibriVoxBookItem extends StatelessWidget {
       ),
     );
 
-    final Widget coverWidget = coverUrl.isNotEmpty
+    final Widget coverWidget = (coverUrl.isNotEmpty || kDemoMode)
         ? ClipRRect(
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(3),
@@ -200,10 +202,11 @@ class LibriVoxBookItem extends StatelessWidget {
                   bottomRight: Radius.circular(8),
                 ),
               ),
-              child: Image.network(
-                coverUrl,
+              child: BookCoverImage(
+                bookId: book.id,
+                networkUrl: coverUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => proceduralCover,
+                fallbackBuilder: (_) => proceduralCover,
               ),
             ),
           )

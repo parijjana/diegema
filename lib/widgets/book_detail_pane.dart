@@ -8,6 +8,7 @@ import '../domain/models/audiobook.dart';
 import '../services/artwork_enrichment_service.dart';
 import '../services/librivox_downloader.dart';
 import '../services/audio_playback_service.dart';
+import 'book_cover_image.dart';
 import 'glass_card.dart';
 
 class BookDetailPane extends StatefulWidget {
@@ -148,13 +149,14 @@ class _BookDetailPaneState extends State<BookDetailPane> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: _coverArtUrl != null
-                  ? Image.network(
-                      _coverArtUrl!,
+              child: (kDemoMode || _coverArtUrl != null)
+                  ? BookCoverImage(
+                      bookId: widget.book.id,
+                      networkUrl: _coverArtUrl,
                       width: 110,
                       height: 110,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildCoverFallback(theme),
+                      fallbackBuilder: (_) => _buildCoverFallback(theme),
                     )
                   : _buildCoverFallback(theme),
             ),

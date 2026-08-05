@@ -36,6 +36,7 @@ flutter:
 
   assets:
     - assets/demo/catalog.json
+    - assets/demo/covers/
 
   fonts:
     - family: Inter

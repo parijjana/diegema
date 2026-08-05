@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../core/playback_constants.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
 import 'glass_card.dart';
 import 'now_playing_screen.dart';
+import 'skip_interval_icon.dart';
 
 class PersistentPlayerBar extends StatelessWidget {
   final AudioPlaybackService audioService;
@@ -189,9 +191,14 @@ class PersistentPlayerBar extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.replay_10, size: 20),
-                            onPressed: () =>
-                                audioService.skipBackward(seconds: 15),
+                            icon: SkipIntervalIcon(
+                              direction: SkipDirection.backward,
+                              seconds: kSkipSeconds,
+                              size: 20,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                            onPressed: () => audioService.skipBackward(
+                                seconds: kSkipSeconds),
                           ),
                           ValueListenableBuilder<PlaybackState>(
                             valueListenable: audioService.stateNotifier,
@@ -218,21 +225,20 @@ class PersistentPlayerBar extends StatelessWidget {
                             },
                           ),
                           IconButton(
-                            icon: const Icon(Icons.forward_10, size: 20),
-                            onPressed: () =>
-                                audioService.skipForward(seconds: 15),
+                            icon: SkipIntervalIcon(
+                              direction: SkipDirection.forward,
+                              seconds: kSkipSeconds,
+                              size: 20,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                            onPressed: () => audioService.skipForward(
+                                seconds: kSkipSeconds),
                           ),
                           PopupMenuButton<double>(
                             icon: Icon(Icons.speed,
                                 color: theme.colorScheme.primary),
                             onSelected: (speed) => audioService.setSpeed(speed),
-                            itemBuilder: (context) => [
-                              0.75,
-                              1.0,
-                              1.25,
-                              1.5,
-                              2.0
-                            ]
+                            itemBuilder: (context) => kPlaybackSpeedOptions
                                 .map((s) => PopupMenuItem(
                                     value: s, child: Text('${s}x')))
                                 .toList(),

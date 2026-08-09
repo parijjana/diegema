@@ -21,14 +21,28 @@ import '../widgets/player_transport.dart';
 /// ## The fade
 ///
 /// A single [AnimationController] (`0` = list, `1` = player) drives both
-/// halves of a cross-dissolve. The two halves are *staggered* rather than
-/// symmetric: the list leaves over the first 60% on the `accel` curve while
-/// drifting up 12px, and the player enters over the last 60% on `decel`
-/// while settling from 0.97 scale. A straight symmetric cross-fade was
-/// tried first and read as a muddy double-exposure at the midpoint —
-/// both layers sat near 50% opacity over each other with nothing legible.
-/// The overlap is kept (20%) so it still reads as one continuous motion
-/// rather than a cut, but at any given frame one layer clearly dominates.
+/// halves, as a **fade-through**: the outgoing layer leaves over roughly
+/// the first third of the timeline and the incoming layer starts as it
+/// finishes, overlapping by about one frame. See [_outgoingEnd].
+///
+/// This is the second attempt. The first staggered the halves but left
+/// them overlapping by 20%, on the theory that one layer would always
+/// dominate. The golden frames in
+/// `test/screens/now_playing_fade_golden_test.dart` showed that it did
+/// not: at the midpoint both layers sat around 30% opacity on top of each
+/// other, with the player's scrubber and transport interleaved with the
+/// list's rows and two copies of the book title a few pixels apart. It
+/// read as a double exposure — exactly the failure the stagger was meant
+/// to prevent. Sequencing them removes it.
+///
+/// The motion on top of the opacity is deliberately small: the list drifts
+/// 12px up as it leaves, the player settles in from 0.97 scale. Both are
+/// tied to their own layer's progress, so the transition is symmetric —
+/// whichever layer is leaving always gets the short first window,
+/// regardless of direction.
+///
+/// Everything collapses to a single frame when the platform asks for
+/// reduced motion; see [_syncFade].
 ///
 /// The idle layer is also kept mounted but [IgnorePointer]-ed and
 /// [ExcludeSemantics]-ed once faded out, so a screen reader never
@@ -115,9 +129,27 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     _load();
   }
 
+  /// The two windows of the timeline, as fractions of the controller.
+  ///
+  /// They overlap by ~4% — about one frame at 60Hz. Butting them exactly
+  /// together (both at 0.3) was tried first, and the golden at the
+  /// handover came out as a completely empty screen: one frame of bare
+  /// background with no list and no player, which reads as a blink rather
+  /// than a transition. A single overlapping frame removes it, and is far
+  /// too short and too faint (roughly 15% and 8% opacity at its midpoint)
+  /// to bring back the double-exposure the first attempt suffered from.
+  static const double _outgoingEnd = 0.32;
+  static const double _incomingStart = 0.28;
+
+  /// Which layer is currently leaving. Only meaningful mid-flight: at
+  /// either end both directions produce the same opacities, so a stale
+  /// value cannot show a wrong frame.
+  bool _reversing = false;
+
   void _syncFade() {
     if (!mounted) return;
     final target = _playerShouldShow ? 1.0 : 0.0;
+    _reversing = target == 0.0;
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
       _fade.value = target;
     } else if (target == 1.0) {
@@ -233,12 +265,28 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           builder: (context, __) {
             final t = _fade.value;
 
-            // Staggered halves — see the class doc comment. The list owns
-            // 0.0-0.6 of the timeline, the player 0.4-1.0.
-            final listT = (t / 0.6).clamp(0.0, 1.0);
-            final playerT = ((t - 0.4) / 0.6).clamp(0.0, 1.0);
-            final listOpacity = 1 - Motion.accel.transform(listT);
-            final playerOpacity = Motion.decel.transform(playerT);
+            // Fade-through, not cross-fade — see the class doc comment.
+            // `progress` is how far the *current* gesture has run, so the
+            // leaving layer always gets the short first window whichever
+            // way the screen is going.
+            final progress = _reversing ? 1 - t : t;
+            final leaving =
+                (progress / _outgoingEnd).clamp(0.0, 1.0).toDouble();
+            final arriving = ((progress - _incomingStart) /
+                    (1 - _incomingStart))
+                .clamp(0.0, 1.0)
+                .toDouble();
+
+            // How visible each layer is, 0-1, before its curve.
+            final listVis = _reversing ? arriving : 1 - leaving;
+            final playerVis = _reversing ? 1 - leaving : arriving;
+
+            final listOpacity = _reversing
+                ? Motion.decel.transform(listVis)
+                : 1 - Motion.accel.transform(1 - listVis);
+            final playerOpacity = _reversing
+                ? 1 - Motion.accel.transform(1 - playerVis)
+                : Motion.decel.transform(playerVis);
 
             final listGone = t >= 1.0;
             final playerGone = t <= 0.0;
@@ -248,13 +296,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               children: [
                 if (!listGone)
                   IgnorePointer(
-                    ignoring: t > 0.5,
+                    ignoring: listVis < 0.5,
                     child: ExcludeSemantics(
-                      excluding: t > 0.5,
+                      excluding: listVis < 0.5,
                       child: Opacity(
                         opacity: listOpacity,
                         child: Transform.translate(
-                          offset: Offset(0, -12 * listT),
+                          offset: Offset(0, -12 * (1 - listVis)),
                           child: _IdleView(
                             loading: _loading,
                             error: _loadError,
@@ -279,13 +327,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                   ),
                 if (!playerGone && book != null)
                   IgnorePointer(
-                    ignoring: t < 0.5,
+                    ignoring: playerVis < 0.5,
                     child: ExcludeSemantics(
-                      excluding: t < 0.5,
+                      excluding: playerVis < 0.5,
                       child: Opacity(
                         opacity: playerOpacity,
                         child: Transform.scale(
-                          scale: 0.97 + 0.03 * playerT,
+                          scale: 0.97 + 0.03 * playerVis,
                           child: _ActiveView(
                             book: book,
                             audioService: widget.audioService,

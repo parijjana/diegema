@@ -16,6 +16,11 @@ import 'package:flutter/material.dart';
 /// Sizes are never applied through a fixed-height `SizedBox`; type must
 /// scale with the OS text-size setting to at least 200% without clipping.
 abstract final class AppType {
+  /// Every style below names the family explicitly. `ThemeData.fontFamily`
+  /// only reaches `textTheme`, so component themes that carry an explicit
+  /// `TextStyle` (every button, chip, list tile and input hint here) were
+  /// silently rendering in the platform default face instead of the
+  /// bundled one.
   static const String sans = 'Inter';
 
   /// Serif accent face for the wordmark and book titles. Not bundled —
@@ -34,25 +39,33 @@ abstract final class AppType {
   ];
 
   static const display = TextStyle(
+      fontFamily: sans,
       fontSize: 34, height: 40 / 34, fontWeight: FontWeight.w700, letterSpacing: 0);
   static const titleLg = TextStyle(
+      fontFamily: sans,
       fontSize: 28, height: 34 / 28, fontWeight: FontWeight.w700, letterSpacing: 0);
   static const titleMd = TextStyle(
+      fontFamily: sans,
       fontSize: 22, height: 28 / 22, fontWeight: FontWeight.w600, letterSpacing: 0);
   static const titleSm = TextStyle(
+      fontFamily: sans,
       fontSize: 18, height: 24 / 18, fontWeight: FontWeight.w600, letterSpacing: 0);
 
   /// The default body size.
   static const bodyLg = TextStyle(
+      fontFamily: sans,
       fontSize: 17, height: 26 / 17, fontWeight: FontWeight.w400, letterSpacing: 0);
   static const body = TextStyle(
+      fontFamily: sans,
       fontSize: 16, height: 24 / 16, fontWeight: FontWeight.w400, letterSpacing: 0);
   static const label = TextStyle(
+      fontFamily: sans,
       fontSize: 15, height: 20 / 15, fontWeight: FontWeight.w600, letterSpacing: 0);
 
   /// The floor. Permitted only for information that also appears elsewhere
   /// or is non-essential.
   static const caption = TextStyle(
+      fontFamily: sans,
       fontSize: 13, height: 18 / 13, fontWeight: FontWeight.w500, letterSpacing: 0);
 
   /// A [caption]/[body]-sized style with tabular figures, for timecodes.

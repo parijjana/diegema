@@ -44,8 +44,16 @@ flutter:
     - assets/demo/covers/
 
   fonts:
+    # Inter 4.0 (SIL Open Font License, assets/fonts/OFL.txt). The type
+    # scale in lib/theme/app_typography.dart uses w400/w500/w600/w700, so
+    # all four are bundled rather than letting the engine snap 500 and 600
+    # onto the nearest of two files.
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
         - asset: assets/fonts/Inter-Bold.ttf
           weight: 700

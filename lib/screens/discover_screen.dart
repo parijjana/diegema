@@ -33,6 +33,11 @@ class DiscoverScreen extends StatefulWidget {
   /// side rail to hold it. Supplied by the shell.
   final Widget? headerAction;
 
+  /// Demo-only: a book to select (and, on phone widths, open the detail
+  /// sheet for) as soon as the shelves land. `'1'` means "the first
+  /// featured book". See `core/demo_deeplink.dart` for why this exists.
+  final String? openBookId;
+
   const DiscoverScreen({
     super.key,
     required this.db,
@@ -41,6 +46,7 @@ class DiscoverScreen extends StatefulWidget {
     required this.artworkService,
     required this.downloader,
     this.headerAction,
+    this.openBookId,
   });
 
   @override
@@ -68,9 +74,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _searching = false;
   Object? _error;
 
+  /// Set while a deep-linked book still has to be opened; cleared the
+  /// first time the sheet is shown so it cannot reopen on every rebuild.
+  bool _pendingOpen = false;
+
   @override
   void initState() {
     super.initState();
+    _pendingOpen = widget.openBookId != null;
     _loadShelves();
   }
 
@@ -104,6 +115,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       if (!mounted) return;
       setState(() {
         _shelves = results;
+        final requested = widget.openBookId;
+        if (requested != null && featured.isNotEmpty) {
+          _selected = featured.firstWhere(
+            (b) => b.id == requested,
+            orElse: () => featured.first,
+          );
+        }
         _selected ??= featured.isNotEmpty ? featured.first : null;
         _loading = false;
       });
@@ -186,6 +204,17 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= Dim.wideBreakpoint;
+
+        // A deep-linked book is already visible in the detail pane on wide
+        // layouts; on phone widths the book view is a modal sheet, so it
+        // has to be pushed once the shelves exist.
+        if (_pendingOpen && !_loading && !wide && _selected != null) {
+          final book = _selected!;
+          _pendingOpen = false;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _openDetailSheet(context, book);
+          });
+        }
 
         final Widget browse;
         if (_loading) {

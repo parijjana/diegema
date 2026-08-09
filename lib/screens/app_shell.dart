@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../core/demo_deeplink.dart';
 import '../core/demo_mode.dart';
 import '../core/ui_preferences.dart';
 import '../database/app_database.dart';
 import '../services/artwork_enrichment_service.dart';
 import '../services/audio_playback_service.dart';
 import '../services/librivox_downloader.dart';
+import '../services/demo_catalog.dart';
 import '../services/librivox_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/demo_notice.dart';
@@ -47,6 +49,12 @@ class AppShell extends StatefulWidget {
   /// [LibraryScanner].
   final LibraryScanner? libraryScanner;
 
+  /// Demo-only query-string entry point; see [DemoDeepLink]. It chooses
+  /// the landing screen and can put the app straight into its playing
+  /// state, which is otherwise unreachable without a tap — and a tap is
+  /// not something browser automation can perform on a canvas.
+  final DemoDeepLink deepLink;
+
   const AppShell({
     super.key,
     required this.db,
@@ -57,6 +65,7 @@ class AppShell extends StatefulWidget {
     this.artworkService,
     this.preferences = const UiPreferences(),
     this.libraryScanner,
+    this.deepLink = DemoDeepLink.none,
   });
 
   @override
@@ -70,7 +79,7 @@ class _AppShellState extends State<AppShell> {
   late final AudioPlaybackService _audioService;
 
   /// Index 0 — Now Playing — is the default landing screen.
-  int _index = 0;
+  late int _index = widget.deepLink.screen;
 
   @override
   void initState() {
@@ -79,6 +88,30 @@ class _AppShellState extends State<AppShell> {
     _artworkService = widget.artworkService ?? ArtworkEnrichmentService();
     _downloader = widget.downloader ?? LibriVoxStreamAndDownloader();
     _audioService = AudioPlaybackService(db: widget.db);
+    if (kDemoMode && widget.deepLink.play != null) {
+      _startDeepLinkedPlayback(widget.deepLink.play!);
+    }
+  }
+
+  /// Loads the deep-linked demo book through the same path the book view
+  /// uses, so the resulting UI is the real playing state rather than a
+  /// mock-up of one. Failures are swallowed: a bad `?play=` value must
+  /// leave the app on its normal landing screen, not break it.
+  Future<void> _startDeepLinkedPlayback(String idOrFlag) async {
+    try {
+      final catalog = await DemoCatalog.load();
+      final playable = catalog.where((e) => e.playable);
+      if (playable.isEmpty) return;
+      final entry = playable.firstWhere(
+        (e) => e.id == idOrFlag,
+        orElse: () => playable.first,
+      );
+      final book = await _downloader.parseStreamableBook(entry.toLibriVoxBook());
+      if (!mounted) return;
+      await _audioService.loadBook(book);
+    } catch (e) {
+      debugPrint('AppShell: demo deep-link playback failed: $e');
+    }
   }
 
   @override
@@ -182,6 +215,7 @@ class _AppShellState extends State<AppShell> {
       case 2:
         return DiscoverScreen(
           db: widget.db,
+          openBookId: kDemoMode ? widget.deepLink.book : null,
           audioService: _audioService,
           libriVoxService: _libriVoxService,
           artworkService: _artworkService,

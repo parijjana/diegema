@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app.dart';
+import 'core/demo_deeplink.dart';
 import 'core/demo_mode.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
@@ -15,7 +16,12 @@ import 'services/librivox_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Demo builds only; `DemoDeepLink.fromUri` hands back an empty link in
+  // every other build, whatever the URL says.
+  final deepLink = DemoDeepLink.fromUri(Uri.base);
   runApp(AudiobookApp(
+    deepLink: deepLink,
+    initialDarkMode: deepLink.dark ?? false,
     // Wire the canned web demo's stub, network-free catalog services when
     // built with --dart-define=DEMO_MODE=true; every other build keeps
     // using the real LibriVox/archive.org-backed services (the null
@@ -49,6 +55,9 @@ class HomeScreen extends StatelessWidget {
   /// Injectable downloads-folder scan; see [LibraryScanner].
   final LibraryScanner? libraryScanner;
 
+  /// Demo-only query-string entry point; see [DemoDeepLink].
+  final DemoDeepLink deepLink;
+
   const HomeScreen({
     super.key,
     required this.db,
@@ -59,6 +68,7 @@ class HomeScreen extends StatelessWidget {
     this.artworkService,
     this.preferences = const UiPreferences(),
     this.libraryScanner,
+    this.deepLink = DemoDeepLink.none,
   });
 
   @override
@@ -72,6 +82,7 @@ class HomeScreen extends StatelessWidget {
       artworkService: artworkService,
       preferences: preferences,
       libraryScanner: libraryScanner,
+      deepLink: deepLink,
     );
   }
 }

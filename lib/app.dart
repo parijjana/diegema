@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/demo_deeplink.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'main.dart';
@@ -29,9 +30,13 @@ class AudiobookApp extends StatefulWidget {
   /// stub so no `path_provider` channel is touched.
   final LibraryScanner? libraryScanner;
 
-  /// Which theme the app starts in. Only tests set this; the in-app toggle
-  /// drives it at runtime.
+  /// Which theme the app starts in. Only tests and the demo deep link set
+  /// this; the in-app toggle drives it at runtime.
   final bool initialDarkMode;
+
+  /// Demo-only query-string entry point; see [DemoDeepLink]. Ignored
+  /// entirely outside `--dart-define=DEMO_MODE=true` builds.
+  final DemoDeepLink deepLink;
 
   const AudiobookApp({
     super.key,
@@ -42,6 +47,7 @@ class AudiobookApp extends StatefulWidget {
     this.artworkService,
     this.preferences = const UiPreferences(),
     this.libraryScanner,
+    this.deepLink = DemoDeepLink.none,
   });
 
   @override
@@ -84,6 +90,7 @@ class _AudiobookAppState extends State<AudiobookApp> {
         onToggleTheme: () => setState(() => _isDarkMode = !_isDarkMode),
         preferences: widget.preferences,
         libraryScanner: widget.libraryScanner,
+        deepLink: widget.deepLink,
         libriVoxService: widget.libriVoxService,
         downloader: widget.downloader,
         artworkService: widget.artworkService,

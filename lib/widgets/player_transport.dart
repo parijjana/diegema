@@ -304,16 +304,23 @@ class _ChipShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    // No `alignment:` here. A Container with an alignment expands to fill
+    // whatever it is given, which made both chips stretch the full width of
+    // the player column instead of hugging their labels. Centring is the
+    // Row's job.
     return Container(
       constraints: const BoxConstraints(minHeight: Dim.tapMin),
       padding: const EdgeInsets.symmetric(horizontal: Sp.x4),
-      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: emphasised ? c.accentWash : c.surfaceSunken,
         borderRadius: R.pill,
         border: Border.all(color: emphasised ? c.accent : c.borderContrast),
       ),
-      child: child,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [child],
+      ),
     );
   }
 }

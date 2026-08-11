@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:unamedaudiobookplayer/app.dart';
 import 'package:unamedaudiobookplayer/core/ui_preferences.dart';
 import 'package:unamedaudiobookplayer/database/app_database.dart';
+import 'package:unamedaudiobookplayer/core/network/rate_limit_dispatcher.dart';
 import 'package:unamedaudiobookplayer/services/librivox_service.dart';
 
 import '../support/fake_playback_service.dart';
@@ -98,7 +99,15 @@ void main() {
             initialDarkMode: dark,
             database: db,
             audioService: audio,
-            libriVoxService: LibriVoxService(client: buildMockClient()),
+            libriVoxService: LibriVoxService(
+              client: buildMockClient(),
+              // Zero cooldown: the real 1s-per-call delays are wall-clock
+              // waits inside `runAsync`, which widget tests cannot advance
+              // — Discover fans out across every category shelf and the
+              // pending timers hang the binding outright. See the doc on
+              // `RateLimitDispatcher.cooldownOverride`.
+              rateLimiter: RateLimitDispatcher(cooldownOverride: Duration.zero),
+            ),
             preferences: const UiPreferences(overrides: <String, Object>{}),
           ));
           await pumpFrames(tester);

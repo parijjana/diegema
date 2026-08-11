@@ -4,6 +4,21 @@ import 'dart:async';
 class RateLimitDispatcher {
   final Map<String, Future<void>> _queues = {};
 
+  /// Replaces every per-API cooldown when set, including any passed to
+  /// [dispatch].
+  ///
+  /// Exists for tests. The cooldowns below are real wall-clock
+  /// `Future.delayed`s, and widget tests only advance real time in the
+  /// short slices `tester.runAsync` allows — so a screen that fans out
+  /// across several shelves never finishes loading, and the pending timers
+  /// hang the test binding outright (not even `--timeout` interrupts it,
+  /// because the wait is inside `runAsync`). Passing [Duration.zero] here
+  /// keeps the queueing and ordering behaviour these tests exercise while
+  /// removing the waiting they cannot survive.
+  final Duration? cooldownOverride;
+
+  RateLimitDispatcher({this.cooldownOverride});
+
   static const Map<String, Duration> defaultCooldowns = {
     'librivox': Duration(seconds: 1),
   };
@@ -14,8 +29,10 @@ class RateLimitDispatcher {
     Duration? cooldown,
   }) {
     final completer = Completer<T>();
-    final effectiveCooldown =
-        cooldown ?? defaultCooldowns[apiId] ?? const Duration(seconds: 1);
+    final effectiveCooldown = cooldownOverride ??
+        cooldown ??
+        defaultCooldowns[apiId] ??
+        const Duration(seconds: 1);
 
     final previousFuture = _queues[apiId] ?? Future.value();
 

@@ -54,6 +54,17 @@ class DiscoverScreen extends StatefulWidget {
 }
 
 class _DiscoverScreenState extends State<DiscoverScreen> {
+  /// Vertical space kept clear at the bottom of every scrollable on phone
+  /// widths, so the floating search field never permanently covers the
+  /// last shelf heading or an empty state's button. The field is ~52px
+  /// tall and sits [Sp.x4] off the bottom; the rest is breathing room.
+  ///
+  /// It floats *over* content by design (thumb reach beats a fixed bar),
+  /// but "floats over" has to mean "you can scroll past it", not "the
+  /// bottom of the page is unreachable" — which is what a 360x800 capture
+  /// showed: the "Top fiction" heading sat permanently behind the field.
+  static const double _floatingSearchReserve = 96;
+
   static const List<({String name, String query})> _categories = [
     (name: 'Featured', query: ''),
     (name: 'Fiction', query: 'fiction'),
@@ -204,6 +215,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= Dim.wideBreakpoint;
+        final bottomInset = wide ? Sp.x10 : _floatingSearchReserve;
 
         // A deep-linked book is already visible in the detail pane on wide
         // layouts; on phone widths the book view is a modal sheet, so it
@@ -215,6 +227,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             if (mounted) _openDetailSheet(context, book);
           });
         }
+
+        // True when the branch below already reserves the space inside its
+        // own scrollable; the centred states do not, so the column adds it.
+        var childReservesInset = false;
 
         final Widget browse;
         if (_loading) {
@@ -232,6 +248,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ),
           );
         } else if (_searching) {
+          childReservesInset = _results.isNotEmpty;
           browse = _results.isEmpty
               ? AppStateView.empty(
                   icon: Icons.search_off_rounded,
@@ -246,11 +263,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               : _SearchResults(
                   results: _results,
                   selected: _selected,
+                  bottomInset: bottomInset,
                   onSelect: (b) => _select(context, b, wide: wide),
                 );
         } else {
+          childReservesInset = true;
           browse = ListView(
-            padding: const EdgeInsets.only(bottom: Sp.x10),
+            padding: EdgeInsets.only(bottom: bottomInset),
             children: [
               for (final cat in _categories)
                 LibriVoxShelfView(
@@ -301,7 +320,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         final main = Column(
           children: [
             header,
-            Expanded(child: browse),
+            // Centred states (loading, empty, error) are laid out inside
+            // the same reserved area, so their call-to-action button can
+            // never end up underneath the floating field either.
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                    bottom: childReservesInset ? 0 : bottomInset),
+                child: browse,
+              ),
+            ),
           ],
         );
 
@@ -335,20 +363,35 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           );
         }
 
-        // Phone: search floats bottom centre, within thumb reach.
+        // Phone: search floats bottom centre, within thumb reach. It sits
+        // on a short gradient of the page background rather than directly
+        // on the shelves — without it, a shelf heading passing behind the
+        // field reads as a clipping bug rather than as content scrolling
+        // underneath an overlay.
         return Stack(
           children: [
             Positioned.fill(child: main),
             Positioned(
-              left: Sp.x4,
-              right: Sp.x4,
-              bottom: Sp.x4,
-              child: _SearchField(
-                controller: _search,
-                onSubmitted: _performSearch,
-                onClear: _clearSearch,
-                searching: _searching,
-                elevated: true,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x6, Sp.x4, Sp.x4),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [c.bg.withValues(alpha: 0), c.bg, c.bg],
+                    stops: const [0, 0.55, 1],
+                  ),
+                ),
+                child: _SearchField(
+                  controller: _search,
+                  onSubmitted: _performSearch,
+                  onClear: _clearSearch,
+                  searching: _searching,
+                  elevated: true,
+                ),
               ),
             ),
           ],
@@ -420,10 +463,15 @@ class _SearchResults extends StatelessWidget {
   final LibriVoxBook? selected;
   final ValueChanged<LibriVoxBook> onSelect;
 
+  /// Space kept clear for the floating search field; see
+  /// `_DiscoverScreenState._floatingSearchReserve`.
+  final double bottomInset;
+
   const _SearchResults({
     required this.results,
     required this.selected,
     required this.onSelect,
+    required this.bottomInset,
   });
 
   @override
@@ -447,7 +495,7 @@ class _SearchResults extends StatelessWidget {
         ),
         Expanded(
           child: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, 96),
+            padding: EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, bottomInset),
             gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: LibriVoxBookItem.tileWidth + Sp.x4,
               mainAxisExtent: LibriVoxBookItem.coverHeight +

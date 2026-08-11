@@ -49,3 +49,6 @@ app.*.map.json
 # committed: LibriVox audio is public domain, but there's no reason to
 # carry MP3s in git history.
 /demo_audio/
+
+# Local screenshot verification artifacts (not source; goldens live in test/)
+/shots/

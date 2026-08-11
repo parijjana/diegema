@@ -31,12 +31,62 @@
 
   <title>unamedaudiobookplayer</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="demo_banner.css">
 </head>
 <body>
   <!--
+    The "this is a preview" demo notice lives here, outside the Flutter app
+    entirely (Task 1 of the UI redesign — see
+    lib/core/host_page_demo_notice.dart). It is plain, self-contained
+    HTML/CSS/JS: no external requests, no CDN, works under a strict CSP.
+
+    #demo-banner starts `display: none` (web/demo_banner.css) and is only
+    ever revealed by a kDemoMode build (lib/main.dart), so a non-demo web
+    build never shows it and the Flutter app in #flutter-host fills the
+    full viewport exactly as before.
+  -->
+  <div id="demo-frame">
+    <div id="demo-banner" role="note" aria-label="Preview notice">
+      <div class="demo-banner__row">
+        <svg class="demo-banner__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 11v5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="12" cy="7.75" r="1.15" fill="currentColor"/>
+        </svg>
+        <div class="demo-banner__text">
+          <p class="demo-banner__title">This is a preview</p>
+          <p class="demo-banner__body" id="demo-banner-body">
+            A curated, work-in-progress demo. Only a couple of titles actually
+            play; the rest are browse-only and marked &quot;Preview only&quot;.
+          </p>
+        </div>
+        <button
+          type="button"
+          id="demo-banner-toggle"
+          class="demo-banner__toggle"
+          aria-expanded="true"
+          aria-label="Collapse the preview notice"
+          title="Collapse"
+        >&minus;</button>
+      </div>
+      <div class="demo-banner__actions" id="demo-banner-actions">
+        <a
+          class="demo-banner__link"
+          href="https://librivox.org/pages/volunteer-for-librivox/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Volunteer for LibriVox</a>
+      </div>
+    </div>
+    <div id="flutter-host"></div>
+  </div>
+  <script src="demo_banner.js"></script>
+  <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+    or to give the user feedback during the initialization process. This
+    project's web/flutter_bootstrap.js template points Flutter at
+    #flutter-host above instead of <body> — see that file for why.
 
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization

@@ -110,8 +110,20 @@ class AudioPlaybackService {
     }
   }
 
-  Future<void> loadBook(UnifiedAudiobook book,
-      {int? initialChapterIndex, Duration? initialPosition}) async {
+  /// Loads [book], restoring saved progress unless [initialChapterIndex] /
+  /// [initialPosition] are supplied explicitly.
+  ///
+  /// [autoPlay] defaults to `true` (every existing call site's behaviour is
+  /// unchanged). Passing `false` loads the chapter, seeks to the target
+  /// position, and leaves playback paused — used by [NowPlayingScreen] to
+  /// restore the last-played book on the idle screen without starting
+  /// audio the user did not ask for.
+  Future<void> loadBook(
+    UnifiedAudiobook book, {
+    int? initialChapterIndex,
+    Duration? initialPosition,
+    bool autoPlay = true,
+  }) async {
     await init();
     _currentBook = book;
     currentBookNotifier.value = book;
@@ -143,10 +155,11 @@ class AudioPlaybackService {
 
     if (book.chapters.isEmpty) return;
 
-    await _playCurrentChapter(seekToPosition: targetPosition);
+    await _playCurrentChapter(seekToPosition: targetPosition, autoPlay: autoPlay);
   }
 
-  Future<void> _playCurrentChapter({Duration? seekToPosition}) async {
+  Future<void> _playCurrentChapter(
+      {Duration? seekToPosition, bool autoPlay = true}) async {
     if (_currentBook == null ||
         _currentChapterIndex < 0 ||
         _currentChapterIndex >= _currentBook!.chapters.length) {
@@ -175,7 +188,11 @@ class AudioPlaybackService {
         await _player.seek(seekToPosition);
       }
 
-      await _player.play();
+      if (autoPlay) {
+        await _player.play();
+      } else {
+        stateNotifier.value = PlaybackState.paused;
+      }
     } catch (e) {
       debugPrint('AudioPlaybackService: Failed to play chapter: $e');
       stateNotifier.value = PlaybackState.error;

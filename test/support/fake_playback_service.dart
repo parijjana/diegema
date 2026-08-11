@@ -32,13 +32,15 @@ class FakePlaybackService extends AudioPlaybackService {
     UnifiedAudiobook book, {
     int? initialChapterIndex,
     Duration? initialPosition,
+    bool autoPlay = true,
   }) async {
     loadCalls++;
     currentBookNotifier.value = book;
     chapterIndexNotifier.value = initialChapterIndex ?? 0;
     positionNotifier.value = initialPosition ?? fixedPosition;
     durationNotifier.value = fixedDuration;
-    stateNotifier.value = PlaybackState.playing;
+    stateNotifier.value =
+        autoPlay ? PlaybackState.playing : PlaybackState.paused;
   }
 
   @override

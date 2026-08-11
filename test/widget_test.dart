@@ -86,8 +86,7 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('wide layout uses a side rail, not a bottom bar',
-      (tester) async {
+  testWidgets('wide layout uses top tabs, not a bottom bar', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     await setSurface(tester, const Size(1440, 900));
@@ -95,7 +94,11 @@ void main() {
     await tester.pumpWidget(buildApp(db));
     await pumpFrames(tester);
 
-    expect(find.byType(NavigationRail), findsOneWidget);
+    // Wide layouts put navigation across the top. The old NavigationRail read
+    // as a web page's sidebar rather than an app; the bottom bar stays for
+    // phone widths only, where it is the native pattern on iOS and Android.
+    expect(find.byKey(const ValueKey('top-tab-bar')), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
     expect(find.byType(NavigationBar), findsNothing);
 
     await unmount(tester);

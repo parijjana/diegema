@@ -10,7 +10,6 @@ import '../services/librivox_downloader.dart';
 import '../services/demo_catalog.dart';
 import '../services/librivox_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/demo_notice.dart';
 import '../widgets/mini_player_bar.dart';
 import 'discover_screen.dart';
 import 'library_screen.dart';
@@ -142,11 +141,6 @@ class _AppShellState extends State<AppShell> {
 
             final Widget content = Column(
               children: [
-                if (kDemoMode)
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(Sp.x4, Sp.x3, Sp.x4, 0),
-                    child: DemoNotice(),
-                  ),
                 Expanded(child: _screenFor(_index)),
                 // The mini player never appears on Now Playing: that screen
                 // *is* the player, and a second copy of the same controls
@@ -163,16 +157,29 @@ class _AppShellState extends State<AppShell> {
               return content;
             }
 
-            return Row(
+            // Wide layouts get a top tab bar, not a side rail: a vertical
+            // strip of nav pills down the left edge reads like a web
+            // console/dashboard, which was the owner's exact complaint
+            // after seeing the desktop-width demo. A top tab bar is the
+            // native-app pattern at this width (browser chrome, mail
+            // clients, most macOS/iOS apps with more than a couple of top-
+            // level sections).
+            //
+            // Phone width deliberately keeps the bottom `NavigationBar`
+            // (see `_BottomNav` / `bottomNavigationBar` below) rather than
+            // moving it to the top too: a bottom tab bar *is* the native
+            // pattern on both iOS and Android at phone width, and moving it
+            // would make the phone layout read less like an app, not more.
+            return Column(
               children: [
-                _SideNav(
+                _TopTabBar(
                   index: _index,
                   destinations: _destinations,
                   onSelect: _go,
                   isDarkMode: widget.isDarkMode,
                   onToggleTheme: widget.onToggleTheme,
                 ),
-                VerticalDivider(width: 1, color: c.border),
+                Divider(height: 1, color: c.border),
                 Expanded(child: content),
               ],
             );
@@ -276,14 +283,16 @@ class _BottomNav extends StatelessWidget {
   }
 }
 
-class _SideNav extends StatelessWidget {
+/// Wide-layout navigation: a top tab bar, replacing the old `NavigationRail`
+/// (see the class doc comment on the call site in `AppShell.build`).
+class _TopTabBar extends StatelessWidget {
   final int index;
   final List<_Destination> destinations;
   final ValueChanged<int> onSelect;
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
 
-  const _SideNav({
+  const _TopTabBar({
     required this.index,
     required this.destinations,
     required this.onSelect,
@@ -294,43 +303,91 @@ class _SideNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return NavigationRail(
-      selectedIndex: index,
-      onDestinationSelected: onSelect,
-      labelType: NavigationRailLabelType.all,
-      minWidth: 88,
-      leading: Padding(
-        padding: const EdgeInsets.symmetric(vertical: Sp.x5, horizontal: Sp.x2),
-        child: Semantics(
-          header: true,
-          child: Text(
-            'LibriVox',
-            textAlign: TextAlign.center,
-            // Serif wordmark: a public-domain library, not a console.
-            style: AppType.serif(AppType.titleSm).copyWith(color: c.accentText),
-          ),
-        ),
-      ),
-      trailing: Expanded(
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: Sp.x5),
-            child: ThemeToggleButton(
-              isDarkMode: isDarkMode,
-              onToggle: onToggleTheme,
+    return Material(
+      color: c.surface,
+      child: Padding(
+        key: const ValueKey('top-tab-bar'),
+        padding: const EdgeInsets.symmetric(horizontal: Sp.x5, vertical: Sp.x2),
+        child: Row(
+          children: [
+            Semantics(
+              header: true,
+              child: Text(
+                'LibriVox',
+                // Serif wordmark: a public-domain library, not a console.
+                style: AppType.serif(AppType.titleSm).copyWith(color: c.accentText),
+              ),
             ),
+            const SizedBox(width: Sp.x8),
+            for (var i = 0; i < destinations.length; i++) ...[
+              if (i != 0) const SizedBox(width: Sp.x2),
+              _TopTabItem(
+                destination: destinations[i],
+                selected: index == i,
+                onTap: () => onSelect(i),
+              ),
+            ],
+            const Spacer(),
+            ThemeToggleButton(isDarkMode: isDarkMode, onToggle: onToggleTheme),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One top tab. Selected state is carried by a filled pill background
+/// *and* a bolder label weight *and* the icon swapping to its filled
+/// variant — never colour alone (`design/tokens.md` §8, rule 4).
+class _TopTabItem extends StatelessWidget {
+  final _Destination destination;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TopTabItem({
+    required this.destination,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: destination.label,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: R.sm,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: Dim.tapMin),
+          padding: const EdgeInsets.symmetric(horizontal: Sp.x4),
+          decoration: BoxDecoration(
+            color: selected ? c.accentFill : Colors.transparent,
+            borderRadius: R.sm,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected ? destination.selectedIcon : destination.icon,
+                size: Dim.iconMd,
+                color: selected ? c.textOnAccent : c.text,
+              ),
+              const SizedBox(width: Sp.x2),
+              Text(
+                destination.label,
+                style: AppType.label.copyWith(
+                  color: selected ? c.textOnAccent : c.text,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
       ),
-      destinations: [
-        for (final d in destinations)
-          NavigationRailDestination(
-            icon: Icon(d.icon),
-            selectedIcon: Icon(d.selectedIcon),
-            label: Text(d.label),
-          ),
-      ],
     );
   }
 }

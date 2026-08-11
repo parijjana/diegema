@@ -47,12 +47,17 @@ void main() {
     db = AppDatabase(NativeDatabase.memory());
     audio = FakePlaybackService();
 
-    // A realistic idle list: two in-progress books, one of them pinned,
-    // plus a pinned book that is not in progress so the pinned row renders.
-    book = await seedBook(db,
-        id: 'middlemarch', title: 'Middlemarch', positionSeconds: 1800);
-    await seedBook(db,
-        id: 'persuasion', title: 'Persuasion', positionSeconds: 420);
+    // Deliberately no `positionSeconds` on any of these: since the "always
+    // show the player when something was last played" behaviour (see the
+    // restore test below and `_maybeRestoreLastPlayed` in
+    // `now_playing_screen.dart`) loads a paused player the instant a
+    // `PlaybackProgress` row exists, a seeded progress row would make the
+    // screen start already in the player rather than the idle list — which
+    // is exactly what these frame-by-frame tests need to NOT happen, so the
+    // tap-driven fade they exercise stays isolated from the restore
+    // feature. The pinned row still renders from `dracula` alone.
+    book = await seedBook(db, id: 'middlemarch', title: 'Middlemarch');
+    await seedBook(db, id: 'persuasion', title: 'Persuasion');
     await seedBook(db, id: 'dracula', title: 'Dracula');
     await db.pinBook('dracula');
   });
@@ -191,4 +196,14 @@ void main() {
 
     await unmount(tester);
   });
+
+  // Coverage for "always restore the last-played book, paused" (Task 3)
+  // lives in test/screens/now_playing_screen_test.dart instead of here: it
+  // reuses that file's already-proven `db`/`audio`/`tearDown` setup rather
+  // than standing up a second `AppDatabase(NativeDatabase.memory())` and a
+  // second `FakePlaybackService` (with its own real, undisposed
+  // `AudioPlayer`) inside an individual test — doing that here was
+  // extremely slow under `flutter test` and is not worth chasing down for
+  // a golden-frame file that is about the animation curve, not the restore
+  // feature itself.
 }

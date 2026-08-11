@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app.dart';
 import 'core/demo_deeplink.dart';
 import 'core/demo_mode.dart';
+import 'core/host_page_demo_notice.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'screens/app_shell.dart';
@@ -11,15 +12,40 @@ import 'services/artwork_enrichment_service.dart';
 import 'services/demo_artwork_service.dart';
 import 'services/demo_downloader.dart';
 import 'services/demo_librivox_service.dart';
+import 'services/demo_seed.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // The "this is a preview" notice now lives in the host HTML page
+  // (`web/index.html`), outside the Flutter app entirely — see Task 1 of
+  // the UI redesign and `core/host_page_demo_notice.dart`. It ships
+  // hidden in the DOM on every web build and is only ever revealed here,
+  // so a non-demo build never shows it.
+  if (kDemoMode) {
+    revealHostPageDemoNotice();
+  }
   // Demo builds only; `DemoDeepLink.fromUri` hands back an empty link in
   // every other build, whatever the URL says.
   final deepLink = DemoDeepLink.fromUri(Uri.base);
+
+  // DEMO_MODE only (Tasks 4 & 5): seed the two playable demo titles into
+  // the library as though the user already owns them, one of them with
+  // ~30% saved progress, before the first frame renders — so Library and
+  // Now Playing open already populated instead of racing their own
+  // `initState` loads against this seed. Built here (rather than letting
+  // `AudiobookApp` create its own database) specifically so `main` can
+  // `await` the seed before `runApp`; every other build keeps passing
+  // `database: null` and gets exactly the startup path it always had.
+  AppDatabase? demoDb;
+  if (kDemoMode) {
+    demoDb = AppDatabase();
+    await seedDemoLibrary(demoDb);
+  }
+
   runApp(AudiobookApp(
+    database: demoDb,
     deepLink: deepLink,
     initialDarkMode: deepLink.dark ?? false,
     // Wire the canned web demo's stub, network-free catalog services when

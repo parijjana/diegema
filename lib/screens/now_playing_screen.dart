@@ -166,6 +166,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       final continueListening = await widget.db.getContinueListening(limit: 5);
       final pinned = await widget.db.getPinnedBooks();
       final visible = await widget.preferences.getPinnedRowVisible();
+      await _maybeRestoreLastPlayed();
       if (!mounted) return;
       setState(() {
         _continueListening = continueListening;
@@ -180,6 +181,41 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         _loadError = e;
         _loading = false;
       });
+    }
+  }
+
+  /// The genuinely-idle screen is now the exception, not the rule: if
+  /// anything was ever played (any saved [PlaybackProgress] row exists),
+  /// Now Playing loads it into the player — paused, at its saved position —
+  /// rather than showing the near-blank "nothing in progress" state. Only a
+  /// brand-new install with zero progress rows ever sees the true empty
+  /// state.
+  ///
+  /// Guarded by [AudioPlaybackService.currentBookNotifier] already having a
+  /// value, which is also what makes this safe to call from every [_load]
+  /// (hide, undo, pin toggle, the current-book listener): once a book is
+  /// loaded — restored or genuinely playing — this is a no-op forever
+  /// after, for this screen instance.
+  ///
+  /// Never calls [AudioPlaybackService.play]: this only loads and seeks
+  /// (`autoPlay: false`), so a restored book sits paused until the user
+  /// presses play themselves.
+  Future<void> _maybeRestoreLastPlayed() async {
+    if (widget.audioService.currentBookNotifier.value != null) return;
+    try {
+      final recent = await widget.db.getMostRecentProgress();
+      if (recent == null) return;
+      final book = await widget.db.getAudiobook(recent.audiobookId);
+      if (book == null || book.chapters.isEmpty) return;
+      if (widget.audioService.currentBookNotifier.value != null) return;
+      await widget.audioService.loadBook(
+        book,
+        initialChapterIndex: recent.chapterIndex,
+        initialPosition: Duration(seconds: recent.positionSeconds),
+        autoPlay: false,
+      );
+    } catch (e) {
+      debugPrint('NowPlayingScreen: could not restore last-played book: $e');
     }
   }
 

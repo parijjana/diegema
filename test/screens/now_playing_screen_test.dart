@@ -41,12 +41,24 @@ void main() {
 
   Widget wrap({VoidCallback? onGoToDiscover}) => MaterialApp(
         theme: AppTheme.light(),
-        home: Scaffold(
-          body: NowPlayingScreen(
-            db: db,
-            audioService: audio,
-            preferences: UiPreferences(overrides: prefs),
-            onGoToDiscover: onGoToDiscover ?? () {},
+        home: Builder(
+          builder: (context) => MediaQuery(
+            // The screen jumps the fade straight to its target when
+            // animations are disabled (see `_syncFade`). These tests assert
+            // *what* is on screen, not how it got there, and letting the
+            // 320ms controller run made them timing-dependent: the leaving
+            // layer was still mounted when an expectation ran, so a book
+            // title matched twice. The transition itself is covered
+            // frame-by-frame by `now_playing_fade_golden_test.dart`.
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: Scaffold(
+              body: NowPlayingScreen(
+                db: db,
+                audioService: audio,
+                preferences: UiPreferences(overrides: prefs),
+                onGoToDiscover: onGoToDiscover ?? () {},
+              ),
+            ),
           ),
         ),
       );
@@ -60,15 +72,33 @@ void main() {
   /// a no-op when the screen is already showing the list (the genuinely-
   /// empty case has no "Your list" button at all).
   Future<void> revealList(WidgetTester tester) async {
-    final backToList = find.text('Your list');
-    if (backToList.evaluate().isEmpty) return;
-    await tester.tap(backToList.first);
-    // The active layer stays in the tree (opacity-faded, not removed)
-    // until the reverse fade fully completes — a plain `pumpFrames()`
-    // budget is not always enough for the 320ms controller to settle at
-    // 0, which shows up as a book title matching twice: once in the
-    // (still-mounted-but-invisible) player, once in the idle list.
-    await pumpFrames(tester, frames: 16);
+    // "Your list" belongs to the player layer, so it is a reliable sentinel
+    // for that layer being present. Both waits below are bounded rather than
+    // a fixed pump budget because the restore is asynchronous — a DB read
+    // and then `loadBook` — and a fixed budget raced it: the tap landed
+    // before the player existed, the restore completed afterwards, and the
+    // book title then matched twice (once in each layer).
+    Future<bool> pumpUntil(bool Function() done) async {
+      for (var i = 0; i < 12; i++) {
+        if (done()) return true;
+        await pumpFrames(tester, frames: 4);
+      }
+      return done();
+    }
+
+    // Nothing to go back from if the player never arrives (the genuinely-
+    // empty case has no "Your list" button at all).
+    final arrived = await pumpUntil(
+      () => find.text('Your list').evaluate().isNotEmpty,
+    );
+    if (!arrived) return;
+
+    await tester.tap(find.text('Your list').first);
+
+    // The screen drops the player layer entirely once the reverse fade
+    // reaches 0 (see `playerGone` in `now_playing_screen.dart`), so the
+    // sentinel disappearing means the layer has genuinely left the tree.
+    await pumpUntil(() => find.text('Your list').evaluate().isEmpty);
   }
 
   group('idle state', () {
@@ -83,11 +113,27 @@ void main() {
     });
 
     testWidgets('lists started-but-unfinished books', (tester) async {
-      await seedBook(db, id: 'a', title: 'Middlemarch', positionSeconds: 600);
+      // Explicit, increasing `updatedAt` so `getMostRecentProgress` (and
+      // therefore the Task 3 restore) deterministically lands on 'a' —
+      // otherwise three rows saved back-to-back can tie on `DateTime.now()`
+      // and which book gets restored (and therefore which title also shows
+      // in the peek strip below the list, see `revealList`) becomes
+      // arbitrary.
+      final now = DateTime.now();
       // Under the 30s floor: sampled, not started.
-      await seedBook(db, id: 'b', title: 'Barely Opened', positionSeconds: 10);
+      await seedBook(db,
+          id: 'b',
+          title: 'Barely Opened',
+          positionSeconds: 10,
+          updatedAt: now.subtract(const Duration(minutes: 2)));
       // Past 95% of a 3600s runtime: effectively finished.
-      await seedBook(db, id: 'c', title: 'Nearly Done', positionSeconds: 3500);
+      await seedBook(db,
+          id: 'c',
+          title: 'Nearly Done',
+          positionSeconds: 3500,
+          updatedAt: now.subtract(const Duration(minutes: 1)));
+      await seedBook(db,
+          id: 'a', title: 'Middlemarch', positionSeconds: 600, updatedAt: now);
 
       await setSurface(tester, const Size(390, 844));
       await tester.pumpWidget(wrap());
@@ -97,7 +143,12 @@ void main() {
       // actually cares about.
       await revealList(tester);
 
-      expect(find.text('Middlemarch'), findsOneWidget);
+      // The row itself, not raw title text: Middlemarch is also the
+      // restored book, so its title legitimately appears a second time in
+      // the "back to the player" peek strip (see `_PeekPlayerStrip` in
+      // `now_playing_screen.dart`) — a key on the continue-listening row
+      // is unambiguous regardless.
+      expect(find.byKey(const ValueKey('continue-a')), findsOneWidget);
       expect(find.text('Barely Opened'), findsNothing);
       expect(find.text('Nearly Done'), findsNothing);
     });
@@ -113,15 +164,18 @@ void main() {
       await tester.pumpWidget(wrap());
       await pumpFrames(tester);
       await revealList(tester);
-      expect(find.text('Middlemarch'), findsOneWidget);
+      final row = find.byKey(const ValueKey('continue-a'));
+      expect(row, findsOneWidget);
 
-      await tester.drag(find.text('Middlemarch'), const Offset(-500, 0));
+      await tester.drag(row, const Offset(-500, 0));
       await pumpFrames(tester);
 
-      expect(find.text('Middlemarch'), findsNothing);
+      expect(find.byKey(const ValueKey('continue-a')), findsNothing);
 
       // The book and its progress row both survive; only the surface flag
-      // changed.
+      // changed. It is also still the loaded (restored) book, so its title
+      // legitimately remains visible in the peek strip — hiding it from
+      // Continue listening is not the same as unloading it.
       expect(await db.getAudiobook('a'), isNotNull);
       final progress = await db.getProgress('a');
       expect(progress, isNotNull);
@@ -137,7 +191,8 @@ void main() {
       await pumpFrames(tester);
       await revealList(tester);
 
-      await tester.drag(find.text('Middlemarch'), const Offset(-500, 0));
+      await tester.drag(
+          find.byKey(const ValueKey('continue-a')), const Offset(-500, 0));
       await pumpFrames(tester);
 
       expect(find.text('Undo'), findsOneWidget);
@@ -145,7 +200,7 @@ void main() {
       await pumpFrames(tester);
 
       expect(await db.getContinueListening(), hasLength(1));
-      expect(find.text('Middlemarch'), findsOneWidget);
+      expect(find.byKey(const ValueKey('continue-a')), findsOneWidget);
     });
   });
 
@@ -195,7 +250,10 @@ void main() {
       await revealList(tester);
 
       // Once, in Continue listening — not duplicated into the pinned row.
-      expect(find.text('Middlemarch'), findsOneWidget);
+      // (It also legitimately appears a second time in the peek strip,
+      // since it is the restored/loaded book — see the row-key comment in
+      // the 'idle state' group above.)
+      expect(find.byKey(const ValueKey('continue-a')), findsOneWidget);
       final pinToggle = find.byKey(const ValueKey('pin-toggle-a'));
       expect(pinToggle, findsOneWidget);
       expect(
@@ -269,9 +327,11 @@ void main() {
 
       // The way back to the continue-listening list is still reachable,
       // and the restored book legitimately also appears there (it clears
-      // the 30s continue-listening floor).
+      // the 30s continue-listening floor) — via its row key, since the
+      // title itself also renders a second time in the peek strip below
+      // the list (it is still the loaded book).
       await revealList(tester);
-      expect(find.text('The Gettysburg Address'), findsOneWidget);
+      expect(find.byKey(const ValueKey('continue-gettysburg')), findsOneWidget);
       expect(find.text('Player'), findsOneWidget);
     });
 

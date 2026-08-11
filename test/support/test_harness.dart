@@ -56,12 +56,20 @@ Future<void> unmount(WidgetTester tester) async {
 /// Seeds [db] with a book, one chapter of [runtimeSeconds], and a progress
 /// row at [positionSeconds] — enough for `getContinueListening` to consider
 /// it in progress when the position clears the 30s floor.
+/// [updatedAt] controls [AppDatabase.getMostRecentProgress]'s ordering when
+/// a test seeds more than one progress row and cares which one is "most
+/// recent" (Task 3's restore-on-idle reads this — see
+/// `now_playing_screen.dart`'s `_maybeRestoreLastPlayed`). Left `null`
+/// (the default) uses `DateTime.now()`, which is fine for single-progress
+/// tests but ties easily when several rows are seeded back-to-back in the
+/// same test.
 Future<UnifiedAudiobook> seedBook(
   AppDatabase db, {
   required String id,
   String? title,
   int runtimeSeconds = 3600,
   int? positionSeconds,
+  DateTime? updatedAt,
 }) async {
   final book = UnifiedAudiobook(
     id: id,
@@ -86,6 +94,7 @@ Future<UnifiedAudiobook> seedBook(
       audiobookId: id,
       chapterIndex: 0,
       positionSeconds: positionSeconds,
+      updatedAt: updatedAt,
     );
   }
   return book;

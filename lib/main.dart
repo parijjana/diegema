@@ -12,6 +12,7 @@ import 'services/artwork_enrichment_service.dart';
 import 'services/demo_artwork_service.dart';
 import 'services/demo_downloader.dart';
 import 'services/demo_librivox_service.dart';
+import 'services/audio_playback_service.dart';
 import 'services/demo_seed.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
@@ -75,6 +76,10 @@ class HomeScreen extends StatelessWidget {
   final LibriVoxStreamAndDownloader? downloader;
   final ArtworkEnrichmentService? artworkService;
 
+  /// Injectable so tests can supply a fake instead of the real
+  /// `just_audio`-backed service. See `AppShell.audioService`.
+  final AudioPlaybackService? audioService;
+
   /// Injectable so widget tests need no `shared_preferences` channel.
   final UiPreferences preferences;
 
@@ -92,6 +97,7 @@ class HomeScreen extends StatelessWidget {
     this.libriVoxService,
     this.downloader,
     this.artworkService,
+    this.audioService,
     this.preferences = const UiPreferences(),
     this.libraryScanner,
     this.deepLink = DemoDeepLink.none,
@@ -106,6 +112,7 @@ class HomeScreen extends StatelessWidget {
       libriVoxService: libriVoxService,
       downloader: downloader,
       artworkService: artworkService,
+      audioService: audioService,
       preferences: preferences,
       libraryScanner: libraryScanner,
       deepLink: deepLink,

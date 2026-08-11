@@ -95,6 +95,22 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   /// still playing.
   bool _peekingList = false;
 
+  /// True for the duration of [_maybeRestoreLastPlayed]'s own call to
+  /// [AudioPlaybackService.loadBook]. That call sets
+  /// `currentBookNotifier.value`, which — on a stub playback service whose
+  /// `loadBook` has no internal `await` (see
+  /// `test/support/fake_playback_service.dart`) — fires
+  /// [_onCurrentBookChanged] synchronously, *while still inside* the
+  /// `_load` call that triggered the restore in the first place. Without
+  /// this guard, that reentrant call kicks off a second `_load()` that
+  /// races the original one against the same [AppDatabase] connection.
+  /// Harmless on its own, but it was observed compounding into a hang once
+  /// several overlapping `_load()`s piled up (three-nested restores across
+  /// screen remounts). The restoring `_load()` call already refreshes
+  /// every list this screen shows once it completes, so the reentrant call
+  /// is redundant regardless — this guard only skips known-redundant work.
+  bool _restoring = false;
+
   bool get _playerShouldShow =>
       widget.audioService.currentBookNotifier.value != null && !_peekingList;
 
@@ -125,8 +141,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       _peekingList = false;
     }
     _syncFade();
-    // The shortlist changes as soon as something is played.
-    _load();
+    // The shortlist changes as soon as something is played — except while
+    // this change is the restore's own doing (see [_restoring]): the
+    // `_load()` already in flight will pick up the fresh shortlist once it
+    // completes, so calling it again here would only race it.
+    if (!_restoring) {
+      _load();
+    }
   }
 
   /// The two windows of the timeline, as fractions of the controller.
@@ -208,6 +229,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       final book = await widget.db.getAudiobook(recent.audiobookId);
       if (book == null || book.chapters.isEmpty) return;
       if (widget.audioService.currentBookNotifier.value != null) return;
+      _restoring = true;
       await widget.audioService.loadBook(
         book,
         initialChapterIndex: recent.chapterIndex,
@@ -216,6 +238,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       );
     } catch (e) {
       debugPrint('NowPlayingScreen: could not restore last-played book: $e');
+    } finally {
+      _restoring = false;
     }
   }
 

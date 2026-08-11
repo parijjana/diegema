@@ -5,6 +5,7 @@ import 'database/app_database.dart';
 import 'main.dart';
 import 'screens/library_screen.dart' show LibraryScanner;
 import 'services/artwork_enrichment_service.dart';
+import 'services/audio_playback_service.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
 import 'theme/app_theme.dart';
@@ -21,6 +22,11 @@ class AudiobookApp extends StatefulWidget {
   final LibriVoxService? libriVoxService;
   final LibriVoxStreamAndDownloader? downloader;
   final ArtworkEnrichmentService? artworkService;
+
+  /// Injectable so tests can supply a fake instead of the real
+  /// `just_audio`-backed service — see the identical doc comment on
+  /// `AppShell.audioService`, which this is threaded straight through to.
+  final AudioPlaybackService? audioService;
 
   /// Injectable UI preference store, so widget tests never need the
   /// `shared_preferences` platform channel.
@@ -45,6 +51,7 @@ class AudiobookApp extends StatefulWidget {
     this.libriVoxService,
     this.downloader,
     this.artworkService,
+    this.audioService,
     this.preferences = const UiPreferences(),
     this.libraryScanner,
     this.deepLink = DemoDeepLink.none,
@@ -94,6 +101,7 @@ class _AudiobookAppState extends State<AudiobookApp> {
         libriVoxService: widget.libriVoxService,
         downloader: widget.downloader,
         artworkService: widget.artworkService,
+        audioService: widget.audioService,
       ),
     );
   }

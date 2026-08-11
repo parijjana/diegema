@@ -40,6 +40,16 @@ class AppShell extends StatefulWidget {
   final LibriVoxStreamAndDownloader? downloader;
   final ArtworkEnrichmentService? artworkService;
 
+  /// Injectable so tests can supply a fake instead of the real
+  /// `just_audio`-backed service. Now Playing's Task 3 restore feature
+  /// (`_maybeRestoreLastPlayed`) means any test that mounts this shell with
+  /// a seeded `PlaybackProgress` row calls `loadBook` on the very first
+  /// frame, unprompted — the real service's `AudioPlayer` reaches for its
+  /// platform channel the moment that happens, which throws
+  /// `MissingPluginException` under `flutter_test` (see
+  /// `test/support/fake_playback_service.dart`).
+  final AudioPlaybackService? audioService;
+
   /// Injectable so tests can supply in-memory preferences instead of the
   /// `shared_preferences` platform channel.
   final UiPreferences preferences;
@@ -62,6 +72,7 @@ class AppShell extends StatefulWidget {
     this.libriVoxService,
     this.downloader,
     this.artworkService,
+    this.audioService,
     this.preferences = const UiPreferences(),
     this.libraryScanner,
     this.deepLink = DemoDeepLink.none,
@@ -77,6 +88,13 @@ class _AppShellState extends State<AppShell> {
   late final LibriVoxStreamAndDownloader _downloader;
   late final AudioPlaybackService _audioService;
 
+  /// Whether this shell created [_audioService] itself, as opposed to
+  /// receiving one via [AppShell.audioService]. Only the shell disposes an
+  /// instance it owns — an injected one is the caller's responsibility
+  /// (e.g. a test's own `tearDown`), and disposing it twice is a bug
+  /// waiting to happen.
+  bool get _ownsAudioService => widget.audioService == null;
+
   /// Index 0 — Now Playing — is the default landing screen.
   late int _index = widget.deepLink.screen;
 
@@ -86,7 +104,7 @@ class _AppShellState extends State<AppShell> {
     _libriVoxService = widget.libriVoxService ?? LibriVoxService();
     _artworkService = widget.artworkService ?? ArtworkEnrichmentService();
     _downloader = widget.downloader ?? LibriVoxStreamAndDownloader();
-    _audioService = AudioPlaybackService(db: widget.db);
+    _audioService = widget.audioService ?? AudioPlaybackService(db: widget.db);
     if (kDemoMode && widget.deepLink.play != null) {
       _startDeepLinkedPlayback(widget.deepLink.play!);
     }
@@ -115,7 +133,9 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
-    _audioService.dispose();
+    if (_ownsAudioService) {
+      _audioService.dispose();
+    }
     super.dispose();
   }
 

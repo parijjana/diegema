@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 /// Which way a [SkipIntervalIcon] skips.
 enum SkipDirection { backward, forward }
 
-/// A skip-interval control glyph: a generic replay/fast-forward icon with
-/// the actual skip amount (in seconds) stamped on top of it.
+/// A skip-interval control glyph: an open circular-arrow icon with the
+/// actual skip amount (in seconds) stamped inside it. Forward mirrors the
+/// same glyph rather than using a different one, so the pair matches.
 ///
 /// Material Icons only ships `_10_` and `_30_` suffixed skip icons — there
 /// is no `_15_` variant — which is why this app used to pair a "10" icon
@@ -31,9 +32,15 @@ class SkipIntervalIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final glyph = direction == SkipDirection.backward
-        ? Icons.replay_rounded
-        : Icons.fast_forward_rounded;
+    // Both directions use the same open circular-arrow glyph, the forward
+    // one mirrored. `Icons.fast_forward_rounded` was used here for forward
+    // and it does not work: it is a *filled* double-triangle, so the number
+    // stamped on top of it is illegible and the control just reads as a
+    // generic fast-forward — losing the "15" that is the whole point. The
+    // replay glyph is an open ring with empty space in the middle, which is
+    // where the number belongs, and mirroring it keeps the two skip buttons
+    // a matched pair (the convention every audiobook player uses).
+    final forward = direction == SkipDirection.forward;
     final label = direction == SkipDirection.backward
         ? 'Skip back $seconds seconds'
         : 'Skip forward $seconds seconds';
@@ -54,11 +61,20 @@ class SkipIntervalIcon extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Icon(glyph, size: size, color: color),
+            // Only the glyph is mirrored — the number must not be, so it
+            // stays a sibling in the Stack rather than a child of this.
+            Transform.scale(
+              scaleX: forward ? -1.0 : 1.0,
+              child: Icon(Icons.replay_rounded, size: size, color: color),
+            ),
             Text(
               '$seconds',
               style: baseLabelStyle.copyWith(
-                fontSize: size * 0.34,
+                // 0.34 put the number at 8.2px inside a 24px glyph — below
+                // this design system's own 13px type floor, and verified
+                // illegible in a rendered screenshot. The ring's inner hole
+                // is what caps this; going much past 0.42 collides with it.
+                fontSize: size * 0.42,
                 fontWeight: FontWeight.w800,
                 color: color,
                 height: 1.0,

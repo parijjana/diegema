@@ -8,6 +8,7 @@ import 'package:unamedaudiobookplayer/core/ui_preferences.dart';
 import 'package:unamedaudiobookplayer/database/app_database.dart';
 import 'package:unamedaudiobookplayer/core/network/rate_limit_dispatcher.dart';
 import 'package:unamedaudiobookplayer/services/librivox_service.dart';
+import 'package:unamedaudiobookplayer/widgets/player_transport.dart';
 
 import '../support/fake_playback_service.dart';
 import '../support/test_harness.dart';
@@ -151,5 +152,51 @@ void main() {
         }
       });
     }
+  }
+
+  // The loop above only ever runs at the default text scale, which is how a
+  // 64px overflow inside the sleep-timer chip survived it: the chip's label
+  // is the one piece of the player that grows without bound. This app's
+  // stated audience explicitly includes low-vision readers, so a doubled
+  // text scale on the narrowest supported phone is a supported case.
+  //
+  // The player is asserted directly rather than through the tab-walk
+  // because the chips only exist once a book is loaded, and the launch
+  // auto-restore that used to provide one was removed.
+  for (final scale in [1.3, 2.0]) {
+    testWidgets('player controls survive text scale $scale at 360x800',
+        (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+
+      await setSurface(tester, const Size(360, 800));
+      await tester.pumpWidget(AudiobookApp(
+        initialDarkMode: false,
+        database: db,
+        audioService: audio,
+        libriVoxService: LibriVoxService(
+          client: buildMockClient(),
+          rateLimiter: RateLimitDispatcher(cooldownOverride: Duration.zero),
+        ),
+        preferences: const UiPreferences(overrides: <String, Object>{}),
+      ));
+      await pumpFrames(tester);
+
+      final book = await seedBook(db, id: 'z', title: 'Persuasion');
+      await audio.loadBook(book);
+      await pumpFrames(tester);
+
+      expect(tester.takeException(), isNull,
+          reason: 'player overflowed at 360x800, text scale $scale');
+
+      // The sleep-timer chip is the specific control that overflowed, so
+      // assert it is actually on screen and not merely non-throwing.
+      expect(find.byType(SleepTimerSelector), findsOneWidget);
+
+      await unmount(tester);
+    });
   }
 }

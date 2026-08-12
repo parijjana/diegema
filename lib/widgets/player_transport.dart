@@ -59,7 +59,10 @@ class PlayerTransport extends StatelessWidget {
           child: SkipIntervalIcon(
             direction: SkipDirection.backward,
             seconds: kSkipSeconds,
-            size: Dim.iconMd,
+            // iconLg, not iconMd: these two carry a number inside them, so
+            // they need more room than a plain glyph. The tap target is
+            // tapComfy (56), which swallows the extra 4px comfortably.
+            size: Dim.iconLg,
             color: c.text,
           ),
         ),
@@ -71,7 +74,7 @@ class PlayerTransport extends StatelessWidget {
           child: SkipIntervalIcon(
             direction: SkipDirection.forward,
             seconds: kSkipSeconds,
-            size: Dim.iconMd,
+            size: Dim.iconLg,
             color: c.text,
           ),
         ),
@@ -226,8 +229,12 @@ class SpeedSelector extends StatelessWidget {
                 children: [
                   Icon(Icons.speed_rounded, size: Dim.iconSm, color: c.accentText),
                   const SizedBox(width: Sp.x2),
-                  Text('${speed}x',
-                      style: AppType.label.copyWith(color: c.accentText)),
+                  Flexible(
+                    child: Text('${speed}x',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.label.copyWith(color: c.accentText)),
+                  ),
                 ],
               ),
             ),
@@ -283,9 +290,13 @@ class SleepTimerSelector extends StatelessWidget {
                       size: Dim.iconSm,
                       color: active ? c.accentText : c.textSecondary),
                   const SizedBox(width: Sp.x2),
-                  Text(text,
-                      style: AppType.label.copyWith(
-                          color: active ? c.accentText : c.textSecondary)),
+                  Flexible(
+                    child: Text(text,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.label.copyWith(
+                            color: active ? c.accentText : c.textSecondary)),
+                  ),
                 ],
               ),
             ),
@@ -316,10 +327,15 @@ class _ChipShell extends StatelessWidget {
         borderRadius: R.pill,
         border: Border.all(color: emphasised ? c.accent : c.borderContrast),
       ),
+      // `Flexible`, not a bare child: at large text scales the label is
+      // wider than a 360px phone can give it, and an unflexed child in a
+      // min-size Row overflows rather than shrinking. The audience for this
+      // app explicitly includes low-vision readers, so a 2x text scale is a
+      // supported case, not an edge one.
       child: Row(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [child],
+        children: [Flexible(child: child)],
       ),
     );
   }

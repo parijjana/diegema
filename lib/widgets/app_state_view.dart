@@ -49,42 +49,61 @@ class AppStateView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final accentTone =
-        tone == _errorTone ? c.danger : (tone ?? c.accentText);
+    final accentTone = tone == _errorTone ? c.danger : (tone ?? c.accentText);
 
+    // Scrollable, not a bare `Center`. An icon, a headline, a paragraph and
+    // a button stack up taller than a 360x800 phone can show once the text
+    // scale is raised, and a `Center` has nowhere to put the excess — it
+    // overflowed by 138px at 1.3x, which clips the call-to-action button
+    // right off the screen. The `minHeight` keeps the content centred
+    // whenever it *does* fit, so nothing changes at the default scale.
     return Semantics(
       liveRegion: busy,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(Sp.x8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 48, color: accentTone),
-              const SizedBox(height: Sp.x4),
-              Text(
-                headline,
-                textAlign: TextAlign.center,
-                style: AppType.titleMd.copyWith(color: c.text),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight.isFinite
+                    ? constraints.maxHeight
+                    : 0.0,
               ),
-              if (body != null) ...[
-                const SizedBox(height: Sp.x2),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  child: Text(
-                    body!,
-                    textAlign: TextAlign.center,
-                    style: AppType.bodyLg.copyWith(color: c.textSecondary),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(Sp.x8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 48, color: accentTone),
+                      const SizedBox(height: Sp.x4),
+                      Text(
+                        headline,
+                        textAlign: TextAlign.center,
+                        style: AppType.titleMd.copyWith(color: c.text),
+                      ),
+                      if (body != null) ...[
+                        const SizedBox(height: Sp.x2),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 460),
+                          child: Text(
+                            body!,
+                            textAlign: TextAlign.center,
+                            style:
+                                AppType.bodyLg.copyWith(color: c.textSecondary),
+                          ),
+                        ),
+                      ],
+                      if (action != null) ...[
+                        const SizedBox(height: Sp.x6),
+                        action!,
+                      ],
+                    ],
                   ),
                 ),
-              ],
-              if (action != null) ...[
-                const SizedBox(height: Sp.x6),
-                action!,
-              ],
-            ],
-          ),
-        ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

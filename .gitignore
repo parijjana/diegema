@@ -52,3 +52,8 @@ app.*.map.json
 
 # Local screenshot verification artifacts (not source; goldens live in test/)
 /shots/
+
+# Golden-test failure artifacts. Flutter writes these next to the test on
+# every failed golden comparison (master/test/diff PNGs). They are transient
+# debug output, not source — the goldens themselves live in test/**/goldens/.
+**/test/**/failures/

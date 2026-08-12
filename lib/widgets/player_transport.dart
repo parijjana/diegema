@@ -9,7 +9,8 @@ import 'skip_interval_icon.dart';
 
 /// The Now Playing transport cluster.
 ///
-/// Differences from the retired `now_playing_controls.dart`:
+/// Differences from the original controls implementation it replaced
+/// (`now_playing_controls.dart`, since deleted):
 /// - **No outer `FittedBox(scaleDown)`.** When the cluster does not fit it
 ///   [Wrap]s onto a second line; it never shrinks controls below the 44px
 ///   minimum target.

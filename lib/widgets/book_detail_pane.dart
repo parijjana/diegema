@@ -235,8 +235,68 @@ class _BookDetailPaneState extends State<BookDetailPane> {
         ),
         const SizedBox(height: 16),
         // Full-book ZIP download is never available in the web demo (it is
-        // streaming-only, see rework_plan.md); hide the control entirely
-        // rather than showing a button that would fail.
+        // streaming-only, see rework_plan.md).
+        //
+        // Shown disabled rather than hidden: the demo's job is to represent
+        // the real app, and silently omitting the control made offline
+        // listening look like a feature that does not exist. A greyed box
+        // says "this is here, just not in a browser preview" — and it can
+        // never fail, because it is not a button at all.
+        if (kDemoMode)
+          Semantics(
+            enabled: false,
+            label: 'Download full audiobook. '
+                'Not available in this browser preview.',
+            excludeSemantics: true,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.download_rounded,
+                    size: 20,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.38),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Download Full Audiobook (ZIP)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.38),
+                          ),
+                        ),
+                        Text(
+                          'Offline listening is in the app, not this preview',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.38),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (kDemoMode) const SizedBox(height: 20),
         if (!kDemoMode)
           SizedBox(
             width: double.infinity,

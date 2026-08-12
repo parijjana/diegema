@@ -7,6 +7,7 @@ import '../services/local_library_scanner.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
+import '../widgets/library_book_detail_overlay.dart';
 import '../widgets/local_audiobook_importer.dart';
 
 /// Screen 2 — **Library**: books the user owns, whether downloaded through
@@ -46,10 +47,24 @@ class _LibraryScreenState extends State<LibraryScreen> {
   bool _loading = true;
   Object? _error;
 
+  /// The root [Navigator] the detail overlay was pushed on, captured at
+  /// open time so it can be closed from [dispose] even though `_index`
+  /// switching in `AppShell` swaps this screen out of the tree rather than
+  /// pushing/popping a route for it — without this, the overlay (shown on
+  /// the app's one shared root Navigator, same as the tab switch itself)
+  /// would keep floating over whichever tab the user switched to.
+  NavigatorState? _openOverlayNavigator;
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _openOverlayNavigator?.maybePop();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -77,6 +92,58 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   void _import() =>
       LocalAudiobookImporter.showOptionsModal(context, widget.db, _load);
+
+  /// Tapping a row used to call `audioService.loadBook(...)` directly,
+  /// which meant looking at a book in your own library interrupted
+  /// whatever was already playing. It now opens a detail overlay instead —
+  /// same sheet-on-phone / dialog-on-wide treatment Discover uses for the
+  /// same "selection reveals detail, at every width" pattern — and playing
+  /// moves to an explicit action inside it.
+  void _openDetail(BuildContext context, UnifiedAudiobook book,
+      {required bool wide}) {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    _openOverlayNavigator = navigator;
+    final Future<void> shown;
+    if (wide) {
+      shown = showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          shape: const RoundedRectangleBorder(borderRadius: R.lg),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640, maxHeight: 760),
+            child: Padding(
+              padding: const EdgeInsets.all(Sp.x5),
+              child: LibraryBookDetailOverlay(
+                book: book,
+                audioService: widget.audioService,
+              ),
+            ),
+          ),
+        ),
+      );
+    } else {
+      shown = showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (context) => FractionallySizedBox(
+          heightFactor: 0.92,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x4),
+            child: LibraryBookDetailOverlay(
+              book: book,
+              audioService: widget.audioService,
+            ),
+          ),
+        ),
+      );
+    }
+    shown.whenComplete(() {
+      if (identical(_openOverlayNavigator, navigator)) {
+        _openOverlayNavigator = null;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +198,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: Sp.listGap),
             itemBuilder: (context, i) => _BookRow(
               book: _books[i],
-              onPlay: () => widget.audioService.loadBook(_books[i]),
+              onTap: () => _openDetail(context, _books[i], wide: wide),
             ),
           );
         }
@@ -189,78 +256,86 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
 class _BookRow extends StatelessWidget {
   final UnifiedAudiobook book;
-  final VoidCallback onPlay;
 
-  const _BookRow({required this.book, required this.onPlay});
+  /// Opens the detail overlay. Tapping a library book used to play it
+  /// immediately (via a now-removed `onPlay`), interrupting whatever was
+  /// already playing; the row itself no longer starts playback at all —
+  /// that lives inside the overlay as an explicit action.
+  final VoidCallback onTap;
+
+  const _BookRow({required this.book, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final chapters = book.chapters.length;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: c.surface,
+    return Material(
+      color: c.surface,
+      borderRadius: R.md,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: R.md,
-        border: Border.all(color: c.border),
-        boxShadow: c.shadow1,
-      ),
-      padding: const EdgeInsets.all(Sp.x3),
-      child: Row(
-        children: [
-          AppBookCover(
-            bookId: book.id,
-            title: book.title,
-            coverUrl: book.coverArtUrlOrPath,
-            width: 56,
-            height: 74,
-          ),
-          const SizedBox(width: Sp.x3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+        child: Semantics(
+          button: true,
+          label: 'View details for ${book.title}',
+          excludeSemantics: true,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: R.md,
+              border: Border.all(color: c.border),
+              boxShadow: c.shadow1,
+            ),
+            padding: const EdgeInsets.all(Sp.x3),
+            child: Row(
               children: [
-                Text(
-                  book.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppType.bodyLg
-                      .copyWith(color: c.text, fontWeight: FontWeight.w600),
+                AppBookCover(
+                  bookId: book.id,
+                  title: book.title,
+                  coverUrl: book.coverArtUrlOrPath,
+                  width: 56,
+                  height: 74,
                 ),
-                const SizedBox(height: Sp.x1),
-                Text(
-                  book.author,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppType.body.copyWith(color: c.textSecondary),
+                const SizedBox(width: Sp.x3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        book.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.bodyLg.copyWith(
+                            color: c.text, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: Sp.x1),
+                      Text(
+                        book.author,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.body.copyWith(color: c.textSecondary),
+                      ),
+                      const SizedBox(height: Sp.x1),
+                      Text(
+                        chapters == 0
+                            ? (book.source ?? 'Local')
+                            : '$chapters ${chapters == 1 ? 'chapter' : 'chapters'} '
+                                '· ${book.source ?? 'Local'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.caption.copyWith(color: c.textMuted),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: Sp.x1),
-                Text(
-                  chapters == 0
-                      ? (book.source ?? 'Local')
-                      : '$chapters ${chapters == 1 ? 'chapter' : 'chapters'} '
-                          '· ${book.source ?? 'Local'}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppType.caption.copyWith(color: c.textMuted),
-                ),
+                const SizedBox(width: Sp.x2),
+                Icon(Icons.chevron_right_rounded,
+                    size: Dim.iconXl, color: c.textMuted),
               ],
             ),
           ),
-          const SizedBox(width: Sp.x2),
-          Semantics(
-            button: true,
-            label: 'Play ${book.title}',
-            excludeSemantics: true,
-            child: IconButton(
-              tooltip: 'Play',
-              onPressed: onPlay,
-              icon: Icon(Icons.play_circle_fill_rounded,
-                  size: Dim.iconXl, color: c.accentFill),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

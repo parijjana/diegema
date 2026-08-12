@@ -8,7 +8,6 @@ import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/local_audiobook_importer.dart';
-import 'app_shell.dart' show ThemeToggleButton;
 
 /// Screen 2 — **Library**: books the user owns, whether downloaded through
 /// the in-app store or added manually.
@@ -26,8 +25,6 @@ class LibraryScreen extends StatefulWidget {
   final AppDatabase db;
   final AudioPlaybackService audioService;
   final VoidCallback onGoToDiscover;
-  final bool isDarkMode;
-  final VoidCallback onToggleTheme;
 
   /// Defaults to the platform [scanDownloadedLibrary].
   final LibraryScanner? scanLibrary;
@@ -37,8 +34,6 @@ class LibraryScreen extends StatefulWidget {
     required this.db,
     required this.audioService,
     required this.onGoToDiscover,
-    required this.isDarkMode,
-    required this.onToggleTheme,
     this.scanLibrary,
   });
 
@@ -181,11 +176,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       icon: const Icon(Icons.refresh_rounded),
                     ),
                   ),
-                  if (!wide)
-                    ThemeToggleButton(
-                      isDarkMode: widget.isDarkMode,
-                      onToggle: widget.onToggleTheme,
-                    ),
                 ],
               ),
             ),

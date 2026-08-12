@@ -15,13 +15,93 @@ html, body {
   margin: 0;
 }
 
+/* Page ground. Deliberately a shade darker than the app surface so the
+ * bordered stage below reads as an application floating on a page, rather
+ * than as the page itself. */
 #demo-frame {
   display: flex;
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+  box-sizing: border-box;
+  background: #EDECE6;
+}
+
+/* Everything below the banner: the page ground the app sits on. Padded and
+ * centred so the stage floats rather than filling the window. */
+#demo-frame > #demo-stage {
+  margin: 14px auto;
+}
+
+/* The "app" surface: a contained, bordered, rounded card. `overflow:
+ * hidden` is what keeps the Flutter canvas clipped to the rounded corners.
+ *
+ * Sized by the viewport switcher (see #demo-frame[data-view] below). In
+ * desktop view it fills the available space; in mobile view it is pinned to
+ * a phone-sized box. Either way Flutter re-lays-out from this element's
+ * bounding box. */
+#demo-stage {
+  display: flex;
+  flex-direction: column;
+  width: calc(100% - 28px);
+  max-width: 1280px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
   background: #F8F8F5;
+  border: 1px solid #C9D8DD;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(20, 26, 30, 0.06),
+              0 12px 28px rgba(20, 26, 30, 0.10);
+}
+
+/* Mobile view: a phone-shaped stage, centred, with a heavier radius so it
+ * reads as a handset rather than a narrow window. Height is capped to the
+ * space available so it never overflows a short screen. */
+#demo-frame[data-view="mobile"] #demo-stage {
+  width: 390px;
+  max-width: 100%;
+  flex: 0 1 844px;
+  border-radius: 26px;
+}
+
+/* Viewport switcher. Segmented-control styling, sized to the 44px touch
+ * target the rest of this file uses. Hidden until a kDemoMode build reveals
+ * it, exactly like the banner. */
+#demo-toolbar {
+  display: none;
+  flex: 0 0 auto;
+  align-self: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #EFEEE8;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+    "Liberation Sans", Arial, sans-serif;
+}
+
+.demo-toolbar__btn {
+  min-height: 36px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #55534C;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.demo-toolbar__btn:hover { color: #22201C; }
+.demo-toolbar__btn.is-active {
+  background: #FFFFFF;
+  color: #22201C;
+  box-shadow: 0 1px 2px rgba(20, 26, 30, 0.12);
+}
+.demo-toolbar__btn:focus-visible {
+  outline: 3px solid #265A68;
+  outline-offset: 2px;
 }
 
 /* The Flutter app fills whatever height the banner does not use. Flutter's
@@ -40,10 +120,12 @@ html, body {
   flex: 0 0 auto;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 12px 20px;
   background: #FFFFFF;
   color: #22201C;
   border-bottom: 2px solid #AECFD7;
+  box-shadow: 0 2px 10px rgba(20, 26, 30, 0.06);
+  z-index: 1;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
     "Liberation Sans", Arial, sans-serif;
   box-sizing: border-box;
@@ -108,32 +190,14 @@ html, body {
   outline-offset: 2px;
 }
 
-.demo-banner__actions {
-  display: flex;
-  margin-left: 32px;
-}
-
-.demo-banner__link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 8px;
-  border: 1px solid #265A68;
-  color: #265A68;
-  font-size: 15px;
-  font-weight: 600;
-  text-decoration: none;
-  box-sizing: border-box;
-}
-.demo-banner__link:hover { background: #EEF5F7; }
-.demo-banner__link:focus-visible {
-  outline: 3px solid #265A68;
-  outline-offset: 2px;
-}
-
 @media (prefers-color-scheme: dark) {
-  #demo-frame { background: #101417; }
+  #demo-frame { background: #0B0E10; }
+  #demo-stage {
+    background: #101417;
+    border-color: #263038;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5),
+                0 12px 28px rgba(0, 0, 0, 0.45);
+  }
   #demo-banner {
     background: #181C20;
     color: #E6E4DF;
@@ -143,8 +207,15 @@ html, body {
   .demo-banner__body { color: #B4B0A6; }
   .demo-banner__toggle { color: #E6E4DF; }
   .demo-banner__toggle:hover { background: #22272C; }
-  .demo-banner__toggle:focus-visible,
-  .demo-banner__link:focus-visible { outline-color: #7FB2BF; }
-  .demo-banner__link { border-color: #7FB2BF; color: #7FB2BF; }
-  .demo-banner__link:hover { background: #16303A; }
+  .demo-banner__toggle:focus-visible { outline-color: #7FB2BF; }
+
+  #demo-toolbar { background: #191E22; }
+  .demo-toolbar__btn { color: #B4B0A6; }
+  .demo-toolbar__btn:hover { color: #E6E4DF; }
+  .demo-toolbar__btn.is-active {
+    background: #2A3138;
+    color: #E6E4DF;
+    box-shadow: none;
+  }
+  .demo-toolbar__btn:focus-visible { outline-color: #7FB2BF; }
 }

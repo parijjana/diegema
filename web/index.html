@@ -46,6 +46,21 @@
     full viewport exactly as before.
   -->
   <div id="demo-frame">
+    <!--
+      Viewport switcher. Lives outside #demo-stage deliberately: it is
+      meta-chrome about the preview, not part of the app being previewed.
+      Hidden by default like the banner, and revealed by the same
+      kDemoMode-only call.
+
+      Mobile is 390x844 — under app_metrics.dart's `Dim.wideBreakpoint`
+      (760), so switching genuinely crosses the breakpoint and swaps the
+      top tab bar for the bottom NavigationBar. Flutter sizes itself from
+      #flutter-host's bounding box (web/flutter_bootstrap.js), so resizing
+      the stage is all that is needed - no reload, no JS bridge.
+
+      This is a LAYOUT preview, not device emulation: device pixel ratio,
+      text scaling and touch behaviour stay desktop.
+    -->
     <div id="demo-banner" role="note" aria-label="Preview notice">
       <div class="demo-banner__row">
         <svg class="demo-banner__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -60,6 +75,26 @@
             play; the rest are browse-only and marked &quot;Preview only&quot;.
           </p>
         </div>
+        <!--
+          Viewport switcher, inside the banner: it is chrome about the
+          preview, and the banner is where preview chrome belongs.
+
+          Mobile is 390x844 — under app_metrics.dart's `Dim.wideBreakpoint`
+          (760), so switching genuinely crosses the breakpoint and swaps the
+          top tab bar for the bottom NavigationBar. Flutter sizes itself
+          from #flutter-host's bounding box (web/flutter_bootstrap.js), so
+          resizing the stage is all that is needed — no reload, no JS
+          bridge, and playback survives the switch.
+
+          This is a LAYOUT preview, not device emulation: device pixel
+          ratio, text scaling and touch behaviour stay desktop.
+        -->
+        <div id="demo-toolbar" role="group" aria-label="Preview viewport">
+          <button type="button" class="demo-toolbar__btn is-active"
+                  id="demo-view-desktop" aria-pressed="true">Desktop</button>
+          <button type="button" class="demo-toolbar__btn"
+                  id="demo-view-mobile" aria-pressed="false">Mobile</button>
+        </div>
         <button
           type="button"
           id="demo-banner-toggle"
@@ -69,16 +104,17 @@
           title="Collapse"
         >&minus;</button>
       </div>
-      <div class="demo-banner__actions" id="demo-banner-actions">
-        <a
-          class="demo-banner__link"
-          href="https://librivox.org/pages/volunteer-for-librivox/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >Volunteer for LibriVox</a>
-      </div>
     </div>
-    <div id="flutter-host"></div>
+    <!--
+      The bordered "app" surface, a sibling of the banner rather than its
+      parent: the banner is page chrome and stays put at the top, while
+      this is the application it is describing. Giving the canvas a
+      contained, rounded, bordered surface on a darker page ground is what
+      makes it read as an app rather than a web page.
+    -->
+    <div id="demo-stage">
+      <div id="flutter-host"></div>
+    </div>
   </div>
   <script src="demo_banner.js"></script>
   <!--

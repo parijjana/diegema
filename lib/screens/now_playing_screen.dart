@@ -487,17 +487,34 @@ class _IdleView extends StatelessWidget {
             ),
           );
         } else if (continueListening.isEmpty && pinnedOnly.isEmpty) {
-          body = AppStateView.empty(
-            icon: Icons.auto_stories_rounded,
-            headline: 'Nothing in progress',
-            body: 'Books you start appear here so you can pick up where you '
-                'left off. Find something to listen to in Discover.',
-            action: FilledButton.icon(
-              onPressed: onGoToDiscover,
-              icon: const Icon(Icons.explore_rounded),
-              label: const Text('Browse Discover'),
-            ),
-          );
+          // "Nothing in progress" is a lie while peeking: something IS
+          // playing, and `_PeekPlayerStrip` names it a few pixels below.
+          // The list is empty only because `getContinueListening` has a
+          // 30-second floor, so a just-started book has not qualified yet —
+          // which is exactly when someone taps "Your list" to look around.
+          body = peeking
+              ? AppStateView.empty(
+                  icon: Icons.auto_stories_rounded,
+                  headline: 'Nothing else in progress',
+                  body: 'The book you are listening to is the only one on the '
+                      'go. Anything else you start will show up here.',
+                  action: FilledButton.icon(
+                    onPressed: onGoToDiscover,
+                    icon: const Icon(Icons.explore_rounded),
+                    label: const Text('Browse Discover'),
+                  ),
+                )
+              : AppStateView.empty(
+                  icon: Icons.auto_stories_rounded,
+                  headline: 'Nothing in progress',
+                  body: 'Books you start appear here so you can pick up where '
+                      'you left off. Find something to listen to in Discover.',
+                  action: FilledButton.icon(
+                    onPressed: onGoToDiscover,
+                    icon: const Icon(Icons.explore_rounded),
+                    label: const Text('Browse Discover'),
+                  ),
+                );
         } else {
           body = ListView(
             padding: EdgeInsets.fromLTRB(gutter, Sp.x2, gutter, Sp.x10),

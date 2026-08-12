@@ -1,6 +1,7 @@
-// Collapse/expand affordance for the host-page demo banner (#demo-banner,
-// see web/index.html and web/demo_banner.css). Plain JS, no dependencies,
-// no external requests — this file is copied verbatim into build/web/ by
+// Host-page chrome for the canned web demo: the "this is a preview" notice
+// (#demo-banner) and the desktop/mobile viewport switcher (#demo-toolbar).
+// See web/index.html and web/demo_banner.css. Plain JS, no dependencies, no
+// external requests — this file is copied verbatim into build/web/ by
 // `flutter build web` and must run under a strict CSP.
 //
 // The banner never gets a "dismiss" — only collapse, which keeps a
@@ -9,32 +10,62 @@
 // the demo disclosure must never be fully hideable. It also starts
 // expanded on every page load; nothing here persists a collapsed
 // preference.
-// Unhides the banner. Called from Dart via dart:js_interop, and only by a
-// kDemoMode build — see lib/core/host_page_demo_notice_web.dart. Defined as
+
+// Unhides the demo chrome. Called from Dart via dart:js_interop, and only by
+// a kDemoMode build — see lib/core/host_page_demo_notice_web.dart. Defined as
 // a global so the Dart side needs no DOM access of its own (dart:html is
 // deprecated, and package:web would be a new dependency for one line).
+//
+// Name kept as-is despite now revealing the viewport switcher too: it is the
+// Dart-side contract, and renaming it would mean editing Dart for no
+// behavioural gain.
 window.revealDemoBanner = function () {
   var banner = document.getElementById('demo-banner');
   if (banner) banner.style.display = 'flex';
+  var toolbar = document.getElementById('demo-toolbar');
+  if (toolbar) toolbar.style.display = 'flex';
 };
 
 (function () {
   var toggle = document.getElementById('demo-banner-toggle');
   var body = document.getElementById('demo-banner-body');
-  var actions = document.getElementById('demo-banner-actions');
-  if (!toggle || !body || !actions) return;
+  if (toggle && body) {
+    toggle.addEventListener('click', function () {
+      var expanded = toggle.getAttribute('aria-expanded') === 'true';
+      var next = !expanded;
+      toggle.setAttribute('aria-expanded', String(next));
+      toggle.setAttribute(
+        'aria-label',
+        next ? 'Collapse the preview notice' : 'Expand the preview notice'
+      );
+      toggle.setAttribute('title', next ? 'Collapse' : 'Expand');
+      body.style.display = next ? 'block' : 'none';
+      toggle.textContent = next ? '−' : '+';
+    });
+  }
+})();
 
-  toggle.addEventListener('click', function () {
-    var expanded = toggle.getAttribute('aria-expanded') === 'true';
-    var next = !expanded;
-    toggle.setAttribute('aria-expanded', String(next));
-    toggle.setAttribute(
-      'aria-label',
-      next ? 'Collapse the preview notice' : 'Expand the preview notice'
-    );
-    toggle.setAttribute('title', next ? 'Collapse' : 'Expand');
-    body.style.display = next ? 'block' : 'none';
-    actions.style.display = next ? 'flex' : 'none';
-    toggle.textContent = next ? '−' : '+';
-  });
+// Viewport switcher. Setting `data-view` on #demo-frame is the whole
+// mechanism: CSS resizes #demo-stage, and Flutter re-lays-out because it
+// sizes itself from #flutter-host's bounding box (web/flutter_bootstrap.js).
+// No reload and no Dart involvement — which is also why the app keeps its
+// playback state across a switch.
+(function () {
+  var frame = document.getElementById('demo-frame');
+  var desktop = document.getElementById('demo-view-desktop');
+  var mobile = document.getElementById('demo-view-mobile');
+  if (!frame || !desktop || !mobile) return;
+
+  function select(view) {
+    frame.setAttribute('data-view', view);
+    var onMobile = view === 'mobile';
+    mobile.classList.toggle('is-active', onMobile);
+    desktop.classList.toggle('is-active', !onMobile);
+    mobile.setAttribute('aria-pressed', String(onMobile));
+    desktop.setAttribute('aria-pressed', String(!onMobile));
+  }
+
+  desktop.addEventListener('click', function () { select('desktop'); });
+  mobile.addEventListener('click', function () { select('mobile'); });
+  select('desktop');
 })();

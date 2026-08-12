@@ -222,21 +222,19 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _screenFor(int index) {
-    // On narrow layouts there is no side rail, so each screen's heading
-    // carries the theme toggle instead. Nothing is hover-only and nothing
-    // is reachable from only one screen.
-    final headerAction = ThemeToggleButton(
-      isDarkMode: widget.isDarkMode,
-      onToggle: widget.onToggleTheme,
-    );
+    // The theme toggle lives on Now Playing ONLY, at every width. It used
+    // to sit in each screen's heading and in the top tab bar, so the same
+    // control appeared up to three times over.
+    //
+    // Interim placement, not the final home: this becomes a row in the
+    // settings panel once that exists. Now Playing is the landing screen,
+    // so the control stays reachable in one tap until then.
     switch (index) {
       case 1:
         return LibraryScreen(
           db: widget.db,
           audioService: _audioService,
           onGoToDiscover: () => _go(2),
-          isDarkMode: widget.isDarkMode,
-          onToggleTheme: widget.onToggleTheme,
           scanLibrary: widget.libraryScanner,
         );
       case 2:
@@ -247,7 +245,6 @@ class _AppShellState extends State<AppShell> {
           libriVoxService: _libriVoxService,
           artworkService: _artworkService,
           downloader: _downloader,
-          headerAction: headerAction,
         );
       default:
         return NowPlayingScreen(
@@ -255,7 +252,10 @@ class _AppShellState extends State<AppShell> {
           audioService: _audioService,
           preferences: widget.preferences,
           onGoToDiscover: () => _go(2),
-          headerAction: headerAction,
+          headerAction: ThemeToggleButton(
+            isDarkMode: widget.isDarkMode,
+            onToggle: widget.onToggleTheme,
+          ),
         );
     }
   }
@@ -330,15 +330,9 @@ class _TopTabBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: Sp.x5, vertical: Sp.x2),
         child: Row(
           children: [
-            Semantics(
-              header: true,
-              child: Text(
-                'LibriVox',
-                // Serif wordmark: a public-domain library, not a console.
-                style: AppType.serif(AppType.titleSm).copyWith(color: c.accentText),
-              ),
-            ),
-            const SizedBox(width: Sp.x8),
+            // No wordmark here. This app is not LibriVox's and should not
+            // wear their name as branding; the recordings' provenance
+            // belongs in an About surface as attribution, not in the chrome.
             for (var i = 0; i < destinations.length; i++) ...[
               if (i != 0) const SizedBox(width: Sp.x2),
               _TopTabItem(

@@ -81,7 +81,7 @@ class _AudiobookAppState extends State<AudiobookApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LibriVox Audiobook Player',
+      title: 'Audiobook Player',
       debugShowCheckedModeBanner: false,
       // Both themes are supplied so the framework can cross-fade between
       // them; `themeMode` is what the in-app toggle actually drives. The

@@ -29,8 +29,6 @@ void main() {
             db: db,
             audioService: audio,
             onGoToDiscover: () {},
-            isDarkMode: false,
-            onToggleTheme: () {},
             scanLibrary: scanLibrary,
           ),
         ),

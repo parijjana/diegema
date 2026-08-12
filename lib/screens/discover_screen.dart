@@ -425,7 +425,7 @@ class _SearchField extends StatelessWidget {
       onSubmitted: onSubmitted,
       style: AppType.bodyLg.copyWith(color: c.text),
       decoration: InputDecoration(
-        hintText: 'Search LibriVox',
+        hintText: 'Search audiobooks',
         prefixIcon: const Icon(Icons.search_rounded),
         suffixIcon: searching
             ? Semantics(

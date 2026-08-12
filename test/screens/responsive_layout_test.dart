@@ -7,6 +7,7 @@ import 'package:unamedaudiobookplayer/app.dart';
 import 'package:unamedaudiobookplayer/core/ui_preferences.dart';
 import 'package:unamedaudiobookplayer/database/app_database.dart';
 import 'package:unamedaudiobookplayer/core/network/rate_limit_dispatcher.dart';
+import 'package:unamedaudiobookplayer/screens/app_shell.dart';
 import 'package:unamedaudiobookplayer/services/librivox_service.dart';
 import 'package:unamedaudiobookplayer/widgets/player_transport.dart';
 
@@ -195,6 +196,51 @@ void main() {
       // The sleep-timer chip is the specific control that overflowed, so
       // assert it is actually on screen and not merely non-throwing.
       expect(find.byType(SleepTimerSelector), findsOneWidget);
+
+      await unmount(tester);
+    });
+  }
+
+  // The theme toggle is deliberately in exactly one place per layout: the
+  // top tab bar when wide, the Now Playing title bar when narrow. Loading a
+  // book swaps that title bar out for the player — and the player had no
+  // toggle, so on a phone the control disappeared entirely for as long as
+  // anything was playing. Desktop hid the bug because its tab bar keeps a
+  // copy regardless.
+  //
+  // Asserted as "exactly one" in every state, so restoring it on the player
+  // cannot quietly produce two on desktop.
+  for (final entry in {
+    'mobile 390x844': const Size(390, 844),
+    'desktop 1440x900': const Size(1440, 900),
+  }.entries) {
+    testWidgets('exactly one theme toggle on ${entry.key}, playing or not',
+        (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+
+      await setSurface(tester, entry.value);
+      await tester.pumpWidget(AudiobookApp(
+        initialDarkMode: false,
+        database: db,
+        audioService: audio,
+        libriVoxService: LibriVoxService(
+          client: buildMockClient(),
+          rateLimiter: RateLimitDispatcher(cooldownOverride: Duration.zero),
+        ),
+        preferences: const UiPreferences(overrides: <String, Object>{}),
+      ));
+      await pumpFrames(tester);
+
+      expect(find.byType(ThemeToggleButton), findsOneWidget,
+          reason: 'no book loaded, ${entry.key}');
+
+      final book = await seedBook(db, id: 'z', title: 'Persuasion');
+      await audio.loadBook(book);
+      await pumpFrames(tester);
+
+      expect(find.byType(ThemeToggleButton), findsOneWidget,
+          reason: 'book loaded and player showing, ${entry.key}');
 
       await unmount(tester);
     });

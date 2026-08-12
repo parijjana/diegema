@@ -334,6 +334,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             book: book,
                             audioService: widget.audioService,
                             onShowUpNext: _showUpNext,
+                            headerAction: widget.headerAction,
                           ),
                         ),
                       ),
@@ -833,10 +834,20 @@ class _ActiveView extends StatelessWidget {
   final AudioPlaybackService audioService;
   final VoidCallback onShowUpNext;
 
+  /// The theme toggle, shown here only at narrow widths.
+  ///
+  /// Wide layouts carry their own copy in the top tab bar, but narrow ones
+  /// have a bottom `NavigationBar` with nowhere to put it — so when the
+  /// player replaced the idle view, the toggle vanished from the phone
+  /// layout entirely for as long as a book was loaded. The idle view's
+  /// title bar is the only other place it lives.
+  final Widget? headerAction;
+
   const _ActiveView({
     required this.book,
     required this.audioService,
     required this.onShowUpNext,
+    this.headerAction,
   });
 
   @override
@@ -891,6 +902,12 @@ class _ActiveView extends StatelessWidget {
                         );
                       },
                     ),
+                    // Narrow only: the top tab bar holds the wide layout's
+                    // copy, and a bottom NavigationBar has nowhere for it.
+                    if (!wide && headerAction != null) ...[
+                      const SizedBox(width: Sp.x2),
+                      headerAction!,
+                    ],
                   ],
                 ),
               ),

@@ -9,6 +9,7 @@ import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/player_scrubber.dart';
 import '../widgets/player_transport.dart';
+import '../widgets/up_next_sheet.dart';
 
 /// Screen 1 — **Now Playing**, the app's default landing screen.
 ///
@@ -48,12 +49,16 @@ import '../widgets/player_transport.dart';
 /// [ExcludeSemantics]-ed once faded out, so a screen reader never
 /// encounters an invisible list, and scroll position survives a round trip.
 ///
-/// ## Getting back to the list without stopping playback
+/// ## The queue
 ///
-/// [_peekingList] flips the screen back to the idle list while audio keeps
-/// running; a [_PeekPlayerStrip] appears so playback is still reachable and
-/// the way back into the player is obvious. Playback state is never touched
-/// by navigation.
+/// The player opens "Up next" (see `lib/widgets/up_next_sheet.dart`) as a
+/// surface *over* itself, rather than navigating away. This replaced an
+/// earlier "peek", which flipped the screen back to the continue-listening
+/// list while audio kept running: that made this screen the only route to
+/// that list, and produced a body reading "Nothing in progress" while a book
+/// played and was named directly below it. Continue-listening now lives in
+/// Library's "In progress" section, so the player no longer has to double as
+/// a way back to it.
 class NowPlayingScreen extends StatefulWidget {
   final AppDatabase db;
   final AudioPlaybackService audioService;
@@ -91,28 +96,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   bool _loading = true;
   Object? _loadError;
 
-  /// True while the user has deliberately gone back to the list with audio
-  /// still playing.
-  bool _peekingList = false;
-
-  /// True for the duration of [_maybeRestoreLastPlayed]'s own call to
-  /// [AudioPlaybackService.loadBook]. That call sets
-  /// `currentBookNotifier.value`, which — on a stub playback service whose
-  /// `loadBook` has no internal `await` (see
-  /// `test/support/fake_playback_service.dart`) — fires
-  /// [_onCurrentBookChanged] synchronously, *while still inside* the
-  /// `_load` call that triggered the restore in the first place. Without
-  /// this guard, that reentrant call kicks off a second `_load()` that
-  /// races the original one against the same [AppDatabase] connection.
-  /// Harmless on its own, but it was observed compounding into a hang once
-  /// several overlapping `_load()`s piled up (three-nested restores across
-  /// screen remounts). The restoring `_load()` call already refreshes
-  /// every list this screen shows once it completes, so the reentrant call
-  /// is redundant regardless — this guard only skips known-redundant work.
-  bool _restoring = false;
-
   bool get _playerShouldShow =>
-      widget.audioService.currentBookNotifier.value != null && !_peekingList;
+      widget.audioService.currentBookNotifier.value != null;
 
   @override
   void initState() {
@@ -135,19 +120,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   }
 
   void _onCurrentBookChanged() {
-    // Starting a new book always reveals the player; the peek is a
-    // transient state, not a sticky preference.
-    if (widget.audioService.currentBookNotifier.value != null) {
-      _peekingList = false;
-    }
     _syncFade();
-    // The shortlist changes as soon as something is played — except while
-    // this change is the restore's own doing (see [_restoring]): the
-    // `_load()` already in flight will pick up the fresh shortlist once it
-    // completes, so calling it again here would only race it.
-    if (!_restoring) {
-      _load();
-    }
+    // The shortlist changes as soon as something is played.
+    _load();
   }
 
   /// The two windows of the timeline, as fractions of the controller.
@@ -187,7 +162,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       final continueListening = await widget.db.getContinueListening(limit: 5);
       final pinned = await widget.db.getPinnedBooks();
       final visible = await widget.preferences.getPinnedRowVisible();
-      await _maybeRestoreLastPlayed();
       if (!mounted) return;
       setState(() {
         _continueListening = continueListening;
@@ -202,44 +176,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         _loadError = e;
         _loading = false;
       });
-    }
-  }
-
-  /// The genuinely-idle screen is now the exception, not the rule: if
-  /// anything was ever played (any saved [PlaybackProgress] row exists),
-  /// Now Playing loads it into the player — paused, at its saved position —
-  /// rather than showing the near-blank "nothing in progress" state. Only a
-  /// brand-new install with zero progress rows ever sees the true empty
-  /// state.
-  ///
-  /// Guarded by [AudioPlaybackService.currentBookNotifier] already having a
-  /// value, which is also what makes this safe to call from every [_load]
-  /// (hide, undo, pin toggle, the current-book listener): once a book is
-  /// loaded — restored or genuinely playing — this is a no-op forever
-  /// after, for this screen instance.
-  ///
-  /// Never calls [AudioPlaybackService.play]: this only loads and seeks
-  /// (`autoPlay: false`), so a restored book sits paused until the user
-  /// presses play themselves.
-  Future<void> _maybeRestoreLastPlayed() async {
-    if (widget.audioService.currentBookNotifier.value != null) return;
-    try {
-      final recent = await widget.db.getMostRecentProgress();
-      if (recent == null) return;
-      final book = await widget.db.getAudiobook(recent.audiobookId);
-      if (book == null || book.chapters.isEmpty) return;
-      if (widget.audioService.currentBookNotifier.value != null) return;
-      _restoring = true;
-      await widget.audioService.loadBook(
-        book,
-        initialChapterIndex: recent.chapterIndex,
-        initialPosition: Duration(seconds: recent.positionSeconds),
-        autoPlay: false,
-      );
-    } catch (e) {
-      debugPrint('NowPlayingScreen: could not restore last-played book: $e');
-    } finally {
-      _restoring = false;
     }
   }
 
@@ -303,14 +239,17 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     await widget.audioService.loadBook(book);
   }
 
-  void _showList() {
-    setState(() => _peekingList = true);
-    _syncFade();
-  }
-
-  void _showPlayer() {
-    setState(() => _peekingList = false);
-    _syncFade();
+  /// Opens the queue for the book that is playing. Nothing about the
+  /// player's own state changes — this is a surface over it, not a
+  /// destination away from it, which is what the old peek got wrong.
+  void _showUpNext() {
+    final book = widget.audioService.currentBookNotifier.value;
+    if (book == null) return;
+    showUpNext(
+      context,
+      book: book,
+      audioService: widget.audioService,
+    );
   }
 
   @override
@@ -377,9 +316,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             onGoToDiscover: widget.onGoToDiscover,
                             onRetry: _load,
                             headerAction: widget.headerAction,
-                            peeking: _peekingList && book != null,
-                            audioService: widget.audioService,
-                            onResumePlayer: _showPlayer,
                           ),
                         ),
                       ),
@@ -397,7 +333,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                           child: _ActiveView(
                             book: book,
                             audioService: widget.audioService,
-                            onShowList: _showList,
+                            onShowUpNext: _showUpNext,
                           ),
                         ),
                       ),
@@ -431,11 +367,6 @@ class _IdleView extends StatelessWidget {
   final VoidCallback onRetry;
   final Widget? headerAction;
 
-  /// True when audio is running but the user has come back to the list.
-  final bool peeking;
-  final AudioPlaybackService audioService;
-  final VoidCallback onResumePlayer;
-
   const _IdleView({
     required this.loading,
     required this.error,
@@ -450,9 +381,6 @@ class _IdleView extends StatelessWidget {
     required this.onGoToDiscover,
     required this.onRetry,
     required this.headerAction,
-    required this.peeking,
-    required this.audioService,
-    required this.onResumePlayer,
   });
 
   @override
@@ -487,34 +415,20 @@ class _IdleView extends StatelessWidget {
             ),
           );
         } else if (continueListening.isEmpty && pinnedOnly.isEmpty) {
-          // "Nothing in progress" is a lie while peeking: something IS
-          // playing, and `_PeekPlayerStrip` names it a few pixels below.
-          // The list is empty only because `getContinueListening` has a
-          // 30-second floor, so a just-started book has not qualified yet —
-          // which is exactly when someone taps "Your list" to look around.
-          body = peeking
-              ? AppStateView.empty(
-                  icon: Icons.auto_stories_rounded,
-                  headline: 'Nothing else in progress',
-                  body: 'The book you are listening to is the only one on the '
-                      'go. Anything else you start will show up here.',
-                  action: FilledButton.icon(
-                    onPressed: onGoToDiscover,
-                    icon: const Icon(Icons.explore_rounded),
-                    label: const Text('Browse Discover'),
-                  ),
-                )
-              : AppStateView.empty(
-                  icon: Icons.auto_stories_rounded,
-                  headline: 'Nothing in progress',
-                  body: 'Books you start appear here so you can pick up where '
-                      'you left off. Find something to listen to in Discover.',
-                  action: FilledButton.icon(
-                    onPressed: onGoToDiscover,
-                    icon: const Icon(Icons.explore_rounded),
-                    label: const Text('Browse Discover'),
-                  ),
-                );
+          // This layer is now only ever reached with no book loaded (the
+          // player replaces it entirely otherwise), so "Nothing in progress"
+          // can no longer contradict a book playing underneath it.
+          body = AppStateView.empty(
+            icon: Icons.auto_stories_rounded,
+            headline: 'Nothing in progress',
+            body: 'Books you start appear here so you can pick up where '
+                'you left off. Find something to listen to in Discover.',
+            action: FilledButton.icon(
+              onPressed: onGoToDiscover,
+              icon: const Icon(Icons.explore_rounded),
+              label: const Text('Browse Discover'),
+            ),
+          );
         } else {
           body = ListView(
             padding: EdgeInsets.fromLTRB(gutter, Sp.x2, gutter, Sp.x10),
@@ -578,15 +492,10 @@ class _IdleView extends StatelessWidget {
           children: [
             _ScreenTitleBar(
               title: 'Now playing',
-              subtitle: peeking ? null : 'Pick up where you left off',
+              subtitle: 'Pick up where you left off',
               action: wide ? null : headerAction,
             ),
             Expanded(child: body),
-            if (peeking)
-              _PeekPlayerStrip(
-                audioService: audioService,
-                onResumePlayer: onResumePlayer,
-              ),
           ],
         );
       },
@@ -919,80 +828,15 @@ class _DismissBackground extends StatelessWidget {
     );
   }
 }
-
-/// Shown at the bottom of the idle list while audio is still playing, so
-/// coming back to the list never means losing the player.
-class _PeekPlayerStrip extends StatelessWidget {
-  final AudioPlaybackService audioService;
-  final VoidCallback onResumePlayer;
-
-  const _PeekPlayerStrip({
-    required this.audioService,
-    required this.onResumePlayer,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return ValueListenableBuilder<UnifiedAudiobook?>(
-      valueListenable: audioService.currentBookNotifier,
-      builder: (context, book, _) {
-        if (book == null) return const SizedBox.shrink();
-        return Material(
-          color: c.surfaceRaised,
-          child: InkWell(
-            onTap: onResumePlayer,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: Sp.x4, vertical: Sp.x3),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: c.border)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.graphic_eq_rounded, color: c.accentText),
-                  const SizedBox(width: Sp.x3),
-                  Expanded(
-                    child: Text(
-                      book.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppType.bodyLg.copyWith(color: c.text),
-                    ),
-                  ),
-                  const SizedBox(width: Sp.x2),
-                  Semantics(
-                    button: true,
-                    label: 'Back to player',
-                    excludeSemantics: true,
-                    child: TextButton(
-                      onPressed: onResumePlayer,
-                      child: const Text('Player'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Active state
-// ---------------------------------------------------------------------------
-
 class _ActiveView extends StatelessWidget {
   final UnifiedAudiobook book;
   final AudioPlaybackService audioService;
-  final VoidCallback onShowList;
+  final VoidCallback onShowUpNext;
 
   const _ActiveView({
     required this.book,
     required this.audioService,
-    required this.onShowList,
+    required this.onShowUpNext,
   });
 
   @override
@@ -1020,12 +864,12 @@ class _ActiveView extends StatelessWidget {
                   children: [
                     Semantics(
                       button: true,
-                      label: 'Back to continue listening. Playback keeps going.',
+                      label: 'Up next. The chapters in this book.',
                       excludeSemantics: true,
                       child: TextButton.icon(
-                        onPressed: onShowList,
-                        icon: const Icon(Icons.expand_more_rounded),
-                        label: const Text('Your list'),
+                        onPressed: onShowUpNext,
+                        icon: const Icon(Icons.queue_music_rounded),
+                        label: const Text('Up next'),
                       ),
                     ),
                     const Spacer(),

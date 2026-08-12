@@ -121,11 +121,16 @@ void main() {
     await pumpFrames(tester);
 
     // Sanity: we really are in the player before going back.
-    expect(find.text('Your list'), findsOneWidget);
+    expect(find.text('Up next'), findsOneWidget);
 
     final positionBefore = audio.positionNotifier.value;
 
-    await tester.tap(find.text('Your list'));
+    // Unloading the book is what drives the reverse fade now. The old
+    // "Your list" peek used to trigger it while a book stayed loaded; that
+    // affordance is gone (continue-listening lives in Library's "In
+    // progress" section), but the transition itself is unchanged and its
+    // frame-by-frame tuning is still worth guarding.
+    audio.currentBookNotifier.value = null;
 
     var elapsed = 0;
     for (final ms in sampleMs) {
@@ -148,31 +153,6 @@ void main() {
     expect(audio.loadCalls, 1);
     expect(audio.stateNotifier.value, PlaybackState.playing);
     expect(audio.positionNotifier.value, positionBefore);
-    expect(audio.currentBookNotifier.value, isNotNull);
-
-    // And the way back into the player is on screen, so returning to the
-    // list is not a dead end.
-    expect(find.text('Player'), findsOneWidget);
-
-    await unmount(tester);
-  });
-
-  testWidgets('the peek round-trips back into the player', (tester) async {
-    await setSurface(tester, surface);
-    await tester.pumpWidget(wrap());
-    await pumpFrames(tester);
-
-    await audio.loadBook(book);
-    await pumpFrames(tester);
-    await tester.tap(find.text('Your list'));
-    await pumpFrames(tester);
-
-    await tester.tap(find.text('Player'));
-    await pumpFrames(tester);
-
-    expect(find.text('Your list'), findsOneWidget);
-    expect(audio.pauseCalls, 0);
-    expect(audio.stateNotifier.value, PlaybackState.playing);
 
     await unmount(tester);
   });
@@ -191,7 +171,7 @@ void main() {
 
     // Straight to the player on the very next frame — no intermediate
     // opacity, nothing to make a vestibular-sensitive user unwell.
-    expect(find.text('Your list'), findsOneWidget);
+    expect(find.text('Up next'), findsOneWidget);
     expect(find.text('Continue listening'), findsNothing);
 
     await unmount(tester);

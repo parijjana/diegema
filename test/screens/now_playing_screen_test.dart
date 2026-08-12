@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:unamedaudiobookplayer/core/ui_preferences.dart';
 import 'package:unamedaudiobookplayer/database/app_database.dart';
 import 'package:unamedaudiobookplayer/screens/now_playing_screen.dart';
-import 'package:unamedaudiobookplayer/services/audio_playback_service.dart';
 import 'package:unamedaudiobookplayer/theme/app_theme.dart';
 
 import '../support/fake_playback_service.dart';
@@ -63,44 +62,6 @@ void main() {
         ),
       );
 
-  /// Now Playing always shows the player when anything was ever played
-  /// (any saved `PlaybackProgress` row — see `_maybeRestoreLastPlayed` in
-  /// `now_playing_screen.dart`), so every test in this file that seeds
-  /// progress mounts straight into the restored player rather than the
-  /// idle list. Tapping "Your list" is the documented way back to it
-  /// (same affordance the screen already offers while genuinely playing);
-  /// a no-op when the screen is already showing the list (the genuinely-
-  /// empty case has no "Your list" button at all).
-  Future<void> revealList(WidgetTester tester) async {
-    // "Your list" belongs to the player layer, so it is a reliable sentinel
-    // for that layer being present. Both waits below are bounded rather than
-    // a fixed pump budget because the restore is asynchronous — a DB read
-    // and then `loadBook` — and a fixed budget raced it: the tap landed
-    // before the player existed, the restore completed afterwards, and the
-    // book title then matched twice (once in each layer).
-    Future<bool> pumpUntil(bool Function() done) async {
-      for (var i = 0; i < 12; i++) {
-        if (done()) return true;
-        await pumpFrames(tester, frames: 4);
-      }
-      return done();
-    }
-
-    // Nothing to go back from if the player never arrives (the genuinely-
-    // empty case has no "Your list" button at all).
-    final arrived = await pumpUntil(
-      () => find.text('Your list').evaluate().isNotEmpty,
-    );
-    if (!arrived) return;
-
-    await tester.tap(find.text('Your list').first);
-
-    // The screen drops the player layer entirely once the reverse fade
-    // reaches 0 (see `playerGone` in `now_playing_screen.dart`), so the
-    // sentinel disappearing means the layer has genuinely left the tree.
-    await pumpUntil(() => find.text('Your list').evaluate().isEmpty);
-  }
-
   group('idle state', () {
     testWidgets('shows the empty state when nothing is in progress',
         (tester) async {
@@ -113,12 +74,9 @@ void main() {
     });
 
     testWidgets('lists started-but-unfinished books', (tester) async {
-      // Explicit, increasing `updatedAt` so `getMostRecentProgress` (and
-      // therefore the Task 3 restore) deterministically lands on 'a' —
-      // otherwise three rows saved back-to-back can tie on `DateTime.now()`
-      // and which book gets restored (and therefore which title also shows
-      // in the peek strip below the list, see `revealList`) becomes
-      // arbitrary.
+      // Explicit, increasing `updatedAt` so the shortlist's ordering is
+      // deterministic — three rows saved back-to-back can otherwise tie on
+      // `DateTime.now()`.
       final now = DateTime.now();
       // Under the 30s floor: sampled, not started.
       await seedBook(db,
@@ -138,16 +96,9 @@ void main() {
       await setSurface(tester, const Size(390, 844));
       await tester.pumpWidget(wrap());
       await pumpFrames(tester);
-      // Some book with progress now restores straight into the player
-      // (Task 3) — "Your list" is the way back to the shortlist this test
-      // actually cares about.
-      await revealList(tester);
 
-      // The row itself, not raw title text: Middlemarch is also the
-      // restored book, so its title legitimately appears a second time in
-      // the "back to the player" peek strip (see `_PeekPlayerStrip` in
-      // `now_playing_screen.dart`) — a key on the continue-listening row
-      // is unambiguous regardless.
+      // Matched on the row key rather than raw title text so the assertion
+      // stays unambiguous if the same title renders elsewhere on screen.
       expect(find.byKey(const ValueKey('continue-a')), findsOneWidget);
       expect(find.text('Barely Opened'), findsNothing);
       expect(find.text('Nearly Done'), findsNothing);
@@ -163,7 +114,6 @@ void main() {
       await setSurface(tester, const Size(390, 844));
       await tester.pumpWidget(wrap());
       await pumpFrames(tester);
-      await revealList(tester);
       final row = find.byKey(const ValueKey('continue-a'));
       expect(row, findsOneWidget);
 
@@ -173,9 +123,8 @@ void main() {
       expect(find.byKey(const ValueKey('continue-a')), findsNothing);
 
       // The book and its progress row both survive; only the surface flag
-      // changed. It is also still the loaded (restored) book, so its title
-      // legitimately remains visible in the peek strip — hiding it from
-      // Continue listening is not the same as unloading it.
+      // changed. Hiding it from Continue listening is not the same as
+      // deleting it.
       expect(await db.getAudiobook('a'), isNotNull);
       final progress = await db.getProgress('a');
       expect(progress, isNotNull);
@@ -189,7 +138,6 @@ void main() {
       await setSurface(tester, const Size(390, 844));
       await tester.pumpWidget(wrap());
       await pumpFrames(tester);
-      await revealList(tester);
 
       await tester.drag(
           find.byKey(const ValueKey('continue-a')), const Offset(-500, 0));
@@ -220,7 +168,6 @@ void main() {
       await setSurface(tester, const Size(430, 932));
       await tester.pumpWidget(wrap());
       await pumpFrames(tester);
-      await revealList(tester);
 
       final pinToggle = find.byKey(const ValueKey('pin-toggle-sixth'));
       expect(tester.getSemantics(pinToggle).label, contains('Pin Sixth Book'));
@@ -247,12 +194,8 @@ void main() {
       await setSurface(tester, const Size(390, 844));
       await tester.pumpWidget(wrap());
       await pumpFrames(tester);
-      await revealList(tester);
 
       // Once, in Continue listening — not duplicated into the pinned row.
-      // (It also legitimately appears a second time in the peek strip,
-      // since it is the restored/loaded book — see the row-key comment in
-      // the 'idle state' group above.)
       expect(find.byKey(const ValueKey('continue-a')), findsOneWidget);
       final pinToggle = find.byKey(const ValueKey('pin-toggle-a'));
       expect(pinToggle, findsOneWidget);
@@ -270,7 +213,6 @@ void main() {
       await setSurface(tester, const Size(390, 844));
       await tester.pumpWidget(wrap());
       await pumpFrames(tester);
-      await revealList(tester);
 
       expect(find.text('Pinned Only'), findsOneWidget);
 
@@ -282,14 +224,10 @@ void main() {
       expect(find.text('Pinned Only'), findsNothing);
       expect(prefs['now_playing.pinned_row_visible'], isFalse);
 
-      // A fresh mount reads the persisted preference back. The audio
-      // service instance (and its `currentBookNotifier`) survives the
-      // remount, so the new screen restores straight into the player
-      // again and needs the same "Your list" tap.
+      // A fresh mount reads the persisted preference back.
       await tester.pumpWidget(const SizedBox());
       await tester.pumpWidget(wrap());
       await pumpFrames(tester);
-      await revealList(tester);
       expect(find.text('Pinned Only'), findsNothing);
       expect(
         tester.getSemantics(find.byKey(const ValueKey('pinned-row-toggle')))
@@ -300,12 +238,17 @@ void main() {
     });
   });
 
-  group('restoring the last-played book', () {
-    testWidgets(
-        'a saved PlaybackProgress row loads the player paused, unprompted',
-        (tester) async {
-      // 161s total, seeded to 48s — same numbers Task 4 seeds for the demo
-      // build, reused here because they are a realistic mid-book position.
+  group('launching with saved progress', () {
+    testWidgets('does NOT auto-load the last-played book', (tester) async {
+      // Now Playing used to restore the most recent book into the player on
+      // the very first frame. That made the player the landing state for
+      // anyone who had ever listened to anything, which in turn made this
+      // screen's own continue-listening list unreachable — the old "peek"
+      // existed purely to get back to it. Continue-listening now lives in
+      // Library's "In progress" section, and launching leaves playback
+      // alone.
+      //
+      // 161s total, seeded to 48s: a realistic mid-book position.
       await seedBook(db,
           id: 'gettysburg',
           title: 'The Gettysburg Address',
@@ -316,23 +259,13 @@ void main() {
       await tester.pumpWidget(wrap());
       await pumpFrames(tester);
 
-      // The player is showing without a single tap: no play was pressed,
-      // no book was picked.
-      expect(find.text('Your list'), findsOneWidget);
+      // Nothing was loaded and nothing plays until the user asks.
+      expect(audio.currentBookNotifier.value, isNull);
+      expect(audio.loadCalls, 0);
+      expect(audio.playCalls, 0);
 
-      // Genuinely paused, not auto-played, at the saved position.
-      expect(audio.stateNotifier.value, PlaybackState.paused);
-      expect(audio.currentBookNotifier.value?.id, 'gettysburg');
-      expect(audio.positionNotifier.value, const Duration(seconds: 48));
-
-      // The way back to the continue-listening list is still reachable,
-      // and the restored book legitimately also appears there (it clears
-      // the 30s continue-listening floor) — via its row key, since the
-      // title itself also renders a second time in the peek strip below
-      // the list (it is still the loaded book).
-      await revealList(tester);
+      // The shortlist is what greets them instead, with the book on it.
       expect(find.byKey(const ValueKey('continue-gettysburg')), findsOneWidget);
-      expect(find.text('Player'), findsOneWidget);
     });
 
     testWidgets('a brand-new install with no progress stays on the empty state',

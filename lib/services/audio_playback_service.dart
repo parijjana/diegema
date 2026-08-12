@@ -189,7 +189,24 @@ class AudioPlaybackService {
       }
 
       if (autoPlay) {
-        await _player.play();
+        // Only the *start* is allowed to fail benignly. Everything above
+        // this point (loading the source, seeking) failing means the book
+        // genuinely cannot be played, and falls through to the outer catch.
+        //
+        // A browser refuses `play()` until it has seen a user gesture, so on
+        // web an autoplay block lands here with the media already loaded and
+        // ready. That is not a failure — it is a book waiting for a tap, and
+        // reporting "Playback failed" for it makes a working app look broken
+        // to a first-time visitor. `playerStateStream` has already set
+        // `paused` (ready && !playing) by this point; we must not stamp
+        // `error` over it.
+        try {
+          await _player.play();
+        } catch (e) {
+          debugPrint(
+              'AudioPlaybackService: start refused, leaving paused: $e');
+          stateNotifier.value = PlaybackState.paused;
+        }
       } else {
         stateNotifier.value = PlaybackState.paused;
       }
@@ -208,7 +225,17 @@ class AudioPlaybackService {
     }
   }
 
-  Future<void> play() async => _player.play();
+  /// Resumes playback. A refused start leaves the book paused rather than
+  /// raising — same reasoning as `_playCurrentChapter`: the media is loaded,
+  /// only the start was declined.
+  Future<void> play() async {
+    try {
+      await _player.play();
+    } catch (e) {
+      debugPrint('AudioPlaybackService: start refused, leaving paused: $e');
+      stateNotifier.value = PlaybackState.paused;
+    }
+  }
   Future<void> pause() async {
     await _player.pause();
     await _persistCurrentProgress();

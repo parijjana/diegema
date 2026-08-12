@@ -182,12 +182,45 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
   }
 
+  /// Selecting a book always opens the detail surface now — there is no
+  /// persistent wide-layout pane to update in place any more. Both widths
+  /// share this one path so there is exactly one "show me this book" flow
+  /// to keep working (deep links included).
   void _select(BuildContext context, LibriVoxBook book, {required bool wide}) {
     setState(() => _selected = book);
-    if (!wide) _openDetailSheet(context, book);
+    _openDetailSurface(context, book, wide: wide);
   }
 
-  void _openDetailSheet(BuildContext context, LibriVoxBook book) {
+  /// Phone widths get the existing near-full-height bottom sheet (thumb
+  /// reach, familiar app pattern). Wide widths get a centred, width-capped
+  /// dialog instead of reusing the sheet at full height — a sheet that
+  /// only fills a third of a desktop-width window reads as a mistake, and
+  /// a full-bleed one would swamp the rest of the page. Both are dismissed
+  /// by tapping outside, matching the sheet's default drag/tap-away.
+  void _openDetailSurface(BuildContext context, LibriVoxBook book,
+      {required bool wide}) {
+    if (wide) {
+      showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          shape: const RoundedRectangleBorder(borderRadius: R.lg),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640, maxHeight: 760),
+            child: Padding(
+              padding: const EdgeInsets.all(Sp.x5),
+              child: BookDetailPane(
+                book: book,
+                artworkService: widget.artworkService,
+                downloader: widget.downloader,
+                audioService: widget.audioService,
+                db: widget.db,
+              ),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -217,14 +250,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         final wide = constraints.maxWidth >= Dim.wideBreakpoint;
         final bottomInset = wide ? Sp.x10 : _floatingSearchReserve;
 
-        // A deep-linked book is already visible in the detail pane on wide
-        // layouts; on phone widths the book view is a modal sheet, so it
-        // has to be pushed once the shelves exist.
-        if (_pendingOpen && !_loading && !wide && _selected != null) {
+        // Both widths now show the book via an on-demand surface (sheet or
+        // dialog) rather than a persistent pane, so a deep-linked book has
+        // to be pushed open explicitly once the shelves exist, regardless
+        // of width.
+        if (_pendingOpen && !_loading && _selected != null) {
           final book = _selected!;
           _pendingOpen = false;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _openDetailSheet(context, book);
+            if (mounted) _openDetailSurface(context, book, wide: wide);
           });
         }
 
@@ -333,34 +367,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           ],
         );
 
+        // Wide used to reserve a permanent side column for BookDetailPane,
+        // showing a "choose a title" placeholder when nothing was selected
+        // — dead chrome that read like a web console rather than an app
+        // (the same complaint that killed the old NavigationRail). The
+        // grid/list now gets the full width at every breakpoint, and the
+        // detail surface only appears once a book is actually picked, via
+        // _select above.
         if (wide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(flex: 5, child: main),
-              VerticalDivider(width: 1, color: c.border),
-              Expanded(
-                flex: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(Sp.gutterDesktop),
-                  child: _selected == null
-                      ? const AppStateView.empty(
-                          icon: Icons.menu_book_rounded,
-                          headline: 'Pick a book',
-                          body: 'Choose a title to see its details, chapters '
-                              'and listening options.',
-                        )
-                      : BookDetailPane(
-                          book: _selected!,
-                          artworkService: widget.artworkService,
-                          downloader: widget.downloader,
-                          audioService: widget.audioService,
-                          db: widget.db,
-                        ),
-                ),
-              ),
-            ],
-          );
+          return main;
         }
 
         // Phone: search floats bottom centre, within thumb reach. It sits

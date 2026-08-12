@@ -44,6 +44,23 @@ class LibraryScreen extends StatefulWidget {
 
 class _LibraryScreenState extends State<LibraryScreen> {
   List<UnifiedAudiobook> _books = [];
+
+  /// Books with saved progress, most-recent first — the same rule
+  /// `AppDatabase.getContinueListening` applies for Now Playing's idle
+  /// shortlist (30-second floor, "effectively finished" excluded). This
+  /// list intentionally overlaps `_books`: a book in progress belongs in
+  /// both sections, since "in progress" is meant to be found here even
+  /// once the player has replaced Now Playing's idle state.
+  List<UnifiedAudiobook> _inProgress = [];
+
+  /// Fraction complete (0.0-1.0) per in-progress book id, keyed off
+  /// [PlaybackProgress] (`chapterIndex` + `positionSeconds`) against the
+  /// sum of chapter durations. `null` means the total runtime is unknown
+  /// (unprobed local chapters all reporting `durationSeconds == 0`) — the
+  /// same case `getContinueListening` treats permissively rather than
+  /// dividing by zero.
+  final Map<String, double?> _progressById = {};
+
   bool _loading = true;
   Object? _error;
 
@@ -75,9 +92,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
     try {
       await (widget.scanLibrary ?? scanDownloadedLibrary)(widget.db);
       final books = await widget.db.getAllAudiobooks();
+      final inProgress = await widget.db.getContinueListening();
+      final progressById = <String, double?>{};
+      for (final book in inProgress) {
+        progressById[book.id] = await _fractionComplete(book);
+      }
       if (!mounted) return;
       setState(() {
         _books = books;
+        _inProgress = inProgress;
+        _progressById
+          ..clear()
+          ..addAll(progressById);
         _loading = false;
       });
     } catch (e) {
@@ -88,6 +114,27 @@ class _LibraryScreenState extends State<LibraryScreen> {
         _loading = false;
       });
     }
+  }
+
+  /// `PlaybackProgress.positionSeconds` is a position *within
+  /// `chapterIndex`*, not an absolute offset into the book, so the
+  /// fraction is the sum of every prior chapter's duration plus the
+  /// current position, over the sum of all chapter durations. Returns
+  /// `null` when the total is `0` (nothing probed yet) rather than
+  /// dividing by zero.
+  Future<double?> _fractionComplete(UnifiedAudiobook book) async {
+    final progress = await widget.db.getProgress(book.id);
+    if (progress == null) return null;
+
+    final totalSeconds =
+        book.chapters.fold<int>(0, (sum, ch) => sum + ch.durationSeconds);
+    if (totalSeconds <= 0) return null;
+
+    var elapsedSeconds = progress.positionSeconds;
+    for (var i = 0; i < progress.chapterIndex && i < book.chapters.length; i++) {
+      elapsedSeconds += book.chapters[i].durationSeconds;
+    }
+    return (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
   }
 
   void _import() =>
@@ -192,14 +239,41 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           );
         } else {
-          body = ListView.separated(
+          // "In progress" is omitted entirely when nothing qualifies — no
+          // empty-state placeholder for it — so the plain all-books list
+          // is exactly what this screen showed before this section
+          // existed. A book that is in progress deliberately appears in
+          // both sections; see `_inProgress`'s doc comment.
+          body = ListView(
             padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Sp.x10),
-            itemCount: _books.length,
-            separatorBuilder: (_, __) => const SizedBox(height: Sp.listGap),
-            itemBuilder: (context, i) => _BookRow(
-              book: _books[i],
-              onTap: () => _openDetail(context, _books[i], wide: wide),
-            ),
+            children: [
+              if (_inProgress.isNotEmpty) ...[
+                const _SectionHeader(title: 'In progress'),
+                const SizedBox(height: Sp.x3),
+                ..._inProgress.map(
+                  (book) => Padding(
+                    padding: const EdgeInsets.only(bottom: Sp.listGap),
+                    child: _InProgressRow(
+                      book: book,
+                      progress: _progressById[book.id],
+                      onTap: () => _openDetail(context, book, wide: wide),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: Sp.sectionGap),
+                const _SectionHeader(title: 'All books'),
+                const SizedBox(height: Sp.x3),
+              ],
+              ..._books.map(
+                (book) => Padding(
+                  padding: const EdgeInsets.only(bottom: Sp.listGap),
+                  child: _BookRow(
+                    book: book,
+                    onTap: () => _openDetail(context, book, wide: wide),
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
@@ -250,6 +324,139 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+/// Section heading, matching Now Playing's idle-state `_SectionHeader`
+/// (sentence case at `titleSm`, not the old build's letter-spaced
+/// all-caps). Library can't reuse that class — it's private to
+/// `now_playing_screen.dart` — so this is a deliberate small duplicate
+/// rather than a shared export, to avoid coupling two screens that are
+/// otherwise independent.
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      header: true,
+      child: Text(title, style: AppType.titleSm.copyWith(color: c.text)),
+    );
+  }
+}
+
+/// One "In progress" row. Visually consistent with `_BookRow` (same
+/// cover size, same card chrome) plus a progress bar/percentage in place
+/// of the chapter-count caption, and — like every row on this screen —
+/// tapping opens the detail overlay rather than resuming playback
+/// directly; see `_openDetail`'s doc comment.
+class _InProgressRow extends StatelessWidget {
+  final UnifiedAudiobook book;
+
+  /// 0.0-1.0, or `null` when the book's total runtime isn't known yet
+  /// (see `_LibraryScreenState._fractionComplete`).
+  final double? progress;
+  final VoidCallback onTap;
+
+  const _InProgressRow({
+    required this.book,
+    required this.progress,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final percentLabel =
+        progress == null ? null : '${(progress! * 100).round()}%';
+
+    return Material(
+      color: c.surface,
+      borderRadius: R.md,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: R.md,
+        child: Semantics(
+          button: true,
+          label: percentLabel == null
+              ? 'View details for ${book.title}'
+              : 'View details for ${book.title}, $percentLabel complete',
+          excludeSemantics: true,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: R.md,
+              border: Border.all(color: c.border),
+              boxShadow: c.shadow1,
+            ),
+            padding: const EdgeInsets.all(Sp.x3),
+            child: Row(
+              children: [
+                AppBookCover(
+                  bookId: book.id,
+                  title: book.title,
+                  coverUrl: book.coverArtUrlOrPath,
+                  width: 56,
+                  height: 74,
+                ),
+                const SizedBox(width: Sp.x3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        book.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.bodyLg.copyWith(
+                            color: c.text, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: Sp.x1),
+                      Text(
+                        book.author,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.body.copyWith(color: c.textSecondary),
+                      ),
+                      const SizedBox(height: Sp.x2),
+                      if (percentLabel != null) ...[
+                        ClipRRect(
+                          borderRadius: R.pill,
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 6,
+                            backgroundColor: c.border,
+                            valueColor: AlwaysStoppedAnimation(c.accentFill),
+                          ),
+                        ),
+                        const SizedBox(height: Sp.x1),
+                        Text(
+                          '$percentLabel listened',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.caption.copyWith(color: c.textMuted),
+                        ),
+                      ] else
+                        Text(
+                          'In progress',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.caption.copyWith(color: c.textMuted),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: Sp.x2),
+                Icon(Icons.chevron_right_rounded,
+                    size: Dim.iconXl, color: c.textMuted),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

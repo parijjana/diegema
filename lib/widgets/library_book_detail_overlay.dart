@@ -128,23 +128,34 @@ class _ChapterTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: Sp.x2),
       decoration: BoxDecoration(
-        color: c.surface,
         borderRadius: R.sm,
         border: Border.all(color: c.border),
       ),
-      child: ListTile(
-        dense: true,
-        shape: const RoundedRectangleBorder(borderRadius: R.sm),
-        leading: Icon(Icons.play_circle_fill_rounded, color: c.accentFill),
-        title: Text(title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppType.bodyLg.copyWith(color: c.text)),
-        subtitle: runtime == null
-            ? null
-            : Text(runtime!,
-                style: AppType.caption.copyWith(color: c.textMuted)),
-        onTap: onTap,
+      // The background used to live on the outer `Container`'s
+      // `BoxDecoration`, which sits between `ListTile` and the nearest
+      // `Material` ancestor — `ListTile` paints its own background and
+      // ink splashes on that ancestor, so the opaque `DecoratedBox` was
+      // silently hiding both (Flutter asserts on this once the tile is
+      // actually built, which nothing previously exercised). Moving the
+      // fill onto its own `Material` gives `ListTile` a paintable surface
+      // right above it and keeps the border/radius on the `Container`.
+      child: Material(
+        color: c.surface,
+        borderRadius: R.sm,
+        child: ListTile(
+          dense: true,
+          shape: const RoundedRectangleBorder(borderRadius: R.sm),
+          leading: Icon(Icons.play_circle_fill_rounded, color: c.accentFill),
+          title: Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.bodyLg.copyWith(color: c.text)),
+          subtitle: runtime == null
+              ? null
+              : Text(runtime!,
+                  style: AppType.caption.copyWith(color: c.textMuted)),
+          onTap: onTap,
+        ),
       ),
     );
   }

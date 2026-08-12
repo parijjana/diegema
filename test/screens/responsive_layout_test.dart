@@ -43,6 +43,35 @@ void main() {
         return http.Response('Not Found', 404);
       });
 
+  // A fake, not the real service: the real `AudioPlayer` reaches for its
+  // platform channel, which has no implementation under `flutter_test`.
+  //
+  // Built in `setUp`, NOT inside the `testWidgets` body, and this placement
+  // is load-bearing. A `testWidgets` body runs inside `FakeAsync`, so a
+  // `FakePlaybackService()` constructed there runs the real
+  // `AudioPlaybackService` constructor under `super()` — creating the
+  // `AudioPlayer`'s stream subscription and `_startProgressAutoSave()`'s
+  // periodic timer as *fake-zone* objects. `pumpFrames` then waits on them
+  // inside `runAsync`, in real time, while only fake time could ever
+  // advance them: the binding deadlocks at `+0` and not even `--timeout`
+  // interrupts it, because the wait is below the framework. `setUp` runs in
+  // the real async zone, which is why `now_playing_screen_test.dart` — same
+  // fake, same app — has always passed.
+  late FakePlaybackService audio;
+
+  setUp(() {
+    audio = FakePlaybackService();
+  });
+
+  // Disposed in `tearDown` rather than `addTearDown`: `addTearDown`
+  // callbacks run after the binding's pending-timer invariant check, too
+  // late to cancel the service's periodic progress-save timer — the same
+  // ordering issue worked around the same way in
+  // `now_playing_fade_golden_test.dart`.
+  tearDown(() async {
+    await audio.dispose().catchError((_) {});
+  });
+
   for (final entry in sizes.entries) {
     for (final dark in [false, true]) {
       final themeName = dark ? 'dark' : 'light';
@@ -50,43 +79,23 @@ void main() {
           (tester) async {
         final db = AppDatabase(NativeDatabase.memory());
         addTearDown(db.close);
-        // A fake, not the real service: Now Playing's Task 3 restore
-        // feature loads whichever book has the most recent
-        // `PlaybackProgress` row on the very first frame, unprompted — and
-        // this test seeds exactly that. The real service's `AudioPlayer`
-        // reaches for its platform channel the moment a real load happens,
-        // which throws under `flutter_test` (see
-        // `test/support/fake_playback_service.dart`).
-        //
-        // Disposed explicitly at the end of the test body (not via
-        // `addTearDown`): `addTearDown` callbacks run after this binding's
-        // pending-timer invariant check, so they are too late to cancel
-        // the service's periodic progress-save timer — the same ordering
-        // issue worked around the same way elsewhere in this suite (see
-        // `now_playing_fade_golden_test.dart`).
-        final audio = FakePlaybackService();
 
-        try {
+        {
           // Long titles and author names are the realistic worst case for
           // a horizontal row, so the seeded data uses them deliberately.
           //
-          // No `positionSeconds` here (unlike this file's earlier form):
-          // any seeded `PlaybackProgress` row makes Task 3's restore fire
-          // on this very first frame through the *real* `AppShell`-owned
-          // `NowPlayingScreen` — and every combination tried (the real
-          // `AudioPlaybackService`, a fake one, with and without a
-          // reentrancy guard on the restore path) reliably hung the test
-          // binding for a reason not tracked down in the time available.
-          // This test's actual job — overflow at each width — does not
-          // depend on the continue-listening rows specifically, so the
-          // seeding is trimmed to what is safe instead. Continue-listening
-          // layout itself (with these same long titles) is covered by
-          // `now_playing_screen_test.dart`, which mounts `NowPlayingScreen`
-          // directly rather than through `AppShell`.
+          // `positionSeconds` is seeded so this book lands in the
+          // continue-listening rows: a long title inside a horizontal row
+          // is the specific overflow stress case this file exists for. An
+          // earlier revision dropped it while chasing a hang that was
+          // wrongly attributed to the Task 3 restore path; the hang was
+          // actually the fake being constructed inside `FakeAsync` (see
+          // the note on `audio` above), so the coverage is restored.
           await seedBook(db,
               id: 'a',
               title: 'The Extraordinarily Long Title of a Victorian Novel, '
-                  'Volume the Second');
+                  'Volume the Second',
+              positionSeconds: 120);
           await seedBook(db, id: 'b', title: 'Middlemarch');
           await seedBook(db, id: 'c', title: 'Persuasion');
           await db.pinBook('c');
@@ -112,19 +121,11 @@ void main() {
           ));
           await pumpFrames(tester);
 
-          // NOTE: the book with the most recent progress now restores
-          // straight into the player on this very first frame (Task 3),
-          // so the continue-listening rows this test seeded long titles
-          // into are not the layer actually on screen here — the overflow
-          // check below exercises the *player* view's layout instead
-          // (still real UI: cover, title, chapter line, transport). An
-          // earlier version of this test tapped "Your list" to reveal the
-          // idle layer and pump it into view, but that reliably hung the
-          // test binding for a reason not tracked down in the time
-          // available; the safer, unblocked check is kept instead. The
-          // idle list's own layout at these widths is covered separately
-          // by `test/screens/now_playing_screen_test.dart`, just not with
-          // this file's specific long-title stress case.
+          // Book 'a' has the most recent progress, so Task 3 restores it
+          // into the player on the first frame and the player view is what
+          // this first assertion checks (cover, title, chapter line,
+          // transport). The seeded long title is exercised by the
+          // continue-listening rows reached via the tab-walk below.
           expect(tester.takeException(), isNull,
               reason: 'Now Playing overflowed at ${entry.key}');
 
@@ -147,8 +148,6 @@ void main() {
           }
 
           await unmount(tester);
-        } finally {
-          await audio.dispose().catchError((_) {});
         }
       });
     }

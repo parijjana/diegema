@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/demo_deeplink.dart';
+import 'core/demo_mode.dart';
+import 'core/host_page_demo_notice.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'main.dart';
@@ -70,6 +72,25 @@ class _AudiobookAppState extends State<AudiobookApp> {
     super.initState();
     _isDarkMode = widget.initialDarkMode;
     _db = widget.database ?? AppDatabase();
+    _syncHostPageTheme();
+  }
+
+  /// Keeps the demo host page's chrome (the preview banner and the stage
+  /// around the app — see `web/demo_banner.css`) on the same theme as the
+  /// app. Demo-only and web-only: a no-op everywhere else, and never called
+  /// at all outside `kDemoMode`, so a normal build is untouched.
+  ///
+  /// Without this the chrome follows the OS `prefers-color-scheme` while the
+  /// app follows its own toggle, so flipping the theme inside the demo leaves
+  /// a light page wrapped around a dark app.
+  void _syncHostPageTheme() {
+    if (!kDemoMode) return;
+    setHostPageTheme(dark: _isDarkMode);
+  }
+
+  void _toggleTheme() {
+    setState(() => _isDarkMode = !_isDarkMode);
+    _syncHostPageTheme();
   }
 
   @override
@@ -94,7 +115,7 @@ class _AudiobookAppState extends State<AudiobookApp> {
       home: HomeScreen(
         db: _db,
         isDarkMode: _isDarkMode,
-        onToggleTheme: () => setState(() => _isDarkMode = !_isDarkMode),
+        onToggleTheme: _toggleTheme,
         preferences: widget.preferences,
         libraryScanner: widget.libraryScanner,
         deepLink: widget.deepLink,

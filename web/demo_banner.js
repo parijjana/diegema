@@ -26,6 +26,19 @@ window.revealDemoBanner = function () {
   if (toolbar) toolbar.style.display = 'flex';
 };
 
+// Mirrors the app's own theme onto the host page chrome. Called from Dart
+// (lib/core/host_page_demo_notice_web.dart) on first build and on every
+// toggle, so the banner and the stage around the app never disagree with the
+// app itself.
+//
+// Without this the chrome followed `prefers-color-scheme` while the app
+// followed its in-app toggle, so flipping the theme inside the demo left a
+// light page wrapped around a dark app.
+window.setDemoTheme = function (theme) {
+  var frame = document.getElementById('demo-frame');
+  if (frame) frame.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+};
+
 (function () {
   var toggle = document.getElementById('demo-banner-toggle');
   var body = document.getElementById('demo-banner-body');

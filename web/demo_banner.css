@@ -15,9 +15,15 @@ html, body {
   margin: 0;
 }
 
-/* Page ground. Deliberately a shade darker than the app surface so the
- * bordered stage below reads as an application floating on a page, rather
- * than as the page itself. */
+/* Page ground. A mid grey, roughly 50% — dark enough that the app surface
+ * reads as a lit object sitting on top of it rather than a panel of the
+ * same page. Warmed very slightly (#8A8781 rather than a flat #808080) so
+ * it sits in the same family as the warm-paper palette instead of looking
+ * like an unstyled default.
+ *
+ * The dark theme moves the OTHER way, to near-black: a mid grey there
+ * would be lighter than the app surface and the stage would read as a hole
+ * punched in the page rather than something raised above it. */
 #demo-frame {
   display: flex;
   flex-direction: column;
@@ -25,7 +31,7 @@ html, body {
   height: 100dvh;
   overflow: hidden;
   box-sizing: border-box;
-  background: #EDECE6;
+  background: #8A8781;
 }
 
 /* Everything below the banner: the page ground the app sits on. Padded and
@@ -51,10 +57,17 @@ html, body {
   overflow: hidden;
   box-sizing: border-box;
   background: #F8F8F5;
-  border: 1px solid #C9D8DD;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(20, 26, 30, 0.06),
-              0 12px 28px rgba(20, 26, 30, 0.10);
+  /* Four layers rather than two. Real falloff is not one big blur — it is
+   * a tight contact shadow holding the edge down, then progressively wider
+   * and softer layers carrying the lift outward. Doubling a single blur
+   * just makes a grey smudge; stacking them keeps the edge crisp while the
+   * penumbra reaches much further, which is what reads as "floating". */
+  box-shadow: 0 2px 4px rgba(16, 20, 23, 0.10),
+              0 8px 18px rgba(16, 20, 23, 0.16),
+              0 26px 52px rgba(16, 20, 23, 0.24),
+              0 56px 110px rgba(16, 20, 23, 0.30);
 }
 
 /* Mobile view: a phone-shaped stage, centred, with a heavier radius so it
@@ -190,32 +203,32 @@ html, body {
   outline-offset: 2px;
 }
 
-@media (prefers-color-scheme: dark) {
-  #demo-frame { background: #0B0E10; }
-  #demo-stage {
-    background: #101417;
-    border-color: #263038;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5),
-                0 12px 28px rgba(0, 0, 0, 0.45);
-  }
-  #demo-banner {
-    background: #181C20;
-    color: #E6E4DF;
-    border-bottom-color: #1E4753;
-  }
-  .demo-banner__icon { color: #E5906F; }
-  .demo-banner__body { color: #B4B0A6; }
-  .demo-banner__toggle { color: #E6E4DF; }
-  .demo-banner__toggle:hover { background: #22272C; }
-  .demo-banner__toggle:focus-visible { outline-color: #7FB2BF; }
-
-  #demo-toolbar { background: #191E22; }
-  .demo-toolbar__btn { color: #B4B0A6; }
-  .demo-toolbar__btn:hover { color: #E6E4DF; }
-  .demo-toolbar__btn.is-active {
-    background: #2A3138;
-    color: #E6E4DF;
-    box-shadow: none;
-  }
-  .demo-toolbar__btn:focus-visible { outline-color: #7FB2BF; }
+/* Dark theme applies to the STAGE ONLY.
+ *
+ * The page ground, the preview banner and the viewport switcher deliberately
+ * do NOT follow the app's theme. This is a demo OF THE APP, not of the page
+ * around it: the chrome is a fixed frame the app is displayed in, like a
+ * gallery wall, and a wall that repaints itself every time the picture
+ * changes draws attention to the wrong thing.
+ *
+ * It also means `prefers-color-scheme` no longer touches this file at all —
+ * the OS setting says nothing about which theme the app is in, and using it
+ * was what let the two drift apart in the first place. The only signal is
+ * `data-theme`, stamped on #demo-frame by `window.setDemoTheme`
+ * (web/demo_banner.js) from Dart on first build and on every toggle
+ * (lib/app.dart's `_syncHostPageTheme`). */
+#demo-frame[data-theme="dark"] #demo-stage {
+  background: #101417;
+  border-color: #3A464F;
+  /* Shadow AND halo. The app is now a dark object on a mid-grey ground, so
+   * it still casts — but the outward glow is what sells a lit screen, and
+   * it is drawn from the app's own accent (#7FB2BF) so the light looks like
+   * it belongs to the app. Same layered-falloff principle as the light
+   * theme: several radii, not one big blur. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07),
+              0 2px 4px rgba(10, 13, 15, 0.28),
+              0 10px 26px rgba(10, 13, 15, 0.34),
+              0 34px 74px rgba(10, 13, 15, 0.40),
+              0 0 48px rgba(127, 178, 191, 0.20),
+              0 0 130px rgba(127, 178, 191, 0.12);
 }

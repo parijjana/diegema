@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/app_settings.dart';
 import '../core/playback_constants.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
@@ -34,6 +35,14 @@ class MiniPlayerBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    // Read live rather than passed in: the interval is a user setting
+    // (`playback.skip_seconds`) and both the seek and the number
+    // stamped on the glyph must come from the same value, which is
+    // what makes an "icon says 10, code does 15" mismatch impossible.
+    // Falls back to the default when no scope is present, so a test
+    // pumping this widget alone needs no settings plumbing.
+    final skipSeconds =
+        SettingsScope.maybeOf(context)?.skipSeconds ?? kSkipSeconds;
 
     return ValueListenableBuilder<UnifiedAudiobook?>(
       valueListenable: audioService.currentBookNotifier,
@@ -76,12 +85,12 @@ class MiniPlayerBar extends StatelessWidget {
                         const SizedBox(width: Sp.x2),
                         if (showSkips)
                           _BarIconButton(
-                            label: 'Skip back $kSkipSeconds seconds',
+                            label: 'Skip back $skipSeconds seconds',
                             onPressed: () => audioService.skipBackward(
-                                seconds: kSkipSeconds),
+                                seconds: skipSeconds),
                             child: SkipIntervalIcon(
                               direction: SkipDirection.backward,
-                              seconds: kSkipSeconds,
+                              seconds: skipSeconds,
                               size: Dim.iconSm,
                               color: c.text,
                             ),
@@ -89,12 +98,12 @@ class MiniPlayerBar extends StatelessWidget {
                         _MiniPlayPause(audioService: audioService),
                         if (showSkips)
                           _BarIconButton(
-                            label: 'Skip forward $kSkipSeconds seconds',
+                            label: 'Skip forward $skipSeconds seconds',
                             onPressed: () => audioService.skipForward(
-                                seconds: kSkipSeconds),
+                                seconds: skipSeconds),
                             child: SkipIntervalIcon(
                               direction: SkipDirection.forward,
-                              seconds: kSkipSeconds,
+                              seconds: skipSeconds,
                               size: Dim.iconSm,
                               color: c.text,
                             ),

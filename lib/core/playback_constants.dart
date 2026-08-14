@@ -23,3 +23,10 @@ const List<double> kPlaybackSpeedOptions = [
 /// relying on a matching icon asset. Must stay in sync with
 /// `AudioPlaybackService`'s own `skipForward`/`skipBackward` defaults.
 const int kSkipSeconds = 15;
+
+/// Skip intervals offered in the settings panel. 15 is the default and the
+/// category convention; 10 suits dense non-fiction, 30 and 60 suit
+/// re-finding your place after drifting off. The stamped-number approach
+/// described above is what makes this configurable at all — an icon set
+/// with no `_15_` glyph could never have carried four.
+const List<int> kSkipSecondsOptions = [10, 15, 30, 60];

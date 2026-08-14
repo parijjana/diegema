@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'playback_constants.dart';
+
 /// Small, non-content UI preferences that must survive a restart but do not
 /// belong in the audiobook schema — the drift schema is for library data,
 /// not for "is this row expanded".
@@ -14,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class UiPreferences {
   static const String _pinnedRowVisibleKey = 'now_playing.pinned_row_visible';
   static const String _themeModeKey = 'appearance.theme_mode';
+  static const String _skipSecondsKey = 'playback.skip_seconds';
 
   /// In-memory store used by tests. When supplied it replaces
   /// `shared_preferences` entirely, so no platform channel is touched.
@@ -86,6 +89,44 @@ class UiPreferences {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_themeModeKey, encoded);
+    } catch (e) {
+      debugPrint('UiPreferences: write failed: $e');
+    }
+  }
+
+  /// How far the skip controls jump, in seconds. Validated against
+  /// [kSkipSecondsOptions] on the way out rather than trusted: a value the
+  /// panel can no longer offer would otherwise be stuck on the device
+  /// forever, with no UI able to change it.
+  Future<int> getSkipSeconds({int defaultValue = kSkipSeconds}) async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      final value = overrides[_skipSecondsKey];
+      return value is int && kSkipSecondsOptions.contains(value)
+          ? value
+          : defaultValue;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getInt(_skipSecondsKey);
+      return stored != null && kSkipSecondsOptions.contains(stored)
+          ? stored
+          : defaultValue;
+    } catch (e) {
+      debugPrint('UiPreferences: read failed, using default: $e');
+      return defaultValue;
+    }
+  }
+
+  Future<void> setSkipSeconds(int value) async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      overrides[_skipSecondsKey] = value;
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_skipSecondsKey, value);
     } catch (e) {
       debugPrint('UiPreferences: write failed: $e');
     }

@@ -74,8 +74,6 @@ Future<void> main() async {
 /// into the individual screens that own it.
 class HomeScreen extends StatelessWidget {
   final AppDatabase db;
-  final bool isDarkMode;
-  final VoidCallback onToggleTheme;
 
   /// Optional injected services, used by tests to avoid live HTTP calls and
   /// by the canned web demo to serve its bundled catalog instead. Default
@@ -100,8 +98,6 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
     required this.db,
-    required this.isDarkMode,
-    required this.onToggleTheme,
     this.libriVoxService,
     this.downloader,
     this.artworkService,
@@ -115,8 +111,6 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppShell(
       db: db,
-      isDarkMode: isDarkMode,
-      onToggleTheme: onToggleTheme,
       libriVoxService: libriVoxService,
       downloader: downloader,
       artworkService: artworkService,

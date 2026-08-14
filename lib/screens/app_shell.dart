@@ -14,13 +14,16 @@ import '../widgets/mini_player_bar.dart';
 import 'discover_screen.dart';
 import 'library_screen.dart';
 import 'now_playing_screen.dart';
+import 'settings_screen.dart';
 
-/// The three-screen navigation shell, replacing the old header-tab shell
+/// The navigation shell, replacing the old header-tab shell
 /// (`app_header.dart` + `storefront_navigation.dart`).
 ///
 /// - **Now Playing** is index 0 and the landing screen.
 /// - **Library** is books the user owns.
 /// - **Discover** is the LibriVox storefront.
+/// - **Settings** is index 3, appended last so the demo deep link's
+///   `?screen=` indices keep their existing meanings.
 ///
 /// Layout is chosen from the shell's own [BoxConstraints], not
 /// `MediaQuery.size`: a `NavigationBar` at the bottom below
@@ -33,8 +36,6 @@ import 'now_playing_screen.dart';
 /// verdict on the previous UI was "too high context".
 class AppShell extends StatefulWidget {
   final AppDatabase db;
-  final bool isDarkMode;
-  final VoidCallback onToggleTheme;
 
   final LibriVoxService? libriVoxService;
   final LibriVoxStreamAndDownloader? downloader;
@@ -67,8 +68,6 @@ class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
     required this.db,
-    required this.isDarkMode,
-    required this.onToggleTheme,
     this.libriVoxService,
     this.downloader,
     this.artworkService,
@@ -141,10 +140,14 @@ class _AppShellState extends State<AppShell> {
 
   void _go(int index) => setState(() => _index = index);
 
+  /// Order is load-bearing: the demo deep link addresses screens by index
+  /// (`?screen=`), so Settings is appended rather than slotted in — 0/1/2
+  /// keep meaning what every existing demo URL says they mean.
   static const List<_Destination> _destinations = [
     _Destination('Now playing', Icons.headphones_outlined, Icons.headphones_rounded),
     _Destination('Library', Icons.book_outlined, Icons.book_rounded),
     _Destination('Discover', Icons.explore_outlined, Icons.explore_rounded),
+    _Destination('Settings', Icons.settings_outlined, Icons.settings_rounded),
   ];
 
   @override
@@ -196,8 +199,6 @@ class _AppShellState extends State<AppShell> {
                   index: _index,
                   destinations: _destinations,
                   onSelect: _go,
-                  isDarkMode: widget.isDarkMode,
-                  onToggleTheme: widget.onToggleTheme,
                 ),
                 Divider(height: 1, color: c.border),
                 Expanded(child: content),
@@ -222,13 +223,11 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _screenFor(int index) {
-    // The theme toggle lives on Now Playing ONLY, at every width. It used
-    // to sit in each screen's heading and in the top tab bar, so the same
-    // control appeared up to three times over.
-    //
-    // Interim placement, not the final home: this becomes a row in the
-    // settings panel once that exists. Now Playing is the landing screen,
-    // so the control stays reachable in one tap until then.
+    // No theme toggle anywhere in here any more. It used to sit in each
+    // screen's heading and in the top tab bar — the same control up to
+    // three times over — and then, after that dedup, on Now Playing only,
+    // explicitly as an interim placement. Settings is the final home, so
+    // the interim is gone.
     switch (index) {
       case 1:
         return LibraryScreen(
@@ -246,16 +245,14 @@ class _AppShellState extends State<AppShell> {
           artworkService: _artworkService,
           downloader: _downloader,
         );
+      case 3:
+        return const SettingsScreen();
       default:
         return NowPlayingScreen(
           db: widget.db,
           audioService: _audioService,
           preferences: widget.preferences,
           onGoToDiscover: () => _go(2),
-          headerAction: ThemeToggleButton(
-            isDarkMode: widget.isDarkMode,
-            onToggle: widget.onToggleTheme,
-          ),
         );
     }
   }
@@ -309,15 +306,11 @@ class _TopTabBar extends StatelessWidget {
   final int index;
   final List<_Destination> destinations;
   final ValueChanged<int> onSelect;
-  final bool isDarkMode;
-  final VoidCallback onToggleTheme;
 
   const _TopTabBar({
     required this.index,
     required this.destinations,
     required this.onSelect,
-    required this.isDarkMode,
-    required this.onToggleTheme,
   });
 
   @override
@@ -342,7 +335,6 @@ class _TopTabBar extends StatelessWidget {
               ),
             ],
             const Spacer(),
-            ThemeToggleButton(isDarkMode: isDarkMode, onToggle: onToggleTheme),
           ],
         ),
       ),
@@ -401,38 +393,6 @@ class _TopTabItem extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Labelled dark-mode toggle carrying `Semantics(toggled:)`. Replaces the
-/// custom 56×28 sliding switch in the old header, which had no accessible
-/// name and no label at all.
-class ThemeToggleButton extends StatelessWidget {
-  final bool isDarkMode;
-  final VoidCallback onToggle;
-
-  const ThemeToggleButton({
-    super.key,
-    required this.isDarkMode,
-    required this.onToggle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final label = isDarkMode ? 'Dark theme' : 'Light theme';
-    return Semantics(
-      button: true,
-      toggled: isDarkMode,
-      label: '$label. Activate to switch.',
-      excludeSemantics: true,
-      child: IconButton(
-        tooltip: isDarkMode ? 'Switch to light theme' : 'Switch to dark theme',
-        onPressed: onToggle,
-        icon: Icon(isDarkMode
-            ? Icons.dark_mode_rounded
-            : Icons.light_mode_rounded),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/app_settings.dart';
 import '../core/playback_constants.dart';
 import '../core/utils/duration_format.dart';
 import '../domain/models/audiobook.dart';
@@ -16,9 +17,11 @@ import 'skip_interval_icon.dart';
 ///   minimum target.
 /// - **No coloured bloom** behind the play button (the 24px teal glow was
 ///   neon-pass residue). Elevation comes from `shadow-2`.
-/// - Skip buttons render their interval from the same [kSkipSeconds] value
-///   that drives the seek, via [SkipIntervalIcon], so the old "icon says
-///   10, code does 15" mismatch is structurally impossible.
+/// - Skip buttons render their interval from the same value that drives the
+///   seek, via [SkipIntervalIcon], so the old "icon says 10, code does 15"
+///   mismatch is structurally impossible. That value is now the user's
+///   `playback.skip_seconds` setting rather than a constant, which the
+///   stamped-number approach supports for free.
 /// - Play/pause is **one toggle whose label changes**, not two icons that
 ///   swap with no accessible name.
 class PlayerTransport extends StatelessWidget {
@@ -34,6 +37,14 @@ class PlayerTransport extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    // Read live rather than passed in: the interval is a user setting
+    // (`playback.skip_seconds`) and both the seek and the number
+    // stamped on the glyph must come from the same value, which is
+    // what makes an "icon says 10, code does 15" mismatch impossible.
+    // Falls back to the default when no scope is present, so a test
+    // pumping this widget alone needs no settings plumbing.
+    final skipSeconds =
+        SettingsScope.maybeOf(context)?.skipSeconds ?? kSkipSeconds;
 
     return Wrap(
       alignment: WrapAlignment.center,
@@ -54,12 +65,12 @@ class PlayerTransport extends StatelessWidget {
               size: Dim.iconSm, color: c.text),
         ),
         _RoundControl(
-          semanticLabel: 'Skip back $kSkipSeconds seconds',
+          semanticLabel: 'Skip back $skipSeconds seconds',
           diameter: Dim.tapComfy,
-          onPressed: () => audioService.skipBackward(seconds: kSkipSeconds),
+          onPressed: () => audioService.skipBackward(seconds: skipSeconds),
           child: SkipIntervalIcon(
             direction: SkipDirection.backward,
-            seconds: kSkipSeconds,
+            seconds: skipSeconds,
             // iconLg, not iconMd: these two carry a number inside them, so
             // they need more room than a plain glyph. The tap target is
             // tapComfy (56), which swallows the extra 4px comfortably.
@@ -69,12 +80,12 @@ class PlayerTransport extends StatelessWidget {
         ),
         _PlayPauseButton(audioService: audioService),
         _RoundControl(
-          semanticLabel: 'Skip forward $kSkipSeconds seconds',
+          semanticLabel: 'Skip forward $skipSeconds seconds',
           diameter: Dim.tapComfy,
-          onPressed: () => audioService.skipForward(seconds: kSkipSeconds),
+          onPressed: () => audioService.skipForward(seconds: skipSeconds),
           child: SkipIntervalIcon(
             direction: SkipDirection.forward,
-            seconds: kSkipSeconds,
+            seconds: skipSeconds,
             size: Dim.iconLg,
             color: c.text,
           ),

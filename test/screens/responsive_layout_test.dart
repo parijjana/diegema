@@ -7,7 +7,6 @@ import 'package:unamedaudiobookplayer/app.dart';
 import 'package:unamedaudiobookplayer/core/ui_preferences.dart';
 import 'package:unamedaudiobookplayer/database/app_database.dart';
 import 'package:unamedaudiobookplayer/core/network/rate_limit_dispatcher.dart';
-import 'package:unamedaudiobookplayer/screens/app_shell.dart';
 import 'package:unamedaudiobookplayer/services/librivox_service.dart';
 import 'package:unamedaudiobookplayer/widgets/player_transport.dart';
 
@@ -131,14 +130,22 @@ void main() {
           expect(tester.takeException(), isNull,
               reason: 'Now Playing overflowed at ${entry.key}');
 
-          // Walk all three screens at this width. Wide layouts use the top
+          // Walk all four screens at this width. Wide layouts use the top
           // tab bar (`_TopTabBar` in app_shell.dart, keyed 'top-tab-bar');
-          // narrow ones keep the bottom `NavigationBar`.
+          // narrow ones keep the bottom `NavigationBar`. Settings joined
+          // this walk with the panel itself — a fourth destination also
+          // makes the bottom nav a quarter tighter per item, and 'Now
+          // playing' is the longest label in it.
           final navFinder = find.byType(NavigationBar).evaluate().isNotEmpty
               ? find.byType(NavigationBar)
               : find.byKey(const ValueKey('top-tab-bar'));
 
-          for (final label in ['Library', 'Discover', 'Now playing']) {
+          for (final label in [
+            'Library',
+            'Discover',
+            'Settings',
+            'Now playing',
+          ]) {
             await tester.tap(find.descendant(
               of: navFinder,
               matching: find.text(label),
@@ -208,13 +215,18 @@ void main() {
   // anything was playing. Desktop hid the bug because its tab bar keeps a
   // copy regardless.
   //
-  // Asserted as "exactly one" in every state, so restoring it on the player
-  // cannot quietly produce two on desktop.
+  // The ad-hoc toggle is now gone entirely: Settings owns the theme, and
+  // the control exists in exactly one place at every width and in every
+  // playback state. This test kept its shape when the toggle was replaced
+  // — the failure it guards against is unchanged, only its subject moved.
+  // Two toggles on desktop was as much a regression as none on mobile, and
+  // a theme control drifting back into a screen heading would be the same
+  // bug a third time.
   for (final entry in {
     'mobile 390x844': const Size(390, 844),
     'desktop 1440x900': const Size(1440, 900),
   }.entries) {
-    testWidgets('exactly one theme toggle on ${entry.key}, playing or not',
+    testWidgets('the theme control lives only in Settings on ${entry.key}',
         (tester) async {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
@@ -232,17 +244,36 @@ void main() {
       ));
       await pumpFrames(tester);
 
-      expect(find.byType(ThemeToggleButton), findsOneWidget,
+      expect(find.text('Theme'), findsNothing,
           reason: 'no book loaded, ${entry.key}');
 
       final book = await seedBook(db, id: 'z', title: 'Persuasion');
       await audio.loadBook(book);
       await pumpFrames(tester);
 
-      expect(find.byType(ThemeToggleButton), findsOneWidget,
+      expect(find.text('Theme'), findsNothing,
           reason: 'book loaded and player showing, ${entry.key}');
+
+      await goToSettings(tester);
+      expect(find.text('Theme'), findsOneWidget,
+          reason: 'settings open, ${entry.key}');
 
       await unmount(tester);
     });
   }
+}
+
+/// Taps the Settings destination in whichever navigation this width uses —
+/// the bottom `NavigationBar` when narrow, the top tab bar when wide. Scoped
+/// to the nav so it cannot accidentally hit the screen's own 'Settings'
+/// heading once the panel is open.
+Future<void> goToSettings(WidgetTester tester) async {
+  final navFinder = find.byType(NavigationBar).evaluate().isNotEmpty
+      ? find.byType(NavigationBar)
+      : find.byKey(const ValueKey('top-tab-bar'));
+  await tester.tap(find.descendant(
+    of: navFinder,
+    matching: find.text('Settings'),
+  ));
+  await pumpFrames(tester);
 }

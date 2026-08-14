@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/app_settings.dart';
 import 'core/demo_deeplink.dart';
 import 'core/demo_mode.dart';
 import 'core/host_page_demo_notice.dart';
@@ -68,29 +69,30 @@ class AudiobookApp extends StatefulWidget {
 class _AudiobookAppState extends State<AudiobookApp>
     with WidgetsBindingObserver {
   late final AppDatabase _db;
-  late ThemeMode _themeMode;
+  late final AppSettings _settings;
 
   @override
   void initState() {
     super.initState();
-    // Start on whatever was passed (tests, demo deep link) and otherwise on
-    // the default, then let the stored choice land when it loads. Reading
-    // preferences is asynchronous and the first frame is not, so there is no
-    // arrangement in which the persisted value is available here.
-    _themeMode = widget.initialThemeMode ?? ThemeMode.system;
+    // Every value starts at its default and is corrected when `load`
+    // returns. Reading preferences is asynchronous and the first frame is
+    // not, so there is no arrangement in which the persisted values are
+    // available here.
+    _settings = AppSettings(
+      preferences: widget.preferences,
+      initialThemeMode: widget.initialThemeMode,
+    );
+    _settings.addListener(_onSettingsChanged);
     _db = widget.database ?? AppDatabase();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.initialThemeMode == null) {
-      _loadStoredThemeMode();
-    }
+    _settings.load();
     _syncHostPageTheme();
   }
 
-  Future<void> _loadStoredThemeMode() async {
-    final stored = await widget.preferences.getThemeMode();
-    if (!mounted || stored == _themeMode) return;
-    setState(() => _themeMode = stored);
-    _syncHostPageTheme();
+  void _onSettingsChanged() {
+    // `MaterialApp.themeMode` is read in `build`, so the app itself needs a
+    // rebuild; the host page's CSS chrome needs telling separately.
+    setState(_syncHostPageTheme);
   }
 
   /// Only relevant under [ThemeMode.system]: the app's own colours follow the
@@ -100,7 +102,7 @@ class _AudiobookAppState extends State<AudiobookApp>
   @override
   void didChangePlatformBrightness() {
     super.didChangePlatformBrightness();
-    if (_themeMode != ThemeMode.system) return;
+    if (_settings.themeMode != ThemeMode.system) return;
     setState(_syncHostPageTheme);
   }
 
@@ -111,7 +113,7 @@ class _AudiobookAppState extends State<AudiobookApp>
   /// `MediaQuery` ancestor to read from. Reached via `WidgetsBinding` — not
   /// `PlatformDispatcher.instance` — so that a widget test driving
   /// `tester.platformDispatcher` is actually obeyed.
-  bool get _isDarkMode => switch (_themeMode) {
+  bool get _isDarkMode => switch (_settings.themeMode) {
         ThemeMode.light => false,
         ThemeMode.dark => true,
         ThemeMode.system =>
@@ -132,51 +134,40 @@ class _AudiobookAppState extends State<AudiobookApp>
     setHostPageTheme(dark: _isDarkMode);
   }
 
-  /// Flips to the opposite of what is currently on screen, and persists it.
-  ///
-  /// Note this resolves [ThemeMode.system] rather than cycling through it: a
-  /// single button is a two-state control, and a user on System who wants
-  /// dark means "dark now", not "advance to the next enum value". Getting
-  /// back to System is a job for the settings panel (plan item 1.2/Phase 1),
-  /// which does not exist yet.
-  void _toggleTheme() {
-    final next = _isDarkMode ? ThemeMode.light : ThemeMode.dark;
-    setState(() => _themeMode = next);
-    _syncHostPageTheme();
-    widget.preferences.setThemeMode(next);
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _settings.removeListener(_onSettingsChanged);
+    _settings.dispose();
     _db.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Audiobook Player',
-      debugShowCheckedModeBanner: false,
-      // Both themes are supplied so the framework can cross-fade between
-      // them; `themeMode` is what the in-app toggle actually drives. The
-      // two `ThemeData` blocks of raw hex that used to live here are gone —
-      // every value now comes from `lib/theme/`, built from
-      // `design/tokens.css`.
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: _themeMode,
-      home: HomeScreen(
-        db: _db,
-        isDarkMode: _isDarkMode,
-        onToggleTheme: _toggleTheme,
-        preferences: widget.preferences,
-        libraryScanner: widget.libraryScanner,
-        deepLink: widget.deepLink,
-        libriVoxService: widget.libriVoxService,
-        downloader: widget.downloader,
-        artworkService: widget.artworkService,
-        audioService: widget.audioService,
+    return SettingsScope(
+      settings: _settings,
+      child: MaterialApp(
+        title: 'Audiobook Player',
+        debugShowCheckedModeBanner: false,
+        // Both themes are supplied so the framework can cross-fade between
+        // them; `themeMode` is what the settings panel actually drives. The
+        // two `ThemeData` blocks of raw hex that used to live here are gone
+        // — every value now comes from `lib/theme/`, built from
+        // `design/tokens.css`.
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: _settings.themeMode,
+        home: HomeScreen(
+          db: _db,
+          preferences: widget.preferences,
+          libraryScanner: widget.libraryScanner,
+          deepLink: widget.deepLink,
+          libriVoxService: widget.libriVoxService,
+          downloader: widget.downloader,
+          artworkService: widget.artworkService,
+          audioService: widget.audioService,
+        ),
       ),
     );
   }

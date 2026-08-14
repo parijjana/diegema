@@ -86,21 +86,28 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('wide layout uses top tabs, not a bottom bar', (tester) async {
-    final db = AppDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    await setSurface(tester, const Size(1440, 900));
+  // Navigation is at the bottom at every width as of 08-14. Both earlier
+  // arrangements are asserted absent, not just the one this replaced: the
+  // side NavigationRail (rejected 08-12) and the wide-only top tab bar that
+  // replaced it. Crossing the breakpoint used to move the nav *and* the mini
+  // player at once, which is what read as the app changing shape.
+  for (final entry in {
+    'phone 390x844': const Size(390, 844),
+    'desktop 1440x900': const Size(1440, 900),
+  }.entries) {
+    testWidgets('navigation is a bottom bar on ${entry.key}', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await setSurface(tester, entry.value);
 
-    await tester.pumpWidget(buildApp(db));
-    await pumpFrames(tester);
+      await tester.pumpWidget(buildApp(db));
+      await pumpFrames(tester);
 
-    // Wide layouts put navigation across the top. The old NavigationRail read
-    // as a web page's sidebar rather than an app; the bottom bar stays for
-    // phone widths only, where it is the native pattern on iOS and Android.
-    expect(find.byKey(const ValueKey('top-tab-bar')), findsOneWidget);
-    expect(find.byType(NavigationRail), findsNothing);
-    expect(find.byType(NavigationBar), findsNothing);
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(NavigationRail), findsNothing);
+      expect(find.byKey(const ValueKey('top-tab-bar')), findsNothing);
 
-    await unmount(tester);
-  });
+      await unmount(tester);
+    });
+  }
 }

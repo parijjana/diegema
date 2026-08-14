@@ -130,15 +130,13 @@ void main() {
           expect(tester.takeException(), isNull,
               reason: 'Now Playing overflowed at ${entry.key}');
 
-          // Walk all four screens at this width. Wide layouts use the top
-          // tab bar (`_TopTabBar` in app_shell.dart, keyed 'top-tab-bar');
-          // narrow ones keep the bottom `NavigationBar`. Settings joined
-          // this walk with the panel itself — a fourth destination also
-          // makes the bottom nav a quarter tighter per item, and 'Now
-          // playing' is the longest label in it.
-          final navFinder = find.byType(NavigationBar).evaluate().isNotEmpty
-              ? find.byType(NavigationBar)
-              : find.byKey(const ValueKey('top-tab-bar'));
+          // Walk all four screens at this width. The bottom `NavigationBar`
+          // is the navigation at every width as of 08-14, so there is no
+          // longer a wide-layout variant to find. Settings joined this walk
+          // with the panel itself — a fourth destination makes the bar a
+          // quarter tighter per item, and 'Now playing' is its longest
+          // label, so 360px is the case that matters.
+          final navFinder = find.byType(NavigationBar);
 
           for (final label in [
             'Library',
@@ -263,16 +261,12 @@ void main() {
   }
 }
 
-/// Taps the Settings destination in whichever navigation this width uses —
-/// the bottom `NavigationBar` when narrow, the top tab bar when wide. Scoped
-/// to the nav so it cannot accidentally hit the screen's own 'Settings'
-/// heading once the panel is open.
+/// Taps the Settings destination. Scoped to the navigation bar so it cannot
+/// accidentally hit the screen's own 'Settings' heading once the panel is
+/// open.
 Future<void> goToSettings(WidgetTester tester) async {
-  final navFinder = find.byType(NavigationBar).evaluate().isNotEmpty
-      ? find.byType(NavigationBar)
-      : find.byKey(const ValueKey('top-tab-bar'));
   await tester.tap(find.descendant(
-    of: navFinder,
+    of: find.byType(NavigationBar),
     matching: find.text('Settings'),
   ));
   await pumpFrames(tester);

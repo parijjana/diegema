@@ -25,10 +25,27 @@ import 'settings_screen.dart';
 /// - **Settings** is index 3, appended last so the demo deep link's
 ///   `?screen=` indices keep their existing meanings.
 ///
-/// Layout is chosen from the shell's own [BoxConstraints], not
-/// `MediaQuery.size`: a `NavigationBar` at the bottom below
-/// [Dim.wideBreakpoint], a `NavigationRail` at the side above it. The old
-/// header was a single unwrapped `Row` that could not fit 390px at all.
+/// **Navigation sits at the bottom at every width**, and so does the mini
+/// player directly above it. Two earlier arrangements are gone: the side
+/// `NavigationRail` (rejected 08-12 for reading like a web console) and the
+/// wide-only top tab bar that replaced it (removed 08-14).
+///
+/// The top tab bar was the more defensible of the two and it still lost, so
+/// the reasoning is worth keeping. It was chosen because a top tab bar is
+/// the native desktop pattern, and it meant crossing [Dim.wideBreakpoint]
+/// moved **two things at once** — the nav jumped top-to-bottom, and the mini
+/// player's position in the stack changed with it. Simultaneous motion in
+/// two elements is what read as "the app changed shape", which the owner
+/// called jarring on 08-14.
+///
+/// The cost is accepted knowingly: a bottom bar on a 1440px desktop window
+/// is not the native macOS idiom. iOS is this project's lead platform and
+/// macOS is the port, so the phone idiom wins, and what is bought is that
+/// **the mini player never moves** — one position, every screen size.
+///
+/// Individual screens still adapt at [Dim.wideBreakpoint] for their own
+/// content (gutters, detail panes); it is only the shell chrome that no
+/// longer does.
 ///
 /// The shell is deliberately thin. There is no persistent app header, no
 /// tagline, no collapsing search animation and no category sub-bar at this
@@ -158,66 +175,24 @@ class _AppShellState extends State<AppShell> {
       backgroundColor: c.bg,
       body: SafeArea(
         bottom: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= Dim.wideBreakpoint;
-
-            final Widget content = Column(
-              children: [
-                Expanded(child: _screenFor(_index)),
-                // The mini player never appears on Now Playing: that screen
-                // *is* the player, and a second copy of the same controls
-                // is exactly the redundancy this redesign removes.
-                if (_index != 0)
-                  MiniPlayerBar(
-                    audioService: _audioService,
-                    onOpenPlayer: () => _go(0),
-                  ),
-              ],
-            );
-
-            if (!wide) {
-              return content;
-            }
-
-            // Wide layouts get a top tab bar, not a side rail: a vertical
-            // strip of nav pills down the left edge reads like a web
-            // console/dashboard, which was the owner's exact complaint
-            // after seeing the desktop-width demo. A top tab bar is the
-            // native-app pattern at this width (browser chrome, mail
-            // clients, most macOS/iOS apps with more than a couple of top-
-            // level sections).
-            //
-            // Phone width deliberately keeps the bottom `NavigationBar`
-            // (see `_BottomNav` / `bottomNavigationBar` below) rather than
-            // moving it to the top too: a bottom tab bar *is* the native
-            // pattern on both iOS and Android at phone width, and moving it
-            // would make the phone layout read less like an app, not more.
-            return Column(
-              children: [
-                _TopTabBar(
-                  index: _index,
-                  destinations: _destinations,
-                  onSelect: _go,
-                ),
-                Divider(height: 1, color: c.border),
-                Expanded(child: content),
-              ],
-            );
-          },
+        child: Column(
+          children: [
+            Expanded(child: _screenFor(_index)),
+            // The mini player never appears on Now Playing: that screen
+            // *is* the player, and a second copy of the same controls
+            // is exactly the redundancy this redesign removes.
+            if (_index != 0)
+              MiniPlayerBar(
+                audioService: _audioService,
+                onOpenPlayer: () => _go(0),
+              ),
+          ],
         ),
       ),
-      bottomNavigationBar: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth >= Dim.wideBreakpoint) {
-            return const SizedBox.shrink();
-          }
-          return _BottomNav(
-            index: _index,
-            destinations: _destinations,
-            onSelect: _go,
-          );
-        },
+      bottomNavigationBar: _BottomNav(
+        index: _index,
+        destinations: _destinations,
+        onSelect: _go,
       ),
     );
   }
@@ -295,104 +270,6 @@ class _BottomNav extends StatelessWidget {
               tooltip: d.label,
             ),
         ],
-      ),
-    );
-  }
-}
-
-/// Wide-layout navigation: a top tab bar, replacing the old `NavigationRail`
-/// (see the class doc comment on the call site in `AppShell.build`).
-class _TopTabBar extends StatelessWidget {
-  final int index;
-  final List<_Destination> destinations;
-  final ValueChanged<int> onSelect;
-
-  const _TopTabBar({
-    required this.index,
-    required this.destinations,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Material(
-      color: c.surface,
-      child: Padding(
-        key: const ValueKey('top-tab-bar'),
-        padding: const EdgeInsets.symmetric(horizontal: Sp.x5, vertical: Sp.x2),
-        child: Row(
-          children: [
-            // No wordmark here. This app is not LibriVox's and should not
-            // wear their name as branding; the recordings' provenance
-            // belongs in an About surface as attribution, not in the chrome.
-            for (var i = 0; i < destinations.length; i++) ...[
-              if (i != 0) const SizedBox(width: Sp.x2),
-              _TopTabItem(
-                destination: destinations[i],
-                selected: index == i,
-                onTap: () => onSelect(i),
-              ),
-            ],
-            const Spacer(),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// One top tab. Selected state is carried by a filled pill background
-/// *and* a bolder label weight *and* the icon swapping to its filled
-/// variant — never colour alone (`design/tokens.md` §8, rule 4).
-class _TopTabItem extends StatelessWidget {
-  final _Destination destination;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _TopTabItem({
-    required this.destination,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: destination.label,
-      excludeSemantics: true,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: R.sm,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: Dim.tapMin),
-          padding: const EdgeInsets.symmetric(horizontal: Sp.x4),
-          decoration: BoxDecoration(
-            color: selected ? c.accentFill : Colors.transparent,
-            borderRadius: R.sm,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                selected ? destination.selectedIcon : destination.icon,
-                size: Dim.iconMd,
-                color: selected ? c.textOnAccent : c.text,
-              ),
-              const SizedBox(width: Sp.x2),
-              Text(
-                destination.label,
-                style: AppType.label.copyWith(
-                  color: selected ? c.textOnAccent : c.text,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

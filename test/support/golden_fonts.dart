@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show FontLoader;
 import 'package:path/path.dart' as p;
-import 'package:unamedaudiobookplayer/theme/app_typography.dart';
+import 'package:diegema/theme/app_typography.dart';
 
 /// Loads real fonts into the golden-test renderer.
 ///

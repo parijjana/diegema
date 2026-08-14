@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/app_info.dart';
 import 'core/app_settings.dart';
 import 'core/demo_deeplink.dart';
 import 'core/demo_mode.dart';
@@ -148,7 +149,7 @@ class _AudiobookAppState extends State<AudiobookApp>
     return SettingsScope(
       settings: _settings,
       child: MaterialApp(
-        title: 'Audiobook Player',
+        title: kAppName,
         debugShowCheckedModeBanner: false,
         // Both themes are supplied so the framework can cross-fade between
         // them; `themeMode` is what the settings panel actually drives. The

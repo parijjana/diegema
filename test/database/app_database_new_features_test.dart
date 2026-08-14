@@ -5,8 +5,8 @@
 // project's test-suite convention.
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:unamedaudiobookplayer/database/app_database.dart';
-import 'package:unamedaudiobookplayer/domain/models/audiobook.dart';
+import 'package:diegema/database/app_database.dart';
+import 'package:diegema/domain/models/audiobook.dart';
 
 Future<void> _seedBook(
   AppDatabase db, {

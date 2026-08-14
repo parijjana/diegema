@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:unamedaudiobookplayer/database/app_database.dart';
-import 'package:unamedaudiobookplayer/domain/models/audiobook.dart';
+import 'package:diegema/database/app_database.dart';
+import 'package:diegema/domain/models/audiobook.dart';
 
 /// Sets the test surface to a real device size in logical pixels and
 /// restores it afterwards.

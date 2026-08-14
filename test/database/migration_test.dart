@@ -13,7 +13,7 @@
 // escaping each one)
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:unamedaudiobookplayer/database/app_database_io.dart';
+import 'package:diegema/database/app_database_io.dart';
 
 import '../generated_migrations/schema.dart';
 

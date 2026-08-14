@@ -1,4 +1,4 @@
-# Audiobook Player (name not yet decided)
+# Diegema
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
@@ -7,10 +7,13 @@
 A free, open-source, ad-free audiobook player for public domain recordings from
 **LibriVox**, hosted on the **Internet Archive**.
 
-> **Status: work in progress.** The player works and is under active development,
-> but it has not been released, the project does not have a settled name yet, and
-> the repository directory name contains a typo. Treat anything here as subject to
+> **Status: work in progress.** The player works and is under active
+> development, but it has not been released. Treat anything here as subject to
 > change.
+>
+> **"Diegema" is a working title.** Greek *διήγημα*, "a narrative" — the root of
+> *diegesis*. If the LibriVox community is receptive to this project, the
+> intention is to let them choose the real name.
 
 ---
 
@@ -21,15 +24,16 @@ A free, open-source, ad-free audiobook player for public domain recordings from
 - **Local library import** — pick a directory or individual files (`.mp3`,
   `.m4a`, `.flac`, `.wav`) and play your own audio alongside the catalogue.
 - **Playback controls** built for long-form listening: variable speed
-  (0.5×–2.0×), ±15s skip, previous/next chapter, and a sleep timer
-  (15/30/45/60 minutes).
+  (0.5×–2.0×), a configurable skip interval (10/15/30/60s), previous/next
+  chapter, and a sleep timer (15/30/45/60 minutes).
 - **Progress that persists** — position is saved per book so you can pick up
   where you left off, with a "continue listening" surface and pinning.
 - **An "Up next" queue** — for an audiobook, the queue is the chapter list.
 - **Cover art** fetched from the Internet Archive, with a generated fallback
   cover when a recording has none.
-- **Light and dark themes** from a documented token system (see `design/`),
-  measured against WCAG contrast floors rather than eyeballed.
+- **Light, dark or follow-the-system themes**, from a documented token system
+  (see `design/`) measured against WCAG contrast floors rather than eyeballed.
+- **A settings panel** for appearance, playback and About.
 - **Rate-limited network layer** (`RateLimitDispatcher`) so catalogue browsing
   does not trip HTTP 429s.
 
@@ -80,8 +84,9 @@ flutter test
 flutter run -d macos
 ```
 
-There is **no git remote yet** — this repository currently exists only locally,
-so there is nothing to clone.
+```bash
+git clone https://github.com/parijjana/diegema.git
+```
 
 ### Building the web demo
 

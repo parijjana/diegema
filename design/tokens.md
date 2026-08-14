@@ -207,7 +207,7 @@ Serif accent: `Iowan Old Style / Palatino / Georgia`, used for the wordmark and 
 `IMPORT LOCAL BOOK` and `DISCOVER` (11px/bold/ls 1.0), `LIBRARY`/`DISCOVER` nav pills
 (11px/w900/ls 1.0), `NOW PLAYING` (10px/ls 1.0), `IMPORT BOOK` (10px/ls 1.0),
 `YOUR LIBRARY (n)` (11px/ls 1.5), `SEARCH RESULTS (n)` (10px/ls 1.5),
-`VOLUNTEER FOR LIBRIVOX` (12px/ls 1.0), `JOIN →` (10px/ls 1.0), `AULOS` (16px/w900/ls 2.0),
+`VOLUNTEER FOR LIBRIVOX` (12px/ls 1.0), `JOIN →` (10px/ls 1.0), `DIEGEMA` (16px/w900/ls 2.0),
 and every `GlassCard` title (`title.toUpperCase()`, 10px/ls 1.5).
 
 Why it goes:

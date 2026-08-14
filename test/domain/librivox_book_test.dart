@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:unamedaudiobookplayer/domain/models/librivox_book.dart';
+import 'package:diegema/domain/models/librivox_book.dart';
 
 void main() {
   group('LibriVoxBook Unit Tests', () {

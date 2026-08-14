@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:unamedaudiobookplayer/services/librivox_service.dart';
+import 'package:diegema/services/librivox_service.dart';
 
 void main() {
   group('LibriVoxService TDD Unit Tests', () {

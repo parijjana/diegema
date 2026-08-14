@@ -25,7 +25,7 @@ Future<String?> _platformDocumentsRoot() async {
   }
 }
 
-/// Scans `<documents root>/unamedaudiobookplayer/downloads` (the directory
+/// Scans `<documents root>/diegema/downloads` (the directory
 /// `BookDetailPane`'s ZIP downloader writes into) and registers any
 /// not-yet-known book folders in [db].
 Future<void> scanDownloadedLibrary(
@@ -36,7 +36,7 @@ Future<void> scanDownloadedLibrary(
   if (rootPath == null) return;
 
   final downloadsDir =
-      Directory(p.join(rootPath, 'unamedaudiobookplayer', 'downloads'));
+      Directory(p.join(rootPath, 'diegema', 'downloads'));
 
   if (!await downloadsDir.exists()) return;
 

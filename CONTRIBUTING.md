@@ -1,6 +1,6 @@
-# Contributing to Aulos Audiobook Player
+# Contributing to Diegema
 
-Thank you for your interest in contributing to the **Aulos Audiobook Player**! We welcome bug fixes, documentation improvements, UI enhancements, and new feature contributions.
+Thank you for your interest in contributing to **Diegema**! We welcome bug fixes, documentation improvements, UI enhancements, and new feature contributions.
 
 ---
 

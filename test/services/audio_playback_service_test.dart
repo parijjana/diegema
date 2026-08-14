@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:unamedaudiobookplayer/services/audio_playback_service.dart';
+import 'package:diegema/services/audio_playback_service.dart';
 
 /// A player that refuses to start, the way a browser refuses `play()` until
 /// it has seen a user gesture. The media is loaded; only the start is denied.

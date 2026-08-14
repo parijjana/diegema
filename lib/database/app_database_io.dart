@@ -257,7 +257,7 @@ class AppDatabase extends _$AppDatabase {
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
       final dbFolder = await getApplicationDocumentsDirectory();
-      final file = File(p.join(dbFolder.path, 'unamedaudiobookplayer.sqlite'));
+      final file = File(p.join(dbFolder.path, 'diegema.sqlite'));
       return NativeDatabase(file);
     });
   }

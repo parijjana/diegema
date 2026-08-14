@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:unamedaudiobookplayer/app.dart';
-import 'package:unamedaudiobookplayer/core/ui_preferences.dart';
-import 'package:unamedaudiobookplayer/database/app_database.dart';
-import 'package:unamedaudiobookplayer/core/network/rate_limit_dispatcher.dart';
-import 'package:unamedaudiobookplayer/services/librivox_service.dart';
-import 'package:unamedaudiobookplayer/widgets/player_transport.dart';
+import 'package:diegema/app.dart';
+import 'package:diegema/core/ui_preferences.dart';
+import 'package:diegema/database/app_database.dart';
+import 'package:diegema/core/network/rate_limit_dispatcher.dart';
+import 'package:diegema/services/librivox_service.dart';
+import 'package:diegema/widgets/player_transport.dart';
 
 import '../support/fake_playback_service.dart';
 import '../support/test_harness.dart';

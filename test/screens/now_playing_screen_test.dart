@@ -1,10 +1,10 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:unamedaudiobookplayer/core/ui_preferences.dart';
-import 'package:unamedaudiobookplayer/database/app_database.dart';
-import 'package:unamedaudiobookplayer/screens/now_playing_screen.dart';
-import 'package:unamedaudiobookplayer/theme/app_theme.dart';
+import 'package:diegema/core/ui_preferences.dart';
+import 'package:diegema/database/app_database.dart';
+import 'package:diegema/screens/now_playing_screen.dart';
+import 'package:diegema/theme/app_theme.dart';
 
 import '../support/fake_playback_service.dart';
 import '../support/test_harness.dart';

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Script to install local Git pre-commit hooks for unamedaudiobookplayer
+# Script to install local Git pre-commit hooks for diegema
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_DIR="$( dirname "$SCRIPT_DIR" )"
@@ -11,7 +11,7 @@ fi
 
 cat << 'EOF' > "$HOOKS_DIR/pre-commit"
 #!/usr/bin/env bash
-# Local CI Pre-Commit Hook for Aulos Audiobook Player
+# Local CI Pre-Commit Hook for Diegema
 
 set -e
 

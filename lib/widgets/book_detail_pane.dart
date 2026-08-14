@@ -77,7 +77,7 @@ class _BookDetailPaneState extends State<BookDetailPane> {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final savePath =
-          p.join(appDir.path, 'unamedaudiobookplayer', 'downloads');
+          p.join(appDir.path, 'diegema', 'downloads');
 
       final extractedFiles = await widget.downloader.downloadAndExtractZip(
         widget.book,

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
-import 'package:unamedaudiobookplayer/database/app_database.dart';
-import 'package:unamedaudiobookplayer/domain/models/audiobook.dart';
+import 'package:diegema/database/app_database.dart';
+import 'package:diegema/domain/models/audiobook.dart';
 
 void main() {
   late AppDatabase db;

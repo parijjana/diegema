@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
-import 'package:unamedaudiobookplayer/core/utils/book_identity.dart';
-import 'package:unamedaudiobookplayer/database/app_database.dart';
-import 'package:unamedaudiobookplayer/services/local_library_scanner.dart';
+import 'package:diegema/core/utils/book_identity.dart';
+import 'package:diegema/database/app_database.dart';
+import 'package:diegema/services/local_library_scanner.dart';
 
 /// The downloads-folder scan used to be untestable: it called
 /// `getApplicationDocumentsDirectory()` directly, so under `flutter_test`
@@ -21,7 +21,7 @@ void main() {
     db = AppDatabase(NativeDatabase.memory());
     root = await Directory.systemTemp.createTemp('scanner_test');
     downloads =
-        Directory(p.join(root.path, 'unamedaudiobookplayer', 'downloads'));
+        Directory(p.join(root.path, 'diegema', 'downloads'));
   });
 
   tearDown(() async {

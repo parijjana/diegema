@@ -1,6 +1,6 @@
-import 'package:unamedaudiobookplayer/core/playback_constants.dart';
-import 'package:unamedaudiobookplayer/domain/models/audiobook.dart';
-import 'package:unamedaudiobookplayer/services/audio_playback_service.dart';
+import 'package:diegema/core/playback_constants.dart';
+import 'package:diegema/domain/models/audiobook.dart';
+import 'package:diegema/services/audio_playback_service.dart';
 
 /// A playback service that touches no audio and no network.
 ///

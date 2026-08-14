@@ -52,6 +52,11 @@ app.*.map.json
 
 # Local screenshot verification artifacts (not source; goldens live in test/)
 /shots/
+# Store-launch-kit capture output. The harness writes to /private/tmp (see
+# macos/Runner/DebugProfile.entitlements for why it is not a path under the
+# home directory) and the PNGs are copied here for validation and bundling.
+# Generated, large, and re-creatable from lib/screenshot_main.dart.
+/store_screenshots/
 
 # Golden-test failure artifacts. Flutter writes these next to the test on
 # every failed golden comparison (master/test/diff PNGs). They are transient

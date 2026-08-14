@@ -12,5 +12,21 @@
 	<true/>
 	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>
+	<!-- DEBUG ONLY. Lets `lib/screenshot_main.dart` (the store-launch-kit
+	     capture harness) write PNGs outside its sandbox container. The App
+	     Sandbox stays ON: the alternative — flipping app-sandbox off for a
+	     capture run and reverting after — mutates tracked build config every
+	     run and risks shipping an unsandboxed build if the revert is missed.
+
+	     Deliberately NOT a path under /Users/<name>/: this repo is public, and
+	     an absolute home path here would tie the local account name to the
+	     GitHub account. The harness writes to /private/tmp and the PNGs are
+	     copied into the repo afterwards.
+
+	     Release.entitlements is untouched, so store builds never see this. -->
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
+	<array>
+		<string>/private/tmp/diegema-store-screenshots/</string>
+	</array>
 </dict>
 </plist>

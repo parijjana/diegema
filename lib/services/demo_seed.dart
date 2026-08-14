@@ -10,14 +10,13 @@ import 'demo_downloader.dart';
 /// Two things the canned web demo needs so it never lands on an empty
 /// screen:
 ///
-/// - **Task 5**: the two playable demo titles — The Gettysburg Address and
-///   Sonnet 23 — show up in the Library screen as though the user already
-///   owns them. In demo terms they are owned: their audio ships with the
-///   build and plays. The 16 browse-only titles are never touched here —
-///   they stay Discover-only, marked "Preview only".
-/// - **Task 4**: The Gettysburg Address (161s total) gets ~30% saved
-///   progress (48s), so Now Playing opens on a populated player instead of
-///   the empty state. Sonnet 23 is left with no progress.
+/// - **Task 5**: every playable demo title shows up in the Library screen as
+///   though the user already owns it. In demo terms they are owned: their
+///   audio ships with the build and plays. The browse-only titles are never
+///   touched here — they stay Discover-only, marked "Preview only".
+/// - **Task 4**: one of them carries saved progress so the
+///   continue-listening surfaces are never empty. Which book, and why that
+///   one, is explained at the call below.
 ///
 /// Re-seeds on every launch rather than persisting an "already seeded"
 /// flag: the web demo's [AppDatabase] is an in-memory store (see
@@ -66,16 +65,26 @@ Future<void> seedDemoLibrary(AppDatabase db) async {
     }
   }
 
-  // ~30% of 161s. See Task 4 — The Gettysburg Address specifically, not
-  // "whichever book loads first": the owner named it explicitly so the
-  // demo's progress bar always looks the same on every launch.
-  const gettysburgId = 'gettysburg_address_librivox';
-  if (playable.any((e) => e.id == gettysburgId)) {
+  // One named book carries saved progress, not "whichever loads first", so
+  // the demo's continue-listening row looks identical on every launch.
+  //
+  // This was The Gettysburg Address until 2026-08-14. It moved because the
+  // seeded book is what Library's "In progress" row shows, so it lands in
+  // most screenshots — and Gettysburg's cover is a battlefield photograph
+  // of corpses, which is topically accurate and a poor advertisement. It
+  // also had exactly one chapter, so it could never show the chapter list
+  // that "Up next" exists for.
+  //
+  // Frankenstein is a third of the way into its third chapter (of eight):
+  // far enough in to read as a book genuinely in progress rather than one
+  // just opened.
+  const inProgressId = 'frankenstein_cs_librivox';
+  if (playable.any((e) => e.id == inProgressId)) {
     try {
       await db.saveProgress(
-        audiobookId: gettysburgId,
-        chapterIndex: 0,
-        positionSeconds: 48,
+        audiobookId: inProgressId,
+        chapterIndex: 2,
+        positionSeconds: 123,
       );
     } catch (e) {
       debugPrint('seedDemoLibrary: could not seed progress: $e');

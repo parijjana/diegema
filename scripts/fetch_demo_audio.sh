@@ -59,12 +59,27 @@ while IFS=$'\t' read -r id filename; do
   dest_file="$dest_dir/$filename"
   mkdir -p "$dest_dir"
 
+  url="https://archive.org/download/$id/$filename"
+
+  # Downloads land in a .part file and are only moved into place once curl
+  # reports success, so an interrupted transfer can never leave a truncated
+  # file that the skip check below would then treat as complete. archive.org
+  # resets mid-stream often enough that this is not theoretical — it happened
+  # on 2026-08-14 and left a 5.4MB fragment of a 6.6MB chapter looking done.
+  #
+  # `-C -` resumes an existing fragment rather than restarting from zero,
+  # which matters on the larger chapters.
+  part_file="$dest_file.part"
+
   if [[ -f "$dest_file" ]]; then
     echo "skip (already downloaded): $id/$filename"
   else
-    url="https://archive.org/download/$id/$filename"
     echo "downloading: $url"
-    curl -fL --retry 3 --retry-delay 2 -o "$dest_file" "$url"
+    # --retry-all-errors so a connection reset is retried, not just the
+    # transient HTTP statuses curl retries by default.
+    curl -fL -C - --retry 5 --retry-delay 2 --retry-all-errors \
+      -o "$part_file" "$url"
+    mv "$part_file" "$dest_file"
   fi
 
   total_files=$((total_files + 1))

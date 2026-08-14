@@ -107,7 +107,7 @@ void main() {
           await setSurface(tester, entry.value);
 
           await tester.pumpWidget(AudiobookApp(
-            initialDarkMode: dark,
+            initialThemeMode: dark ? ThemeMode.dark : ThemeMode.light,
             database: db,
             audioService: audio,
             libriVoxService: LibriVoxService(
@@ -175,7 +175,7 @@ void main() {
 
       await setSurface(tester, const Size(360, 800));
       await tester.pumpWidget(AudiobookApp(
-        initialDarkMode: false,
+        initialThemeMode: ThemeMode.light,
         database: db,
         audioService: audio,
         libriVoxService: LibriVoxService(
@@ -221,7 +221,7 @@ void main() {
 
       await setSurface(tester, entry.value);
       await tester.pumpWidget(AudiobookApp(
-        initialDarkMode: false,
+        initialThemeMode: ThemeMode.light,
         database: db,
         audioService: audio,
         libriVoxService: LibriVoxService(

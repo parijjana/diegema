@@ -38,9 +38,11 @@ class AudiobookApp extends StatefulWidget {
   /// stub so no `path_provider` channel is touched.
   final LibraryScanner? libraryScanner;
 
-  /// Which theme the app starts in. Only tests and the demo deep link set
-  /// this; the in-app toggle drives it at runtime.
-  final bool initialDarkMode;
+  /// Which theme the app starts in, overriding whatever [preferences] has
+  /// stored. Only tests and the demo deep link set this; leave it null and
+  /// the persisted choice is loaded instead, defaulting to
+  /// [ThemeMode.system]. The in-app toggle drives it at runtime.
+  final ThemeMode? initialThemeMode;
 
   /// Demo-only query-string entry point; see [DemoDeepLink]. Ignored
   /// entirely outside `--dart-define=DEMO_MODE=true` builds.
@@ -48,7 +50,7 @@ class AudiobookApp extends StatefulWidget {
 
   const AudiobookApp({
     super.key,
-    this.initialDarkMode = false,
+    this.initialThemeMode,
     this.database,
     this.libriVoxService,
     this.downloader,
@@ -63,17 +65,59 @@ class AudiobookApp extends StatefulWidget {
   State<AudiobookApp> createState() => _AudiobookAppState();
 }
 
-class _AudiobookAppState extends State<AudiobookApp> {
+class _AudiobookAppState extends State<AudiobookApp>
+    with WidgetsBindingObserver {
   late final AppDatabase _db;
-  late bool _isDarkMode;
+  late ThemeMode _themeMode;
 
   @override
   void initState() {
     super.initState();
-    _isDarkMode = widget.initialDarkMode;
+    // Start on whatever was passed (tests, demo deep link) and otherwise on
+    // the default, then let the stored choice land when it loads. Reading
+    // preferences is asynchronous and the first frame is not, so there is no
+    // arrangement in which the persisted value is available here.
+    _themeMode = widget.initialThemeMode ?? ThemeMode.system;
     _db = widget.database ?? AppDatabase();
+    WidgetsBinding.instance.addObserver(this);
+    if (widget.initialThemeMode == null) {
+      _loadStoredThemeMode();
+    }
     _syncHostPageTheme();
   }
+
+  Future<void> _loadStoredThemeMode() async {
+    final stored = await widget.preferences.getThemeMode();
+    if (!mounted || stored == _themeMode) return;
+    setState(() => _themeMode = stored);
+    _syncHostPageTheme();
+  }
+
+  /// Only relevant under [ThemeMode.system]: the app's own colours follow the
+  /// OS automatically via [MaterialApp.themeMode], but the demo host page's
+  /// chrome is plain CSS and has to be told, or it stays on the old theme
+  /// while the app inside it flips.
+  @override
+  void didChangePlatformBrightness() {
+    super.didChangePlatformBrightness();
+    if (_themeMode != ThemeMode.system) return;
+    setState(_syncHostPageTheme);
+  }
+
+  /// Whether the app is *showing* dark right now — which under
+  /// [ThemeMode.system] is a question about the OS, not about [_themeMode].
+  /// Read from the platform dispatcher rather than a [MediaQuery] because
+  /// this widget sits above [MaterialApp], so there is no guaranteed
+  /// `MediaQuery` ancestor to read from. Reached via `WidgetsBinding` — not
+  /// `PlatformDispatcher.instance` — so that a widget test driving
+  /// `tester.platformDispatcher` is actually obeyed.
+  bool get _isDarkMode => switch (_themeMode) {
+        ThemeMode.light => false,
+        ThemeMode.dark => true,
+        ThemeMode.system =>
+          WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+              Brightness.dark,
+      };
 
   /// Keeps the demo host page's chrome (the preview banner and the stage
   /// around the app — see `web/demo_banner.css`) on the same theme as the
@@ -88,13 +132,23 @@ class _AudiobookAppState extends State<AudiobookApp> {
     setHostPageTheme(dark: _isDarkMode);
   }
 
+  /// Flips to the opposite of what is currently on screen, and persists it.
+  ///
+  /// Note this resolves [ThemeMode.system] rather than cycling through it: a
+  /// single button is a two-state control, and a user on System who wants
+  /// dark means "dark now", not "advance to the next enum value". Getting
+  /// back to System is a job for the settings panel (plan item 1.2/Phase 1),
+  /// which does not exist yet.
   void _toggleTheme() {
-    setState(() => _isDarkMode = !_isDarkMode);
+    final next = _isDarkMode ? ThemeMode.light : ThemeMode.dark;
+    setState(() => _themeMode = next);
     _syncHostPageTheme();
+    widget.preferences.setThemeMode(next);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _db.close();
     super.dispose();
   }
@@ -111,7 +165,7 @@ class _AudiobookAppState extends State<AudiobookApp> {
       // `design/tokens.css`.
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      themeMode: _themeMode,
       home: HomeScreen(
         db: _db,
         isDarkMode: _isDarkMode,

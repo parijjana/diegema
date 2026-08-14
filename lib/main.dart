@@ -48,7 +48,15 @@ Future<void> main() async {
   runApp(AudiobookApp(
     database: demoDb,
     deepLink: deepLink,
-    initialDarkMode: deepLink.dark ?? false,
+    // `?theme=` overrides the stored choice when present, and only then —
+    // absent a deep link this stays null so the persisted preference (or
+    // ThemeMode.system for a fresh install) wins. The demo relies on the
+    // override; a normal build never sees one.
+    initialThemeMode: switch (deepLink.dark) {
+      true => ThemeMode.dark,
+      false => ThemeMode.light,
+      null => null,
+    },
     // Wire the canned web demo's stub, network-free catalog services when
     // built with --dart-define=DEMO_MODE=true; every other build keeps
     // using the real LibriVox/archive.org-backed services (the null

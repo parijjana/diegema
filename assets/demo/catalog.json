@@ -50,7 +50,7 @@
         "LibriVox Volunteers"
       ],
       "category": "fiction",
-      "playable": true,
+      "playable": false,
       "coverUrl": "https://archive.org/services/img/pride_and_prejudice_librivox",
       "chapters": [
         {
@@ -160,7 +160,7 @@
         "LibriVox Volunteers"
       ],
       "category": "science fiction",
-      "playable": true,
+      "playable": false,
       "coverUrl": "https://archive.org/services/img/frankenstein_cs_librivox",
       "chapters": [
         {
@@ -325,7 +325,7 @@
         "LibriVox Volunteers"
       ],
       "category": "fiction",
-      "playable": true,
+      "playable": false,
       "coverUrl": "https://archive.org/services/img/call_of_the_wild",
       "chapters": [
         {

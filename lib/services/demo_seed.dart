@@ -68,23 +68,31 @@ Future<void> seedDemoLibrary(AppDatabase db) async {
   // One named book carries saved progress, not "whichever loads first", so
   // the demo's continue-listening row looks identical on every launch.
   //
-  // This was The Gettysburg Address until 2026-08-14. It moved because the
-  // seeded book is what Library's "In progress" row shows, so it lands in
-  // most screenshots — and Gettysburg's cover is a battlefield photograph
-  // of corpses, which is topically accurate and a poor advertisement. It
-  // also had exactly one chapter, so it could never show the chapter list
-  // that "Up next" exists for.
+  // This was The Gettysburg Address, then Frankenstein, and is now Sonnet 23.
   //
-  // Frankenstein is a third of the way into its third chapter (of eight):
-  // far enough in to read as a book genuinely in progress rather than one
-  // just opened.
-  const inProgressId = 'frankenstein_cs_librivox';
+  // It left Gettysburg because the seeded book is what Library's "In progress"
+  // row shows, so it lands in most screenshots — and Gettysburg's cover is a
+  // battlefield photograph of corpses, which is topically accurate and a poor
+  // advertisement.
+  //
+  // It left Frankenstein because the three multi-chapter titles went back to
+  // preview-only: their audio is 191MB of the 193MB total, and the demo is
+  // served out of a public git repo where that would live in the history
+  // forever. Only Gettysburg and Sonnet 23 ship audio now, so those are the
+  // only two ids this can be — the guard below would otherwise silently seed
+  // nothing and leave the demo's landing screen empty.
+  //
+  // Sonnet 23 has one chapter, so "Up next" renders a list of one. That was
+  // the original objection to a one-chapter subject, and it is accepted here:
+  // "Up next" needed a real chapter list for the STORE SCREENSHOTS, which
+  // have been captured. Nothing else depended on it.
+  const inProgressId = 'sonnet_23_librivox';
   if (playable.any((e) => e.id == inProgressId)) {
     try {
       await db.saveProgress(
         audiobookId: inProgressId,
-        chapterIndex: 2,
-        positionSeconds: 123,
+        chapterIndex: 0,
+        positionSeconds: 31,
       );
     } catch (e) {
       debugPrint('seedDemoLibrary: could not seed progress: $e');

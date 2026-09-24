@@ -32,8 +32,11 @@ class LibriVoxService {
   }) async {
     final term = query.trim();
 
+    // The featured feed (librivox.org) is a different server from the
+    // keyword search (archive.org) and far slower, so it gets its own queue
+    // rather than stalling every archive.org search queued behind it.
     return _rateLimiter.dispatch<List<LibriVoxBook>>(
-      apiId: 'librivox',
+      apiId: term.isEmpty ? 'librivox-feed' : 'librivox',
       call: () async {
         if (term.isNotEmpty) {
           // Use Internet Archive LibriVox collection search for keyword queries
@@ -48,7 +51,8 @@ class LibriVoxService {
         try {
           final response = await _client
               .get(Uri.parse(url), headers: _headers)
-              .timeout(const Duration(seconds: 12));
+              // The feed routinely takes 10-20s to respond; 12s cut it off.
+              .timeout(const Duration(seconds: 30));
 
           if (response.statusCode == 200) {
             final data = await compute(json.decode, response.body) as JsonMap;

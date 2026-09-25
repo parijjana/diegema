@@ -504,8 +504,8 @@ class _InProgressRow extends StatelessWidget {
   final double? progress;
   final VoidCallback onTap;
 
-  /// Phone gets a tighter card (per the approved mockup: a 64x86 cover
-  /// rather than the 56x74 one wide keeps).
+  /// Phone gets a tighter card (per the approved mockup: a 64x64 cover
+  /// rather than the 56x56 one wide keeps).
   final bool compact;
 
   const _InProgressRow({
@@ -547,7 +547,7 @@ class _InProgressRow extends StatelessWidget {
                   title: book.title,
                   coverUrl: book.coverArtUrlOrPath,
                   width: compact ? 64 : 56,
-                  height: compact ? 86 : 74,
+                  height: compact ? 64 : 56,
                 ),
                 const SizedBox(width: Sp.x3),
                 Expanded(
@@ -649,7 +649,7 @@ class _BookRow extends StatelessWidget {
                   title: book.title,
                   coverUrl: book.coverArtUrlOrPath,
                   width: 56,
-                  height: 74,
+                  height: 56,
                 ),
                 const SizedBox(width: Sp.x3),
                 Expanded(

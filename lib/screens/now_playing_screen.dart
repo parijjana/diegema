@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../core/ui_preferences.dart';
@@ -615,12 +617,12 @@ class _PinnedRow extends StatelessWidget {
     if (books.isEmpty) return const SizedBox.shrink();
 
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    const coverHeight = 148.0;
+    const coverSize = 112.0;
     // Two `body` lines at 24px line-height, plus the gap above them and the
     // list's own vertical padding. Derived rather than a fixed number so
     // 200% OS text does not clip — the first cut used a flat 148+48 and
     // overflowed by 16px the moment a title wrapped to two lines.
-    final rowHeight = coverHeight + Sp.x2 + (24 * 2) * textScale + Sp.x2;
+    final rowHeight = coverSize + Sp.x2 + (24 * 2) * textScale + Sp.x2;
 
     return SizedBox(
       height: rowHeight,
@@ -639,7 +641,7 @@ class _PinnedRow extends StatelessWidget {
               onTap: () => onPlay(book),
               borderRadius: R.md,
               child: SizedBox(
-                width: 112,
+                width: coverSize,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -649,8 +651,8 @@ class _PinnedRow extends StatelessWidget {
                           bookId: book.id,
                           title: book.title,
                           coverUrl: book.coverArtUrlOrPath,
-                          width: 112,
-                          height: coverHeight,
+                          width: coverSize,
+                          height: coverSize,
                         ),
                         Positioned(
                           top: Sp.x1,
@@ -732,7 +734,7 @@ class _ContinueListeningItem extends StatelessWidget {
               title: book.title,
               coverUrl: book.coverArtUrlOrPath,
               width: 56,
-              height: 74,
+              height: 56,
             ),
             const SizedBox(width: Sp.x3),
             Expanded(
@@ -858,13 +860,20 @@ class _ActiveView extends StatelessWidget {
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= Dim.wideBreakpoint;
         final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
-        // Cover is sized from the *smaller* of the two axes so it can never
-        // push the transport off a short window. Phone gets a bigger clamp
-        // (up from 220 to 300, at 0.36 of the height rather than 0.30) —
-        // the cover is the hero of the phone layout now that the scrubber
-        // and transport have moved to the bottom of the screen instead of
-        // sitting right underneath it.
-        final coverSize = (constraints.maxHeight * (wide ? 0.30 : 0.36))
+        // Cover art is square (see `app_book_cover.dart`), so a single
+        // `coverSize` now drives both axes. It is sized from the *smaller*
+        // of the two available axes so it can never push the transport off
+        // a short window or overflow a narrow one: on phone that is
+        // `min(width - 2*gutter, ~0.40*height)`, clamped so a very short or
+        // very tall window still leaves room for the bottom-anchored
+        // scrubber/transport/action row (checked down to 360x800 at text
+        // scale 2.0 by `responsive_layout_test.dart`). Wide keeps its
+        // previous height-driven sizing — it was never width-constrained,
+        // the header sits inside a 640px-max column with its own gutter.
+        final coverSize = (wide
+                ? constraints.maxHeight * 0.30
+                : math.min(constraints.maxWidth - 2 * Sp.x4,
+                    constraints.maxHeight * 0.40))
             .clamp(120.0, wide ? 280.0 : 300.0)
             .toDouble();
 
@@ -877,7 +886,7 @@ class _ActiveView extends StatelessWidget {
                 bookId: book.id,
                 title: book.title,
                 coverUrl: book.coverArtUrlOrPath,
-                width: coverSize * 0.76,
+                width: coverSize,
                 height: coverSize,
               ),
               const SizedBox(height: Sp.x5),

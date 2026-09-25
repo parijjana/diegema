@@ -80,6 +80,7 @@ Future<void> main() async {
   runApp(AudiobookApp(
     database: demoDb ?? nativeDb,
     runCoverBackfill: nativeDb != null,
+    runImportMigration: nativeDb != null,
     audioService: audioService,
     deepLink: deepLink,
     // `?theme=` overrides the stored choice when present, and only then —

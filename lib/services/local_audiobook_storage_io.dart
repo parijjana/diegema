@@ -62,14 +62,16 @@ Future<LibraryCopyResult> copyIntoLibrary({
   try {
     final audioResult = <String, String>{};
     for (final srcPath in audioPaths) {
-      final destPath = await _copyOneIntoLibrary(srcPath, libraryDir, usedNames);
+      final destPath =
+          await copyFileIntoDirectory(srcPath, libraryDir, usedNames);
       audioResult[srcPath] = destPath;
       await _deleteIfCached(srcPath, cacheRoot);
     }
 
     String? newCoverPath;
     if (coverPath != null) {
-      newCoverPath = await _copyOneIntoLibrary(coverPath, libraryDir, usedNames);
+      newCoverPath =
+          await copyFileIntoDirectory(coverPath, libraryDir, usedNames);
       await _deleteIfCached(coverPath, cacheRoot);
     }
 
@@ -82,8 +84,15 @@ Future<LibraryCopyResult> copyIntoLibrary({
   }
 }
 
-Future<String> _copyOneIntoLibrary(
-    String srcPath, Directory libraryDir, Set<String> usedNames) async {
+/// Streams [srcPath] into [destDir], picking a collision-free filename:
+/// [srcPath]'s own basename if [usedNames] doesn't already contain it
+/// (case-insensitively), otherwise `name_2.ext`, `name_3.ext`, etc. Adds
+/// the chosen name to [usedNames] before returning. Shared by
+/// [copyIntoLibrary] (whole-book copy, cleans up on failure) and
+/// `local_import_migration_service_io.dart` (one file at a time, a single
+/// failure is logged and skipped rather than aborting the whole book).
+Future<String> copyFileIntoDirectory(
+    String srcPath, Directory destDir, Set<String> usedNames) async {
   final ext = p.extension(srcPath);
   final base = p.basenameWithoutExtension(srcPath);
   var name = p.basename(srcPath);
@@ -94,7 +103,7 @@ Future<String> _copyOneIntoLibrary(
   }
   usedNames.add(name.toLowerCase());
 
-  final destPath = p.join(libraryDir.path, name);
+  final destPath = p.join(destDir.path, name);
   final sink = File(destPath).openWrite();
   try {
     await sink.addStream(File(srcPath).openRead());

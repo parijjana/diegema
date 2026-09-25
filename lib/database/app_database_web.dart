@@ -250,6 +250,45 @@ class AppDatabase {
     _audiobooks.remove(id);
   }
 
+  /// Mirrors `app_database_io.dart`'s `updateChapterAudioPath` — see its
+  /// doc comment. Local import doesn't exist on web (see
+  /// `services/local_audiobook_import_web.dart`), so nothing ever calls
+  /// this in practice; it exists only so both platforms expose the same
+  /// `AppDatabase` surface.
+  Future<void> updateChapterAudioPath(
+      String chapterId, String newAudioPathOrUrl) async {
+    for (final entry in _audiobooks.entries) {
+      final book = entry.value;
+      final chapterIndex =
+          book.chapters.indexWhere((c) => c.id == chapterId);
+      if (chapterIndex == -1) continue;
+      final oldChapter = book.chapters[chapterIndex];
+      final newChapters = List<domain.AudiobookChapter>.from(book.chapters);
+      newChapters[chapterIndex] = domain.AudiobookChapter(
+        id: oldChapter.id,
+        title: oldChapter.title,
+        audioPathOrUrl: newAudioPathOrUrl,
+        durationSeconds: oldChapter.durationSeconds,
+        isStream: oldChapter.isStream,
+        startMs: oldChapter.startMs,
+        endMs: oldChapter.endMs,
+      );
+      _audiobooks[entry.key] = domain.UnifiedAudiobook(
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        description: book.description,
+        coverArtUrlOrPath: book.coverArtUrlOrPath,
+        source: book.source,
+        origin: book.origin,
+        narrators: book.narrators,
+        chapters: newChapters,
+        isDownloaded: book.isDownloaded,
+      );
+      return;
+    }
+  }
+
   Future<void> close() async {}
 }
 

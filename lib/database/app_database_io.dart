@@ -667,6 +667,21 @@ class AppDatabase extends _$AppDatabase {
     await (delete(bookmarks)..where((b) => b.id.equals(id))).go();
   }
 
+  // --- Chapters ---
+
+  /// Rewrites one chapter's [Chapters.audioPathOrUrl] in place, by chapter
+  /// id — used by `local_import_migration_service_io.dart` to point an
+  /// already-imported chapter at its newly-copied, durable file without
+  /// touching the chapter's id, `startMs`/`endMs` offsets, or anything
+  /// else (progress and bookmarks are keyed off the book/chapter index,
+  /// not the path, so neither needs updating here).
+  Future<void> updateChapterAudioPath(
+      String chapterId, String newAudioPathOrUrl) async {
+    await (update(chapters)..where((c) => c.id.equals(chapterId))).write(
+      ChaptersCompanion(audioPathOrUrl: Value(newAudioPathOrUrl)),
+    );
+  }
+
   /// Removes a book row and its chapters. Progress and bookmarks are left
   /// alone; callers only delete rows that have none.
   Future<void> deleteAudiobook(String id) async {

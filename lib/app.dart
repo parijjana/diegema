@@ -15,6 +15,7 @@ import 'services/audio_playback_service.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
 import 'services/local_cover_backfill_service.dart';
+import 'services/local_import_migration_service.dart';
 import 'theme/app_theme.dart';
 
 /// Root widget. [database], [libriVoxService], [downloader], and
@@ -30,6 +31,17 @@ class AudiobookApp extends StatefulWidget {
   /// Whether to run the once-per-launch cover backfill for imported books.
   /// Only `main.dart` turns this on.
   final bool runCoverBackfill;
+
+  /// Whether to run the once-per-launch local-import path migration (moves
+  /// already-imported chapters that still point outside
+  /// `diegema/library/<bookId>/` — e.g. file_picker's Android cache dir —
+  /// into that durable location; see
+  /// `services/local_import_migration_service_io.dart`). A sibling of
+  /// [runCoverBackfill], set only by `main.dart` for the same reason: tests
+  /// leave it off so they never touch real storage, and it runs before the
+  /// cover backfill so a freshly-migrated book's files are already in
+  /// their durable location by the time the backfill re-reads them.
+  final bool runImportMigration;
   final LibriVoxService? libriVoxService;
   final LibriVoxStreamAndDownloader? downloader;
   final ArtworkEnrichmentService? artworkService;
@@ -62,6 +74,7 @@ class AudiobookApp extends StatefulWidget {
     this.initialThemeMode,
     this.database,
     this.runCoverBackfill = false,
+    this.runImportMigration = false,
     this.libriVoxService,
     this.downloader,
     this.artworkService,
@@ -97,14 +110,27 @@ class _AudiobookAppState extends State<AudiobookApp>
     _settings.load();
     _syncHostPageTheme();
 
-    // Step 4 of the local-import cover pipeline: once per launch, give
-    // already-imported local books another shot at a cover. Opt-in rather
-    // than inferred from "no injected database": main.dart injects its
-    // native database too (for background playback), which silently
-    // disabled this in the real app. Tests leave it off so they never hit
-    // [CoverLookupService]'s real network client.
-    if (widget.runCoverBackfill && !kDemoMode) {
-      unawaited(LocalCoverBackfillService(db: _db).run());
+    // Once per launch, before the cover backfill: migrate already-imported
+    // local books whose chapters still point outside
+    // `diegema/library/<bookId>/` (see
+    // `services/local_import_migration_service_io.dart`), then give
+    // already-imported local books another shot at a cover (step 4 of the
+    // local-import cover pipeline). Both are opt-in rather than inferred
+    // from "no injected database": main.dart injects its native database
+    // too (for background playback), which would silently disable this in
+    // the real app. Tests leave both off so they never touch real storage
+    // or hit [CoverLookupService]'s real network client.
+    if (!kDemoMode && (widget.runImportMigration || widget.runCoverBackfill)) {
+      unawaited(_runStartupMaintenance());
+    }
+  }
+
+  Future<void> _runStartupMaintenance() async {
+    if (widget.runImportMigration) {
+      await LocalImportMigrationService(db: _db).run();
+    }
+    if (widget.runCoverBackfill) {
+      await LocalCoverBackfillService(db: _db).run();
     }
   }
 

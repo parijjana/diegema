@@ -168,6 +168,24 @@ class AppDatabase {
     _userCoverPaths.remove(audiobookId);
   }
 
+  /// Mirrors `app_database_io.dart`'s `setCoverUrl` — see its doc comment.
+  Future<void> setCoverUrl(String audiobookId, String coverUrl) async {
+    final book = _audiobooks[audiobookId];
+    if (book == null) return;
+    _audiobooks[audiobookId] = domain.UnifiedAudiobook(
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      description: book.description,
+      coverArtUrlOrPath: coverUrl,
+      source: book.source,
+      origin: book.origin,
+      narrators: book.narrators,
+      chapters: book.chapters,
+      isDownloaded: book.isDownloaded,
+    );
+  }
+
   Future<void> addBookmark({
     required String id,
     required String audiobookId,

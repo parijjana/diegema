@@ -587,6 +587,16 @@ class AppDatabase extends _$AppDatabase {
         .write(const AudiobooksCompanion(userCoverPath: Value(null)));
   }
 
+  /// Sets the auto-found cover URL for [audiobookId] — the post-save online
+  /// lookup (step 3 of the local-import cover pipeline, see
+  /// `services/cover_lookup_service.dart`) and the once-per-launch backfill
+  /// both write here, never to [userCoverPath]. [getAudiobook] still
+  /// prefers `userCoverPath` over this whenever both are set.
+  Future<void> setCoverUrl(String audiobookId, String coverUrl) async {
+    await (update(audiobooks)..where((a) => a.id.equals(audiobookId)))
+        .write(AudiobooksCompanion(coverUrl: Value(coverUrl)));
+  }
+
   // --- Bookmarks / audio clips ---
 
   /// Creates a bookmark or clip. A `null` [endPositionSeconds] (the

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -6,6 +7,7 @@ import '../core/utils/book_identity.dart';
 import '../core/utils/mp4_chapters.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
+import 'cover_lookup_service.dart';
 import 'local_book_metadata_io.dart';
 
 /// Builds this book's chapter list from its constituent files, expanding
@@ -138,6 +140,12 @@ Future<void> importFolder(
     await db.saveAudiobook(book);
     onSuccess();
 
+    // Step 3: still no cover after embedded metadata + folder image —
+    // try an online lookup, after the save, without blocking the import.
+    if (coverPath == null) {
+      unawaited(_enrichCoverOnline(db, bookId, book.title, book.author));
+    }
+
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -215,6 +223,10 @@ Future<void> importFiles(
     await db.saveAudiobook(book);
     onSuccess();
 
+    if (coverPath == null) {
+      unawaited(_enrichCoverOnline(db, bookId, book.title, book.author));
+    }
+
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -236,4 +248,27 @@ Future<void> importFiles(
 String? _nonEmpty(String? value) {
   final trimmed = value?.trim();
   return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+}
+
+/// The default authors assigned when no embedded tag supplied one — never
+/// meaningful as a search term, so [_enrichCoverOnline] treats them as "no
+/// author known" rather than passing them to the lookup.
+const _placeholderAuthors = {'Local Audiobook', 'Local Files'};
+
+/// Step 3 of the local-import cover pipeline: an online lookup, run after
+/// the book is already saved so it never blocks the import. Best-effort —
+/// any failure (including the lookup finding nothing) is silently
+/// swallowed; the book just keeps its placeholder cover.
+Future<void> _enrichCoverOnline(
+    AppDatabase db, String bookId, String title, String author) async {
+  try {
+    final knownAuthor = _placeholderAuthors.contains(author) ? null : author;
+    final url = await CoverLookupService()
+        .lookupCoverUrl(title: title, author: knownAuthor);
+    if (url != null) {
+      await db.setCoverUrl(bookId, url);
+    }
+  } catch (_) {
+    // Background enrichment only — never surfaces to the user.
+  }
 }

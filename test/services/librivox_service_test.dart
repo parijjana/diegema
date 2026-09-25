@@ -83,4 +83,70 @@ void main() {
               'https://archive.org/services/img/frankenstein_1205_librivox'));
     });
   });
+
+  group('zipSizeBytes', () {
+    test('sums the size of every 64Kbps MP3 file', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.toString(),
+            'https://archive.org/metadata/odyssey_1709_librivox/files');
+        const responseJson = '''
+        {
+          "result": [
+            {"name": "odyssey_01.mp3", "format": "64Kbps MP3", "size": "12000000"},
+            {"name": "odyssey_02.mp3", "format": "64Kbps MP3", "size": "11000000"},
+            {"name": "odyssey.ogg", "format": "Ogg Vorbis", "size": "9000000"},
+            {"name": "odyssey_metadata.xml", "format": "Metadata"}
+          ]
+        }
+        ''';
+        return http.Response(responseJson, 200,
+            headers: {'content-type': 'application/json'});
+      });
+
+      final service = LibriVoxService(client: mockClient);
+      final bytes = await service.zipSizeBytes('odyssey_1709_librivox');
+
+      expect(bytes, equals(23000000));
+    });
+
+    test('caches the result per identifier', () async {
+      var calls = 0;
+      final mockClient = MockClient((request) async {
+        calls++;
+        return http.Response(
+            '{"result": [{"format": "64Kbps MP3", "size": "1000"}]}', 200,
+            headers: {'content-type': 'application/json'});
+      });
+
+      final service = LibriVoxService(client: mockClient);
+      await service.zipSizeBytes('a');
+      await service.zipSizeBytes('a');
+
+      expect(calls, equals(1));
+    });
+
+    test('never throws: a network failure resolves to null', () async {
+      final mockClient = MockClient((request) async {
+        throw Exception('offline');
+      });
+
+      final service = LibriVoxService(client: mockClient);
+      final bytes = await service.zipSizeBytes('anything');
+
+      expect(bytes, isNull);
+    });
+
+    test('resolves to null when no 64Kbps MP3 files are listed', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+            '{"result": [{"format": "Ogg Vorbis", "size": "500"}]}', 200,
+            headers: {'content-type': 'application/json'});
+      });
+
+      final service = LibriVoxService(client: mockClient);
+      final bytes = await service.zipSizeBytes('no-mp3');
+
+      expect(bytes, isNull);
+    });
+  });
 }

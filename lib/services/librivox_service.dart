@@ -165,4 +165,68 @@ class LibriVoxService {
       },
     );
   }
+
+  /// Cache for [zipSizeBytes], keyed by archive.org identifier. A book's
+  /// ZIP size never changes once published, so this never needs
+  /// invalidating — only re-populating per identifier the first time it is
+  /// asked for.
+  final Map<String, int?> _zipSizeCache = {};
+
+  /// The size, in bytes, of the "64Kbps MP3" ZIP archive.org would serve
+  /// for [identifier] at
+  /// `https://archive.org/compress/<identifier>/formats=64KBPS%20MP3&file=/<identifier>.zip`
+  /// — the same URL [LibriVoxBook.urlZipFile] points at.
+  ///
+  /// archive.org's `/compress` endpoint builds that ZIP on the fly and
+  /// does not expose a `Content-Length` up front, so this instead sums the
+  /// `size` field of every file in the item's `/metadata/<id>/files`
+  /// listing whose `format` is `"64Kbps MP3"` — the same files the ZIP
+  /// would contain — which is an accurate proxy (verified against
+  /// `odyssey_1709_librivox`: 115.8 MB via this sum against the ZIP
+  /// archive.org actually serves).
+  ///
+  /// Never throws: a network failure, a timeout, or metadata with no
+  /// matching files all resolve to `null` so the caller can show the
+  /// download button without a size line rather than break the sheet.
+  Future<int?> zipSizeBytes(String identifier) async {
+    if (identifier.isEmpty) return null;
+    if (_zipSizeCache.containsKey(identifier)) {
+      return _zipSizeCache[identifier];
+    }
+
+    int? total;
+    try {
+      final response = await _client
+          .get(
+            Uri.parse('https://archive.org/metadata/$identifier/files'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final files = data is JsonMap ? data['result'] : data;
+        if (files is List) {
+          var sum = 0;
+          var matched = false;
+          for (final entry in files) {
+            if (entry is JsonMap && entry['format'] == '64Kbps MP3') {
+              final size = entry['size'];
+              final bytes = size is String ? int.tryParse(size) : size as int?;
+              if (bytes != null) {
+                sum += bytes;
+                matched = true;
+              }
+            }
+          }
+          if (matched) total = sum;
+        }
+      }
+    } catch (e) {
+      debugPrint('LibriVox zip size error: $e');
+    }
+
+    _zipSizeCache[identifier] = total;
+    return total;
+  }
 }

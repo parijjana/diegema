@@ -5,6 +5,7 @@ import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
 import '../theme/app_theme.dart';
 import 'app_book_cover.dart';
+import 'book_detail_pane.dart' show EmptyChaptersNote;
 
 /// The Library-screen counterpart of Discover's `BookDetailPane`.
 ///
@@ -100,6 +101,7 @@ class LibraryBookDetailOverlay extends StatelessWidget {
         Text('Chapters (${book.chapters.length})',
             style: AppType.titleSm.copyWith(color: c.text)),
         const SizedBox(height: Sp.x2),
+        if (book.chapters.isEmpty) const EmptyChaptersNote(),
         for (final entry in book.chapters.asMap().entries)
           _ChapterTile(
             title: entry.value.title,

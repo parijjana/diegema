@@ -3,8 +3,68 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import '../core/utils/book_identity.dart';
+import '../core/utils/mp4_chapters.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
+
+/// Builds this book's chapter list from its constituent files, expanding
+/// any `.m4b`/`.m4a` that carries 2+ embedded chapter markers (see
+/// `core/utils/mp4_chapters.dart`) into one [AudiobookChapter] per marker —
+/// same [audioPathOrUrl], with [AudiobookChapter.startMs]/`endMs` bounding
+/// each marker (the next marker's start, or the file's total duration for
+/// the last one). A file with fewer than 2 markers (including none, or a
+/// non-M4B/M4A file) becomes a single whole-file chapter, exactly as before
+/// M4B chapter support existed.
+///
+/// Chapter ids are `${bookId}_ch_$n`, numbered continuously across every
+/// file in [paths] rather than restarting per file, so ids stay unique
+/// regardless of how many chapters a given file expands into.
+Future<List<AudiobookChapter>> chaptersForFiles(
+    String bookId, List<String> paths) async {
+  final chapters = <AudiobookChapter>[];
+  int idx = 0;
+
+  for (final path in paths) {
+    final ext = p.extension(path).toLowerCase();
+    Mp4Chapters? mp4Chapters;
+    if (ext == '.m4b' || ext == '.m4a') {
+      mp4Chapters = await readMp4Chapters(path);
+    }
+
+    if (mp4Chapters != null && mp4Chapters.chapters.length >= 2) {
+      final markers = mp4Chapters.chapters;
+      for (int i = 0; i < markers.length; i++) {
+        final marker = markers[i];
+        final endMs = i + 1 < markers.length
+            ? markers[i + 1].startMs
+            : mp4Chapters.durationMs;
+        final title =
+            marker.title.trim().isNotEmpty ? marker.title : 'Chapter ${i + 1}';
+        chapters.add(AudiobookChapter(
+          id: '${bookId}_ch_$idx',
+          title: title,
+          audioPathOrUrl: path,
+          durationSeconds: ((endMs - marker.startMs) / 1000).round(),
+          isStream: false,
+          startMs: marker.startMs,
+          endMs: endMs,
+        ));
+        idx++;
+      }
+    } else {
+      chapters.add(AudiobookChapter(
+        id: '${bookId}_ch_$idx',
+        title: p.basenameWithoutExtension(path),
+        audioPathOrUrl: path,
+        durationSeconds: 0,
+        isStream: false,
+      ));
+      idx++;
+    }
+  }
+
+  return chapters;
+}
 
 Future<void> importFolder(
     BuildContext context, AppDatabase db, VoidCallback onSuccess) async {
@@ -24,7 +84,8 @@ Future<void> importFolder(
         .cast<File>()
         .where((f) {
       final ext = p.extension(f.path).toLowerCase();
-      return ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg'].contains(ext);
+      return ['.mp3', '.m4a', '.m4b', '.aac', '.flac', '.wav', '.ogg']
+          .contains(ext);
     }).toList();
 
     files.sort((a, b) => a.path.compareTo(b.path));
@@ -34,7 +95,7 @@ Future<void> importFolder(
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text(
-                  'No audio files (.mp3, .m4a, etc.) found in selected folder.')),
+                  'No audio files (.mp3, .m4a, .m4b, etc.) found in selected folder.')),
         );
       }
       return;
@@ -44,18 +105,8 @@ Future<void> importFolder(
     // core/utils/book_identity.dart for why hashCode must never be a
     // persisted database key.
     final bookId = BookIdentity.localIdForPath(selectedDirectory);
-    final chapters = files.asMap().entries.map((entry) {
-      final idx = entry.key;
-      final file = entry.value;
-      final title = p.basenameWithoutExtension(file.path);
-      return AudiobookChapter(
-        id: '${bookId}_ch_$idx',
-        title: title,
-        audioPathOrUrl: file.path,
-        durationSeconds: 0,
-        isStream: false,
-      );
-    }).toList();
+    final chapters =
+        await chaptersForFiles(bookId, files.map((f) => f.path).toList());
 
     final book = UnifiedAudiobook(
       id: bookId,
@@ -93,7 +144,7 @@ Future<void> importFiles(
     final result = await FilePicker.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: ['mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg'],
+      allowedExtensions: ['mp3', 'm4a', 'm4b', 'aac', 'flac', 'wav', 'ogg'],
       dialogTitle: 'Select Audio Files for Audiobook',
     );
 
@@ -107,26 +158,21 @@ Future<void> importFiles(
 
     if (paths.isEmpty) return;
 
-    final firstFile = paths.first;
-    final parentFolder = p.basename(p.dirname(firstFile));
-    final defaultTitle = parentFolder.isNotEmpty && parentFolder != '.'
-        ? parentFolder
-        : 'Imported Audiobook';
+    // A single picked file uses its own name (minus extension) as the book
+    // title; several files fall back to their shared parent folder's name.
+    final String defaultTitle;
+    if (paths.length == 1) {
+      defaultTitle = p.basenameWithoutExtension(paths.first);
+    } else {
+      final parentFolder = p.basename(p.dirname(paths.first));
+      defaultTitle = parentFolder.isNotEmpty && parentFolder != '.'
+          ? parentFolder
+          : 'Imported Audiobook';
+    }
 
     // Deterministic sha256-of-paths id — NOT hashCode.
     final bookId = BookIdentity.localIdForPaths(paths);
-    final chapters = paths.asMap().entries.map((entry) {
-      final idx = entry.key;
-      final path = entry.value;
-      final title = p.basenameWithoutExtension(path);
-      return AudiobookChapter(
-        id: '${bookId}_ch_$idx',
-        title: title,
-        audioPathOrUrl: path,
-        durationSeconds: 0,
-        isStream: false,
-      );
-    }).toList();
+    final chapters = await chaptersForFiles(bookId, paths);
 
     final book = UnifiedAudiobook(
       id: bookId,

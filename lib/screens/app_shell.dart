@@ -300,8 +300,9 @@ class _BottomNav extends StatelessWidget {
           for (final s in c.shadowUi)
             BoxShadow(
               color: s.color,
-              blurRadius: s.blurRadius * 1.5,
-              offset: Offset(0, -s.offset.dy - s.blurRadius / 3),
+              blurRadius: s.blurRadius,
+              spreadRadius: s.spreadRadius,
+              offset: Offset(0, -s.offset.dy),
             ),
         ],
       ),

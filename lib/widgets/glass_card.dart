@@ -74,6 +74,7 @@ class GlassCard extends StatelessWidget {
         BoxShadow(
             color: s.color,
             blurRadius: s.blurRadius,
+            spreadRadius: s.spreadRadius,
             blurStyle: BlurStyle.outer),
     ];
     Widget withShadow(Widget card) => shadows.isEmpty

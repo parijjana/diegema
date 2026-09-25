@@ -303,38 +303,31 @@ class AppColors extends ThemeExtension<AppColors> {
     );
   }
 
-  /// The drop shadow for [style]: [darkInk] (the text colour) in light
-  /// mode, a faded [accent] glow in dark mode.
-  ///
-  /// Tight on purpose: the extent (offset + blur) stays under the 24px
-  /// gap above the bottom nav and small enough that neighbouring buttons
-  /// 8px apart keep separate halos. Normal blur style, because
-  /// [BlurStyle.outer] combined with an offset leaves a hard, unpainted
-  /// band along the offset edge; elements that take a shadow are drawn
-  /// opaque instead (see [glassSurface]). Dark mode's glow is centred
-  /// (no drop), since light-coloured glows read as light, not depth.
+  /// The drop shadow for [style], modelled on Material 3's elevation
+  /// shadows: a tight "key" shadow that gives the edge, plus a wider, fainter
+  /// "ambient" one with a little spread. Soft is elevation level 1, Strong
+  /// is level 2. Light mode casts them in [darkInk] (the text colour); dark
+  /// mode in a faded [accent], at lower strength, since a coloured glow
+  /// reads much more strongly than a dark shadow does.
   static List<BoxShadow> shadowsFor(
       Brightness brightness, ShadowStyle style, Color accent, Color darkInk) {
     if (style == ShadowStyle.off) return const [];
     final dark = brightness == Brightness.dark;
     final strong = style == ShadowStyle.strong;
     final colour = dark ? accent : darkInk;
-    final alpha = switch ((dark, strong)) {
-      (false, false) => 0.14,
-      (false, true) => 0.22,
-      (true, false) => 0.22,
-      (true, true) => 0.34,
-    };
+    final keyAlpha = dark ? 0.20 : 0.30;
+    final ambientAlpha = dark ? 0.10 : 0.15;
     return [
       BoxShadow(
-        color: colour.withValues(alpha: alpha),
-        blurRadius: strong ? 14 : 8,
-        offset: dark ? Offset.zero : Offset(0, strong ? 4 : 2),
+        color: colour.withValues(alpha: keyAlpha),
+        blurRadius: 2,
+        offset: const Offset(0, 1),
       ),
       BoxShadow(
-        color: colour.withValues(alpha: alpha * 0.5),
-        blurRadius: strong ? 3 : 2,
-        offset: dark ? Offset.zero : const Offset(0, 1),
+        color: colour.withValues(alpha: ambientAlpha),
+        blurRadius: strong ? 6 : 3,
+        spreadRadius: strong ? 2 : 1,
+        offset: Offset(0, strong ? 2 : 1),
       ),
     ];
   }

@@ -96,14 +96,22 @@ void main() {
       }
     });
 
-    test('strong is heavier than soft', () {
-      final soft = AppColors.themed(Brightness.dark, shadows: ShadowStyle.soft);
-      final strong =
-          AppColors.themed(Brightness.dark, shadows: ShadowStyle.strong);
-      expect(strong.shadowUi.first.color.a,
-          greaterThan(soft.shadowUi.first.color.a));
-      expect(strong.shadowUi.first.blurRadius,
-          greaterThan(soft.shadowUi.first.blurRadius));
+    test('Material-style: a tight key shadow and a wider ambient one', () {
+      for (final brightness in Brightness.values) {
+        final soft = AppColors.themed(brightness, shadows: ShadowStyle.soft);
+        final strong =
+            AppColors.themed(brightness, shadows: ShadowStyle.strong);
+        for (final c in [soft, strong]) {
+          final [key, ambient] = c.shadowUi;
+          expect(key.blurRadius, lessThan(ambient.blurRadius));
+          expect(key.color.a, greaterThan(ambient.color.a));
+          // Subtle: nothing reaches further than ~10px from the edge.
+          expect(ambient.blurRadius + ambient.spreadRadius + ambient.offset.dy,
+              lessThanOrEqualTo(10));
+        }
+        expect(strong.shadowUi.last.blurRadius,
+            greaterThan(soft.shadowUi.last.blurRadius));
+      }
     });
   });
 }

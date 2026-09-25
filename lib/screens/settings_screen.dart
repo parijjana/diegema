@@ -110,6 +110,18 @@ class SettingsScreen extends StatelessWidget {
                     value: settings.accent,
                     onChanged: settings.setAccent,
                   ),
+                const SizedBox(height: Sp.x1),
+                _ThreeWayToggle<ShadowStyle>(
+                  label: 'Shadows',
+                  description: 'Drop shadows under cards and buttons: dark '
+                      'in light mode, a soft glow of the accent in dark mode.',
+                  value: settings.shadows,
+                  options: [
+                    for (final style in ShadowStyle.values)
+                      _Choice(style, style.label),
+                  ],
+                  onChanged: settings.setShadows,
+                ),
               ],
             ),
             _Section(
@@ -339,6 +351,7 @@ class _BackgroundCard extends StatelessWidget {
               color: selected ? c.accent : c.border,
               width: selected ? 2 : 1,
             ),
+            boxShadow: c.shadowUi,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -467,6 +480,7 @@ class _AccentSwatch extends StatelessWidget {
                       color: selected ? c.text : c.border,
                       width: selected ? 3 : 1,
                     ),
+                    boxShadow: c.shadowUi,
                   ),
                   child: selected
                       ? Icon(Icons.check_rounded,
@@ -534,6 +548,7 @@ class _ThreeWayToggle<T> extends StatelessWidget {
             color: c.surfaceSunken,
             borderRadius: R.pill,
             border: Border.all(color: c.borderContrast),
+            boxShadow: c.shadowUi,
           ),
           child: Row(
             children: [

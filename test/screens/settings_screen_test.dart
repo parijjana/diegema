@@ -232,6 +232,30 @@ void main() {
     await unmount(tester);
   });
 
+  testWidgets('the Shadows toggle turns drop shadows on and persists',
+      (tester) async {
+    final store = <String, Object>{};
+    await pumpApp(tester, store);
+    await goTo(tester, 'Settings');
+
+    List<BoxShadow> shadows() =>
+        Theme.of(tester.element(find.text('Settings').last))
+            .extension<AppColors>()!
+            .shadowUi;
+    expect(shadows(), isEmpty);
+
+    final strong = find.text('Strong');
+    await reveal(tester, strong);
+    await tester.ensureVisible(strong);
+    await pumpFrames(tester);
+    await tester.tap(strong);
+    await pumpFrames(tester);
+    expect(store['appearance.shadows'], 'strong');
+    expect(shadows(), isNotEmpty);
+
+    await unmount(tester);
+  });
+
   testWidgets('a stored colour choice is applied on launch', (tester) async {
     await pumpApp(tester, {
       'appearance.background': 'mist',

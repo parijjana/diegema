@@ -448,3 +448,18 @@ class BackgroundPair {
   static BackgroundPair byId(String? id) =>
       all.firstWhere((p) => p.id == id, orElse: () => fallback);
 }
+
+/// Drop shadows under cards, tiles and buttons (Settings > Colours). A dark
+/// shadow in light mode; in dark mode, where a dark shadow would vanish, a
+/// faded glow of the accent colour instead.
+enum ShadowStyle {
+  off('Off'),
+  soft('Soft'),
+  strong('Strong');
+
+  final String label;
+  const ShadowStyle(this.label);
+
+  static ShadowStyle fromName(String? name) => ShadowStyle.values
+      .firstWhere((s) => s.name == name, orElse: () => ShadowStyle.off);
+}

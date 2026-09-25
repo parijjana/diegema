@@ -34,6 +34,7 @@ class AppSettings extends ChangeNotifier {
   PlayerControlsStyle _transportStyle = PlayerControlsStyle.round;
   AccentPalette _accent = AccentPalette.fallback;
   BackgroundPair _background = BackgroundPair.fallback;
+  ShadowStyle _shadows = ShadowStyle.off;
 
   AppSettings({
     required UiPreferences preferences,
@@ -61,6 +62,9 @@ class AppSettings extends ChangeNotifier {
   /// The light/dark background pair (Settings > Colours).
   BackgroundPair get background => _background;
 
+  /// Drop shadows under cards, tiles and buttons (Settings > Colours).
+  ShadowStyle get shadows => _shadows;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
@@ -70,13 +74,16 @@ class AppSettings extends ChangeNotifier {
     final storedAccent = AccentPalette.byId(await _preferences.getAccentId());
     final storedBackground =
         BackgroundPair.byId(await _preferences.getBackgroundId());
+    final storedShadows =
+        ShadowStyle.fromName(await _preferences.getShadowsName());
 
     if (storedTheme == _themeMode &&
         storedSkip == _skipSeconds &&
         storedStyle == _controlsStyle &&
         storedTransport == _transportStyle &&
         storedAccent == _accent &&
-        storedBackground == _background) {
+        storedBackground == _background &&
+        storedShadows == _shadows) {
       return;
     }
     _themeMode = storedTheme;
@@ -85,6 +92,7 @@ class AppSettings extends ChangeNotifier {
     _transportStyle = storedTransport;
     _accent = storedAccent;
     _background = storedBackground;
+    _shadows = storedShadows;
     notifyListeners();
   }
 
@@ -130,6 +138,13 @@ class AppSettings extends ChangeNotifier {
     _background = background;
     notifyListeners();
     await _preferences.setBackgroundId(background.id);
+  }
+
+  Future<void> setShadows(ShadowStyle shadows) async {
+    if (shadows == _shadows) return;
+    _shadows = shadows;
+    notifyListeners();
+    await _preferences.setShadowsName(shadows.name);
   }
 }
 

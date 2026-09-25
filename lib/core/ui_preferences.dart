@@ -22,6 +22,7 @@ class UiPreferences {
   static const String _transportStyleKey = 'now_playing.transport_style';
   static const String _accentKey = 'appearance.accent';
   static const String _backgroundKey = 'appearance.background';
+  static const String _shadowsKey = 'appearance.shadows';
 
   /// In-memory store used by tests. When supplied it replaces
   /// `shared_preferences` entirely, so no platform channel is touched.
@@ -214,6 +215,10 @@ class UiPreferences {
   /// The chosen background pair id; null when never chosen.
   Future<String?> getBackgroundId() => _getString(_backgroundKey);
   Future<void> setBackgroundId(String id) => _setString(_backgroundKey, id);
+
+  /// The drop-shadow style's enum name; null when never chosen.
+  Future<String?> getShadowsName() => _getString(_shadowsKey);
+  Future<void> setShadowsName(String name) => _setString(_shadowsKey, name);
 
   Future<String?> _getString(String key) async {
     final overrides = _overrides;

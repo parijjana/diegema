@@ -179,6 +179,7 @@ class PlayerTransport extends StatelessWidget {
                       color: c.surface.withValues(alpha: 0.72),
                       borderRadius: R.lg,
                       border: Border.all(color: c.border),
+                      boxShadow: c.shadowUi,
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: row,
@@ -324,6 +325,7 @@ class _TransportButton extends StatelessWidget {
                         ? c.surfaceSunken
                         : c.surface.withValues(alpha: 0.72),
                     border: Border.all(color: c.border),
+                    boxShadow: c.shadowUi,
                   )
                 : null,
             child: Center(child: spec.child),
@@ -537,6 +539,7 @@ class _ChipShell extends StatelessWidget {
         color: emphasised ? c.accentWash : c.surfaceSunken,
         borderRadius: R.pill,
         border: Border.all(color: emphasised ? c.accent : c.borderContrast),
+        boxShadow: c.shadowUi,
       ),
       // `Flexible`, not a bare child: at large text scales the label is
       // wider than a 360px phone can give it, and an unflexed child in a

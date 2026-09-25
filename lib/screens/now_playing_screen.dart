@@ -1192,6 +1192,7 @@ class _ActionRow extends StatelessWidget {
                 color: c.surface.withValues(alpha: 0.72),
                 borderRadius: R.lg,
                 border: Border.all(color: c.border),
+                boxShadow: c.shadowUi,
               ),
               clipBehavior: Clip.antiAlias,
               child: Row(
@@ -1272,6 +1273,7 @@ class _TileFace extends StatelessWidget {
         color: face.active ? c.accentWash : c.surface.withValues(alpha: 0.72),
         borderRadius: R.md,
         border: Border.all(color: face.active ? c.accent : c.border),
+        boxShadow: c.shadowUi,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1323,6 +1325,7 @@ class _RoundFace extends StatelessWidget {
                   ? c.accentWash
                   : c.surface.withValues(alpha: 0.72),
               border: Border.all(color: face.active ? c.accent : c.border),
+              boxShadow: c.shadowUi,
             ),
             child: Icon(face.icon, size: Dim.iconMd, color: c.accentText),
           ),

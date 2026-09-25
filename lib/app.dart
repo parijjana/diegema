@@ -201,9 +201,13 @@ class _AudiobookAppState extends State<AudiobookApp>
         // — every value now comes from `lib/theme/`, built from
         // `design/tokens.css`.
         theme: AppTheme.light(
-            accent: _settings.accent, background: _settings.background),
+            accent: _settings.accent,
+            background: _settings.background,
+            shadows: _settings.shadows),
         darkTheme: AppTheme.dark(
-            accent: _settings.accent, background: _settings.background),
+            accent: _settings.accent,
+            background: _settings.background,
+            shadows: _settings.shadows),
         themeMode: _settings.themeMode,
         home: HomeScreen(
           db: _db,

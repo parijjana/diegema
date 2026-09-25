@@ -33,20 +33,22 @@ abstract final class AppTheme {
   static ThemeData light({
     AccentPalette accent = AccentPalette.fallback,
     BackgroundPair background = BackgroundPair.fallback,
+    ShadowStyle shadows = ShadowStyle.off,
   }) =>
       _build(
           Brightness.light,
           AppColors.themed(Brightness.light,
-              accent: accent, background: background));
+              accent: accent, background: background, shadows: shadows));
 
   static ThemeData dark({
     AccentPalette accent = AccentPalette.fallback,
     BackgroundPair background = BackgroundPair.fallback,
+    ShadowStyle shadows = ShadowStyle.off,
   }) =>
       _build(
           Brightness.dark,
           AppColors.themed(Brightness.dark,
-              accent: accent, background: background));
+              accent: accent, background: background, shadows: shadows));
 
   static ThemeData _build(Brightness brightness, AppColors c) {
     final textTheme = AppType.textTheme(c.text, c.textSecondary);
@@ -123,7 +125,10 @@ abstract final class AppTheme {
       dividerTheme: DividerThemeData(color: c.border, space: 1, thickness: 1),
       cardTheme: CardThemeData(
         color: c.surface,
-        elevation: 0,
+        // Material cards take the optional drop shadow as an elevation in
+        // the same colour (dark ink, or the accent glow in dark mode).
+        elevation: c.shadowUi.isEmpty ? 0 : c.shadowUi.first.blurRadius / 3,
+        shadowColor: c.shadowUi.isEmpty ? null : c.shadowUi.first.color,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: R.md,
@@ -259,6 +264,8 @@ abstract final class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: c.surface,
+        elevation: c.shadowUi.isEmpty ? 0 : c.shadowUi.first.blurRadius / 3,
+        shadowColor: c.shadowUi.isEmpty ? null : c.shadowUi.first.color,
         surfaceTintColor: Colors.transparent,
         indicatorColor: c.accentWash,
         indicatorShape: const RoundedRectangleBorder(borderRadius: R.pill),

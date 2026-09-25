@@ -141,6 +141,13 @@ class AppColors extends ThemeExtension<AppColors> {
   final List<BoxShadow> shadow3;
   final List<BoxShadow> shadowCover;
 
+  /// The optional drop shadow for cards, tiles and buttons (Settings >
+  /// Colours > Shadows). Empty when shadows are off, which is the default,
+  /// so a widget can always pass it to `boxShadow`. Painted with
+  /// [BlurStyle.outer], so it never darkens a translucent element from
+  /// underneath.
+  final List<BoxShadow> shadowUi;
+
   const AppColors({
     required this.bg,
     required this.surface,
@@ -169,6 +176,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.shadow2,
     required this.shadow3,
     required this.shadowCover,
+    this.shadowUi = const [],
   });
 
   static const AppColors light = AppColors(
@@ -260,16 +268,26 @@ class AppColors extends ThemeExtension<AppColors> {
     Brightness brightness, {
     AccentPalette accent = AccentPalette.fallback,
     BackgroundPair background = BackgroundPair.fallback,
+    ShadowStyle shadows = ShadowStyle.off,
   }) {
     final dark = brightness == Brightness.dark;
     final base = dark ? AppColors.dark : AppColors.light;
+    final a = accent.tones(brightness);
+    final withShadows = shadows == ShadowStyle.off
+        ? base
+        : () {
+            final ui = shadowsFor(brightness, shadows, a.accent, base.text);
+            // The existing elevation tokens follow the same colour, so the
+            // mini player and play button match everything else.
+            return base.copyWith(
+                shadowUi: ui, shadow1: ui, shadow2: ui, shadow3: ui);
+          }();
     if (accent == AccentPalette.fallback &&
         background == BackgroundPair.fallback) {
-      return base;
+      return withShadows;
     }
-    final a = accent.tones(brightness);
     final b = background.tones(brightness);
-    return base.copyWith(
+    return withShadows.copyWith(
       bg: b.bg,
       surface: b.surface,
       surfaceSunken: b.surfaceSunken,
@@ -284,6 +302,36 @@ class AppColors extends ThemeExtension<AppColors> {
       accentWash: accentWashFor(brightness, a, b),
       surfaceAccent: Color.lerp(b.bg, a.accent, dark ? 0.14 : 0.06),
     );
+  }
+
+  /// The drop shadow for [style]: [darkInk] (the text colour) in light
+  /// mode, a faded [accent] glow in dark mode.
+  static List<BoxShadow> shadowsFor(
+      Brightness brightness, ShadowStyle style, Color accent, Color darkInk) {
+    if (style == ShadowStyle.off) return const [];
+    final dark = brightness == Brightness.dark;
+    final strong = style == ShadowStyle.strong;
+    final colour = dark ? accent : darkInk;
+    final alpha = switch ((dark, strong)) {
+      (false, false) => 0.16,
+      (false, true) => 0.28,
+      (true, false) => 0.30,
+      (true, true) => 0.50,
+    };
+    return [
+      BoxShadow(
+        color: colour.withValues(alpha: alpha),
+        blurRadius: strong ? 20 : 12,
+        offset: Offset(0, strong ? 8 : 4),
+        blurStyle: BlurStyle.outer,
+      ),
+      BoxShadow(
+        color: colour.withValues(alpha: alpha * 0.6),
+        blurRadius: strong ? 4 : 2,
+        offset: Offset(0, strong ? 2 : 1),
+        blurStyle: BlurStyle.outer,
+      ),
+    ];
   }
 
   /// The tinted background behind accent text (selected rows, chips).
@@ -321,6 +369,7 @@ class AppColors extends ThemeExtension<AppColors> {
     List<BoxShadow>? shadow2,
     List<BoxShadow>? shadow3,
     List<BoxShadow>? shadowCover,
+    List<BoxShadow>? shadowUi,
   }) {
     return AppColors(
       bg: bg ?? this.bg,
@@ -350,6 +399,7 @@ class AppColors extends ThemeExtension<AppColors> {
       shadow2: shadow2 ?? this.shadow2,
       shadow3: shadow3 ?? this.shadow3,
       shadowCover: shadowCover ?? this.shadowCover,
+      shadowUi: shadowUi ?? this.shadowUi,
     );
   }
 
@@ -386,6 +436,7 @@ class AppColors extends ThemeExtension<AppColors> {
       shadow2: s(shadow2, other.shadow2),
       shadow3: s(shadow3, other.shadow3),
       shadowCover: s(shadowCover, other.shadowCover),
+      shadowUi: s(shadowUi, other.shadowUi),
     );
   }
 }

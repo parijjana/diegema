@@ -118,6 +118,9 @@ Future<void> importFolder(
       coverPath =
           await saveCoverBytes(metadata!.coverBytes!, metadata.coverMime, bookId);
     }
+    // Step 2: no embedded art — look for a cover/folder/front/albumart
+    // image file (or a lone image) sitting in the folder itself.
+    coverPath ??= await findFolderCoverImage(selectedDirectory);
 
     final book = UnifiedAudiobook(
       id: bookId,
@@ -193,6 +196,8 @@ Future<void> importFiles(
       coverPath =
           await saveCoverBytes(metadata!.coverBytes!, metadata.coverMime, bookId);
     }
+    // Step 2: no embedded art — check each picked file's own folder.
+    coverPath ??= await findFolderCoverImageForFiles(paths);
 
     final book = UnifiedAudiobook(
       id: bookId,

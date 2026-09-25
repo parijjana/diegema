@@ -31,6 +31,58 @@ Future<LocalMediaMetadata?> readEmbeddedMetadataForFiles(
   return null;
 }
 
+const _coverBasenames = {'cover', 'folder', 'front', 'albumart'};
+const _coverExtensions = {'.jpg', '.jpeg', '.png'};
+
+/// Step 2 of the local-import cover pipeline: when the embedded-metadata
+/// lookup (step 1) found no art, look for a plain image file sitting next
+/// to the audio. Preferring, in order:
+/// - a file named `cover`/`folder`/`front`/`albumart` (case-insensitive,
+///   `.jpg`/`.jpeg`/`.png`), the first match in directory-listing order;
+/// - if none match by name but the folder holds exactly one image file,
+///   that file.
+///
+/// Never throws; returns `null` on any failure or when nothing qualifies.
+Future<String?> findFolderCoverImage(String folderPath) async {
+  try {
+    final dir = Directory(folderPath);
+    if (!await dir.exists()) return null;
+
+    final images = <File>[];
+    await for (final entity in dir.list()) {
+      if (entity is! File) continue;
+      final ext = p.extension(entity.path).toLowerCase();
+      if (_coverExtensions.contains(ext)) images.add(entity);
+    }
+    if (images.isEmpty) return null;
+
+    for (final file in images) {
+      final base = p.basenameWithoutExtension(file.path).toLowerCase();
+      if (_coverBasenames.contains(base)) return file.path;
+    }
+
+    if (images.length == 1) return images.single.path;
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Runs [findFolderCoverImage] across every distinct parent folder in
+/// [paths] (a file import can span several folders; a folder import has
+/// just the one), returning the first hit.
+Future<String?> findFolderCoverImageForFiles(List<String> paths) async {
+  final folders = <String>{};
+  for (final path in paths) {
+    folders.add(p.dirname(path));
+  }
+  for (final folder in folders) {
+    final found = await findFolderCoverImage(folder);
+    if (found != null) return found;
+  }
+  return null;
+}
+
 /// Saves [bytes] as [bookId]'s cover under
 /// `<application documents>/diegema/covers/<bookId>.<jpg|png>`, returning
 /// the saved absolute path, or `null` on any write failure (never throws).

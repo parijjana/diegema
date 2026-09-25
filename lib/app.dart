@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'core/app_info.dart';
 import 'core/app_settings.dart';
@@ -12,6 +14,7 @@ import 'services/artwork_enrichment_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
+import 'services/local_cover_backfill_service.dart';
 import 'theme/app_theme.dart';
 
 /// Root widget. [database], [libriVoxService], [downloader], and
@@ -88,6 +91,16 @@ class _AudiobookAppState extends State<AudiobookApp>
     WidgetsBinding.instance.addObserver(this);
     _settings.load();
     _syncHostPageTheme();
+
+    // Step 4 of the local-import cover pipeline: once per launch, give
+    // already-imported local books another shot at a cover. Only for a
+    // real, non-injected database — widget/unit tests inject their own
+    // [AppDatabase] (same reason [artworkService]/[libriVoxService] are
+    // injectable) and must never trigger a real network call via
+    // [CoverLookupService]'s default client.
+    if (widget.database == null && !kDemoMode) {
+      unawaited(LocalCoverBackfillService(db: _db).run());
+    }
   }
 
   void _onSettingsChanged() {

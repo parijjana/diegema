@@ -191,8 +191,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   /// its progress row are untouched — the undo below simply clears the
   /// flag again.
   Future<void> _hide(UnifiedAudiobook book) async {
-    setState(() =>
-        _continueListening = _continueListening.where((b) => b.id != book.id).toList());
+    setState(() => _continueListening =
+        _continueListening.where((b) => b.id != book.id).toList());
     await widget.db.hideFromContinue(book.id);
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -273,10 +273,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             final progress = _reversing ? 1 - t : t;
             final leaving =
                 (progress / _outgoingEnd).clamp(0.0, 1.0).toDouble();
-            final arriving = ((progress - _incomingStart) /
-                    (1 - _incomingStart))
-                .clamp(0.0, 1.0)
-                .toDouble();
+            final arriving =
+                ((progress - _incomingStart) / (1 - _incomingStart))
+                    .clamp(0.0, 1.0)
+                    .toDouble();
 
             // How visible each layer is, 0-1, before its curve.
             final listVis = _reversing ? arriving : 1 - leaving;
@@ -564,8 +564,8 @@ class _SectionHeader extends StatelessWidget {
               header: true,
               // Sentence case at title-sm. The old build rendered this slot
               // as `TITLE`.toUpperCase() at 11px with letterSpacing 1.5.
-              child: Text(title,
-                  style: AppType.titleSm.copyWith(color: c.text)),
+              child:
+                  Text(title, style: AppType.titleSm.copyWith(color: c.text)),
             ),
           ),
           if (trailing != null) trailing!,
@@ -784,9 +784,7 @@ class _ContinueListeningItem extends StatelessWidget {
                 tooltip: isPinned ? 'Unpin' : 'Pin',
                 onPressed: onTogglePin,
                 icon: Icon(
-                  isPinned
-                      ? Icons.push_pin_rounded
-                      : Icons.push_pin_outlined,
+                  isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
                   color: isPinned ? c.accentText : c.textSecondary,
                 ),
               ),
@@ -831,6 +829,7 @@ class _DismissBackground extends StatelessWidget {
     );
   }
 }
+
 class _ActiveView extends StatelessWidget {
   final UnifiedAudiobook book;
   final AudioPlaybackService audioService;
@@ -860,64 +859,65 @@ class _ActiveView extends StatelessWidget {
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= Dim.wideBreakpoint;
         final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
-        // Cover art is square (see `app_book_cover.dart`), so a single
-        // `coverSize` now drives both axes. It is sized from the *smaller*
-        // of the two available axes so it can never push the transport off
-        // a short window or overflow a narrow one: on phone that is
-        // `min(width - 2*gutter, ~0.40*height)`, clamped so a very short or
-        // very tall window still leaves room for the bottom-anchored
-        // scrubber/transport/action row (checked down to 360x800 at text
-        // scale 2.0 by `responsive_layout_test.dart`). Wide keeps its
-        // previous height-driven sizing — it was never width-constrained,
-        // the header sits inside a 640px-max column with its own gutter.
-        final coverSize = (wide
-                ? constraints.maxHeight * 0.30
-                : math.min(constraints.maxWidth - 2 * Sp.x4,
-                    constraints.maxHeight * 0.40))
-            .clamp(120.0, wide ? 280.0 : 300.0)
-            .toDouble();
+        // Cover art is square (see `app_book_cover.dart`). Wide sizes it
+        // from the window height inside its 640px column; phone ignores
+        // this and fills the space it is given (the giant cover, below).
+        final coverSize =
+            (constraints.maxHeight * 0.30).clamp(120.0, 280.0).toDouble();
 
-        final header = Padding(
-          padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              AppBookCover(
-                bookId: book.id,
-                title: book.title,
-                coverUrl: book.coverArtUrlOrPath,
-                width: coverSize,
-                height: coverSize,
+        // [bleed] draws the cover edge to edge (phone's giant cover); the
+        // title and chapter line always keep the gutter.
+        Widget headerFor(double size, {bool bleed = false}) => Padding(
+              padding: EdgeInsets.fromLTRB(
+                  bleed ? 0 : Sp.x4, bleed ? 0 : Sp.x2, bleed ? 0 : Sp.x4, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  AppBookCover(
+                    bookId: book.id,
+                    title: book.title,
+                    coverUrl: book.coverArtUrlOrPath,
+                    width: size,
+                    height: size,
+                  ),
+                  const SizedBox(height: Sp.x5),
+                  Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: bleed ? Sp.x4 : 0),
+                    child: Text(
+                      book.title,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppType.serif(AppType.titleMd)
+                          .copyWith(color: c.text),
+                    ),
+                  ),
+                  const SizedBox(height: Sp.x1),
+                  ValueListenableBuilder<int>(
+                    valueListenable: audioService.chapterIndexNotifier,
+                    builder: (context, index, _) {
+                      final chapterLabel = index < book.chapters.length &&
+                              book.chapters.isNotEmpty
+                          ? '${book.author} · ${book.chapters[index].title} of '
+                              '${book.chapters.length}'
+                          : book.author;
+                      return Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: bleed ? Sp.x4 : 0),
+                        child: Text(
+                          chapterLabel,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.body.copyWith(color: c.textSecondary),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
-              const SizedBox(height: Sp.x5),
-              Text(
-                book.title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppType.serif(AppType.titleMd).copyWith(color: c.text),
-              ),
-              const SizedBox(height: Sp.x1),
-              ValueListenableBuilder<int>(
-                valueListenable: audioService.chapterIndexNotifier,
-                builder: (context, index, _) {
-                  final chapterLabel = index < book.chapters.length &&
-                          book.chapters.isNotEmpty
-                      ? '${book.author} · ${book.chapters[index].title} of '
-                          '${book.chapters.length}'
-                      : book.author;
-                  return Text(
-                    chapterLabel,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppType.body.copyWith(color: c.textSecondary),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
+            );
 
         final footer = Padding(
           padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Sp.x6),
@@ -965,14 +965,12 @@ class _ActiveView extends StatelessWidget {
                     return const SizedBox.shrink();
                   }
                   return Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
+                    padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         if (showError) ...[
-                          Icon(Icons.error_outline_rounded,
-                              color: c.danger),
+                          Icon(Icons.error_outline_rounded, color: c.danger),
                           const SizedBox(width: Sp.x2),
                           Text('Playback failed',
                               style: AppType.label.copyWith(color: c.danger)),
@@ -994,7 +992,11 @@ class _ActiveView extends StatelessWidget {
                         constraints: const BoxConstraints(maxWidth: 640),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
-                          children: [header, const SizedBox(height: Sp.x5), footer],
+                          children: [
+                            headerFor(coverSize),
+                            const SizedBox(height: Sp.x5),
+                            footer,
+                          ],
                         ),
                       ),
                     ),
@@ -1022,8 +1024,27 @@ class _ActiveView extends StatelessWidget {
                 Expanded(
                   child: Column(
                     children: [
+                      // The giant cover: as wide as the screen, and as tall
+                      // as the space left once the title lines are
+                      // reserved, so it grows to fill the phone and only
+                      // ever shrinks (never overflows) on short screens or
+                      // at large text sizes.
                       Expanded(
-                        child: SingleChildScrollView(child: header),
+                        child: LayoutBuilder(
+                          builder: (context, box) {
+                            final scale =
+                                MediaQuery.textScalerOf(context).scale(1);
+                            final titleReserve =
+                                Sp.x5 + Sp.x1 + Sp.x4 + 84 * scale;
+                            final size = math
+                                .min(box.maxWidth, box.maxHeight - titleReserve)
+                                .clamp(120.0, box.maxWidth)
+                                .toDouble();
+                            return SingleChildScrollView(
+                              child: headerFor(size, bleed: true),
+                            );
+                          },
+                        ),
                       ),
                       footer,
                     ],
@@ -1111,7 +1132,8 @@ class _UpNextTile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.queue_music_rounded, size: Dim.iconSm, color: c.accentText),
+              Icon(Icons.queue_music_rounded,
+                  size: Dim.iconSm, color: c.accentText),
               const SizedBox(width: Sp.x2),
               Flexible(
                 child: Text('Up next',

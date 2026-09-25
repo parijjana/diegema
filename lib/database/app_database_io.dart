@@ -631,4 +631,13 @@ class AppDatabase extends _$AppDatabase {
   Future<void> deleteBookmark(String id) async {
     await (delete(bookmarks)..where((b) => b.id.equals(id))).go();
   }
+
+  /// Removes a book row and its chapters. Progress and bookmarks are left
+  /// alone; callers only delete rows that have none.
+  Future<void> deleteAudiobook(String id) async {
+    await transaction(() async {
+      await (delete(chapters)..where((c) => c.audiobookId.equals(id))).go();
+      await (delete(audiobooks)..where((a) => a.id.equals(id))).go();
+    });
+  }
 }

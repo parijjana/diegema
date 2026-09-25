@@ -228,6 +228,10 @@ class AppDatabase {
     _bookmarks.removeWhere((b) => b.id == id);
   }
 
+  Future<void> deleteAudiobook(String id) async {
+    _audiobooks.remove(id);
+  }
+
   Future<void> close() async {}
 }
 

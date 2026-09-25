@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:diegema/core/utils/book_identity.dart';
 import 'package:diegema/database/app_database.dart';
+import 'package:diegema/domain/models/audiobook.dart';
 import 'package:diegema/services/local_library_scanner.dart';
 
 /// The downloads-folder scan used to be untestable: it called
@@ -87,5 +88,63 @@ void main() {
     await scanDownloadedLibrary(db, documentsRoot: () async => null);
 
     expect(await db.getAllAudiobooks(), isEmpty);
+  });
+
+  group('a folder a Discover download already owns', () {
+    UnifiedAudiobook discoverDownload(Directory dir) => UnifiedAudiobook(
+          id: 'short_scifi_32_1001_librivox',
+          title: 'Short Science Fiction Collection 032',
+          author: 'Various',
+          description: '',
+          source: 'Downloaded',
+          origin: BookIdentity.originLibrivox,
+          isDownloaded: true,
+          chapters: [
+            AudiobookChapter(
+              id: 'short_scifi_32_1001_librivox_local_0',
+              title: 'one',
+              audioPathOrUrl: p.join(dir.path, '01.mp3'),
+              durationSeconds: 0,
+              isStream: false,
+            ),
+          ],
+        );
+
+    test('is not registered a second time', () async {
+      final dir = bookFolder('Short Science Fiction Collection 032',
+          ['01.mp3', '02.mp3']);
+      await db.saveAudiobook(discoverDownload(dir));
+
+      await scan();
+
+      final books = await db.getAllAudiobooks();
+      expect(books.map((b) => b.id), ['short_scifi_32_1001_librivox']);
+    });
+
+    test('drops a duplicate an earlier scan already made', () async {
+      final dir = bookFolder('Short Science Fiction Collection 032',
+          ['01.mp3', '02.mp3']);
+      await scan(); // the old behaviour: registers the folder by path hash
+      await db.saveAudiobook(discoverDownload(dir));
+
+      await scan();
+
+      final books = await db.getAllAudiobooks();
+      expect(books.map((b) => b.id), ['short_scifi_32_1001_librivox']);
+    });
+
+    test('keeps a duplicate the user has listened to', () async {
+      final dir = bookFolder('Short Science Fiction Collection 032',
+          ['01.mp3', '02.mp3']);
+      await scan();
+      final dupId = BookIdentity.localIdForPath(dir.path);
+      await db.saveProgress(
+          audiobookId: dupId, chapterIndex: 0, positionSeconds: 90);
+      await db.saveAudiobook(discoverDownload(dir));
+
+      await scan();
+
+      expect(await db.getAudiobook(dupId), isNotNull);
+    });
   });
 }

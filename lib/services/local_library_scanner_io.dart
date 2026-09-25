@@ -41,6 +41,19 @@ Future<void> scanDownloadedLibrary(
   if (!await downloadsDir.exists()) return;
 
   final List<FileSystemEntity> entities = await downloadsDir.list().toList();
+
+  // A Discover download lands in this same directory but is saved under
+  // its archive.org id, not the path hash below. Without this map the scan
+  // re-registered every such download as a second "Downloaded Audiobook".
+  final owners = <String, String>{};
+  for (final book in await db.getAllAudiobooks()) {
+    if (book.id.startsWith(BookIdentity.localIdPrefix)) continue;
+    for (final ch in book.chapters) {
+      if (ch.isStream) continue;
+      owners.putIfAbsent(p.normalize(p.dirname(ch.audioPathOrUrl)),
+          () => book.id);
+    }
+  }
   for (final entity in entities) {
     if (entity is! Directory) continue;
 
@@ -58,6 +71,17 @@ Future<void> scanDownloadedLibrary(
     // core/utils/book_identity.dart).
     final bookId = BookIdentity.localIdForPath(entity.path);
     final existing = await db.getAudiobook(bookId);
+
+    // Another book already owns this folder: drop a duplicate an earlier
+    // scan made, unless the user has since listened to or bookmarked it.
+    if (owners.containsKey(p.normalize(entity.path))) {
+      if (existing != null &&
+          await db.getProgress(bookId) == null &&
+          (await db.getBookmarks(bookId)).isEmpty) {
+        await db.deleteAudiobook(bookId);
+      }
+      continue;
+    }
     if (existing != null) continue;
 
     final chapters = mp3Files.asMap().entries.map((e) {
@@ -86,3 +110,4 @@ Future<void> scanDownloadedLibrary(
     await db.saveAudiobook(book);
   }
 }
+

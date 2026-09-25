@@ -1105,6 +1105,22 @@ class _CoverBackdrop extends StatelessWidget {
                 ),
               ),
               ColoredBox(color: c.bg.withValues(alpha: 0.78)),
+              // Fade the tint out into the nav bar's colour over the last
+              // stretch, so the backdrop has no hard seam where the bar
+              // starts (and the bar's optional upward shadow shows).
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [c.surface.withValues(alpha: 0), c.surface],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

@@ -141,4 +141,21 @@ void main() {
 
     await unmount(tester);
   });
+
+  testWidgets('About credits LibriVox and disclaims any affiliation',
+      (tester) async {
+    await pumpApp(tester, <String, Object>{});
+    await goTo(tester, 'Settings');
+
+    expect(find.textContaining('come from LibriVox (librivox.org)'),
+        findsOneWidget);
+    expect(find.text('Visit librivox.org'), findsOneWidget,
+        reason: 'LibriVox asks for credit with a link to its site');
+    expect(find.textContaining('strongly support LibriVox'), findsOneWidget);
+    expect(find.textContaining('not affiliated with or endorsed by LibriVox'),
+        findsOneWidget);
+    expect(find.text('Volunteer for LibriVox'), findsOneWidget);
+
+    await unmount(tester);
+  });
 }

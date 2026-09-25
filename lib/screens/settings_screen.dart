@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_info.dart';
 import '../core/app_settings.dart';
@@ -84,18 +85,43 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 const _InfoRow(
                     label: kAppName, value: 'Version $kAppVersion'),
-                // ⚠️ THE LIBRIVOX ATTRIBUTION GOES HERE.
-                //
-                // Deliberately absent, not forgotten. The recordings are
-                // public domain and legally require nothing, but the
-                // catalogue is LibriVox's and a factual credit is owed
-                // before this app goes public. The owner reserved the
-                // wording for themselves and asked that it not be drafted
-                // unprompted, so this slot renders nothing rather than
-                // shipping a placeholder that reads as the real thing.
-                //
-                // `lib/widgets/librivox_volunteer_banner.dart` was kept
-                // unreferenced specifically as raw material for it.
+                // Credit as LibriVox asks for it ("we much prefer if you
+                // do credit us (with a link to our site)" —
+                // librivox.org/pages/public-domain), their objective in
+                // their own words, and a plain statement that this is an
+                // independent project.
+                const _InfoRow(
+                  label: 'Audiobooks from LibriVox',
+                  value: 'The recordings in Discover come from LibriVox '
+                      '(librivox.org), read and produced by volunteers. '
+                      'LibriVox recordings are in the public domain.',
+                ),
+                const _InfoRow(
+                  label: 'LibriVox\'s objective',
+                  value: '"To make all books in the public domain '
+                      'available, narrated by real people and distributed '
+                      'for free, in audio format on the internet."',
+                ),
+                const _InfoRow(
+                  label: 'We support LibriVox',
+                  value: 'We strongly support LibriVox and its mission. If '
+                      'you enjoy these recordings, consider volunteering to '
+                      'read or proof-listen.',
+                ),
+                _LinkRow(
+                  label: 'Visit librivox.org',
+                  onTap: () => _open('https://librivox.org/'),
+                ),
+                _LinkRow(
+                  label: 'Volunteer for LibriVox',
+                  onTap: () => _open(
+                      'https://librivox.org/pages/volunteer-for-librivox/'),
+                ),
+                const _InfoRow(
+                  label: 'Independent project',
+                  value: '$kAppName is not affiliated with or endorsed by '
+                      'LibriVox or the Internet Archive.',
+                ),
                 const _InfoRow(
                   label: 'Cover art',
                   value: 'Public domain. Per-image sources and asserted '
@@ -115,6 +141,14 @@ class SettingsScreen extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+Future<void> _open(String url) async {
+  try {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  } catch (e) {
+    debugPrint('Could not open $url: $e');
   }
 }
 

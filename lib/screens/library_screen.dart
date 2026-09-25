@@ -404,8 +404,8 @@ class _LibraryFab extends StatelessWidget {
       label: 'Import a book',
       excludeSemantics: true,
       child: Material(
-        color: c.accentFill,
-        elevation: 0,
+        // The fill is in the Ink below, over its shadow (see the cards).
+        type: MaterialType.transparency,
         // 18px — the mockup's own figure; it doesn't line up with an
         // existing `R.*` step (16 or 24), so it's spelled out here rather
         // than rounded to the nearest token.
@@ -413,10 +413,11 @@ class _LibraryFab extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: const BorderRadius.all(Radius.circular(18)),
-          child: Container(
+          child: Ink(
             height: _height,
             padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x5, 0),
             decoration: BoxDecoration(
+              color: c.accentFill,
               borderRadius: const BorderRadius.all(Radius.circular(18)),
               boxShadow: c.shadow2,
             ),
@@ -524,7 +525,10 @@ class _InProgressRow extends StatelessWidget {
         progress == null ? null : '${(progress! * 100).round()}%';
 
     return Material(
-      color: c.surface,
+      // Transparent: the fill lives in the Ink below, painted over its own
+      // shadow. A fill here with the shadow on a transparent box inside
+      // (as before) let the shadow darken the whole card.
+      type: MaterialType.transparency,
       borderRadius: R.md,
       child: InkWell(
         onTap: onTap,
@@ -535,8 +539,9 @@ class _InProgressRow extends StatelessWidget {
               ? 'View details for ${book.title}'
               : 'View details for ${book.title}, $percentLabel complete',
           excludeSemantics: true,
-          child: Container(
+          child: Ink(
             decoration: BoxDecoration(
+              color: c.surface,
               borderRadius: R.md,
               border: Border.all(color: c.border),
               boxShadow: c.shadow1,
@@ -628,7 +633,10 @@ class _BookRow extends StatelessWidget {
     final chapters = book.chapters.length;
 
     return Material(
-      color: c.surface,
+      // Transparent: the fill lives in the Ink below, painted over its own
+      // shadow. A fill here with the shadow on a transparent box inside
+      // (as before) let the shadow darken the whole card.
+      type: MaterialType.transparency,
       borderRadius: R.md,
       child: InkWell(
         onTap: onTap,
@@ -637,8 +645,9 @@ class _BookRow extends StatelessWidget {
           button: true,
           label: 'View details for ${book.title}',
           excludeSemantics: true,
-          child: Container(
+          child: Ink(
             decoration: BoxDecoration(
+              color: c.surface,
               borderRadius: R.md,
               border: Border.all(color: c.border),
               boxShadow: c.shadow1,

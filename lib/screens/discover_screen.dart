@@ -484,6 +484,8 @@ class _SearchField extends StatelessWidget {
       child: elevated
           ? DecoratedBox(
               decoration: BoxDecoration(
+                // Opaque, so the shadow can't show through the field.
+                color: c.surface,
                 borderRadius: R.sm,
                 boxShadow: c.shadow3,
               ),

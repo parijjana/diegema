@@ -12,6 +12,7 @@ import '../services/librivox_service.dart';
 import '../services/audio_playback_service.dart';
 import '../theme/app_theme.dart';
 import 'book_cover_image.dart';
+import 'book_description_view.dart';
 import 'glass_card.dart';
 
 class BookDetailPane extends StatefulWidget {
@@ -393,14 +394,11 @@ class _BookDetailPaneState extends State<BookDetailPane> {
             ),
           ),
         if (!kDemoMode && wide) const SizedBox(height: 20),
+        // No card title: the view brings its own "About" / "Contents"
+        // headings, and a "Description" title over them read twice.
         GlassCard(
-          title: 'Description',
           borderRadius: BorderRadius.circular(10),
-          child: Text(widget.book.description,
-              style: TextStyle(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
-                  height: 1.5,
-                  fontSize: 13)),
+          child: BookDescriptionView(description: widget.book.description),
         ),
         const SizedBox(height: 20),
         Text(

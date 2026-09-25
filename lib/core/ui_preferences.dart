@@ -20,6 +20,8 @@ class UiPreferences {
   static const String _skipSecondsKey = 'playback.skip_seconds';
   static const String _controlsStyleKey = 'now_playing.controls_style';
   static const String _transportStyleKey = 'now_playing.transport_style';
+  static const String _accentKey = 'appearance.accent';
+  static const String _backgroundKey = 'appearance.background';
 
   /// In-memory store used by tests. When supplied it replaces
   /// `shared_preferences` entirely, so no platform channel is touched.
@@ -199,6 +201,44 @@ class UiPreferences {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(key, style.name);
+    } catch (e) {
+      debugPrint('UiPreferences: write failed: $e');
+    }
+  }
+
+  /// The chosen accent palette id; null when never chosen. Unknown ids are
+  /// resolved (to the default) by the palette lookup, not here.
+  Future<String?> getAccentId() => _getString(_accentKey);
+  Future<void> setAccentId(String id) => _setString(_accentKey, id);
+
+  /// The chosen background pair id; null when never chosen.
+  Future<String?> getBackgroundId() => _getString(_backgroundKey);
+  Future<void> setBackgroundId(String id) => _setString(_backgroundKey, id);
+
+  Future<String?> _getString(String key) async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      final value = overrides[key];
+      return value is String ? value : null;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(key);
+    } catch (e) {
+      debugPrint('UiPreferences: read failed, using default: $e');
+      return null;
+    }
+  }
+
+  Future<void> _setString(String key, String value) async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      overrides[key] = value;
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, value);
     } catch (e) {
       debugPrint('UiPreferences: write failed: $e');
     }

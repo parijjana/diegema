@@ -8,6 +8,7 @@ import 'package:diegema/core/network/rate_limit_dispatcher.dart';
 import 'package:diegema/core/ui_preferences.dart';
 import 'package:diegema/database/app_database.dart';
 import 'package:diegema/services/librivox_service.dart';
+import 'package:diegema/theme/app_theme.dart';
 
 import '../support/fake_playback_service.dart';
 import '../support/test_harness.dart';
@@ -193,6 +194,54 @@ void main() {
       expect(tester.takeException(), isNull);
     }
 
+    await unmount(tester);
+  });
+
+  testWidgets('choosing a background and an accent recolours the app',
+      (tester) async {
+    final store = <String, Object>{};
+    await pumpApp(tester, store);
+    await goTo(tester, 'Settings');
+
+    Color bg() => Theme.of(tester.element(find.text('Settings').last))
+        .extension<AppColors>()!
+        .bg;
+    Color fill() => Theme.of(tester.element(find.text('Settings').last))
+        .extension<AppColors>()!
+        .accentFill;
+    expect(bg(), AppColors.light.bg);
+
+    final sepia = find.bySemanticsLabel('Sepia & Espresso background');
+    await reveal(tester, sepia);
+    await tester.ensureVisible(sepia);
+    await pumpFrames(tester);
+    await tester.tap(sepia);
+    await pumpFrames(tester);
+    expect(store['appearance.background'], 'sepia');
+    expect(bg(), BackgroundPair.sepia.light.bg);
+
+    final cyan = find.bySemanticsLabel('Cyan, neon accent');
+    await reveal(tester, cyan);
+    await tester.ensureVisible(cyan);
+    await pumpFrames(tester);
+    await tester.tap(cyan);
+    await pumpFrames(tester);
+    expect(store['appearance.accent'], 'cyan');
+    expect(fill(), AccentPalette.cyan.light.accentFill);
+
+    await unmount(tester);
+  });
+
+  testWidgets('a stored colour choice is applied on launch', (tester) async {
+    await pumpApp(tester, {
+      'appearance.background': 'mist',
+      'appearance.accent': 'crimson',
+    });
+    await goTo(tester, 'Settings');
+    final colors = Theme.of(tester.element(find.text('Settings').last))
+        .extension<AppColors>()!;
+    expect(colors.bg, BackgroundPair.mist.light.bg);
+    expect(colors.accentFill, AccentPalette.crimson.light.accentFill);
     await unmount(tester);
   });
 

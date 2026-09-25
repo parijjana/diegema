@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'app_palettes.dart';
+
 /// Primitive colour ramps from `design/tokens.css` / `design/tokens.md` §1.1.
 ///
 /// These are the *only* place raw hex literals are allowed to live. Widgets
@@ -247,6 +249,48 @@ class AppColors extends ThemeExtension<AppColors> {
       BoxShadow(color: Color(0x8C000000), blurRadius: 8, offset: Offset(0, 2)),
     ],
   );
+
+  /// The semantic tokens for a user-chosen [accent] and [background]
+  /// (Settings > Colours). The default pair returns the hand-measured
+  /// [light]/[dark] sets untouched; any other choice swaps in the palette's
+  /// surfaces and accent tones and derives the two accent tints from them,
+  /// so every combination stays opaque and measurable
+  /// (`test/theme/palette_contrast_test.dart`).
+  static AppColors themed(
+    Brightness brightness, {
+    AccentPalette accent = AccentPalette.fallback,
+    BackgroundPair background = BackgroundPair.fallback,
+  }) {
+    final dark = brightness == Brightness.dark;
+    final base = dark ? AppColors.dark : AppColors.light;
+    if (accent == AccentPalette.fallback &&
+        background == BackgroundPair.fallback) {
+      return base;
+    }
+    final a = accent.tones(brightness);
+    final b = background.tones(brightness);
+    return base.copyWith(
+      bg: b.bg,
+      surface: b.surface,
+      surfaceSunken: b.surfaceSunken,
+      surfaceRaised: b.surfaceRaised,
+      border: b.border,
+      borderContrast: b.borderContrast,
+      accent: a.accent,
+      accentText: a.accentText,
+      accentFill: a.accentFill,
+      textOnAccent: a.textOnAccent,
+      focusRing: a.accentText,
+      accentWash: accentWashFor(brightness, a, b),
+      surfaceAccent: Color.lerp(b.bg, a.accent, dark ? 0.14 : 0.06),
+    );
+  }
+
+  /// The tinted background behind accent text (selected rows, chips).
+  static Color accentWashFor(
+          Brightness brightness, AccentTones a, BackgroundTones b) =>
+      Color.lerp(
+          b.surface, a.accent, brightness == Brightness.dark ? 0.20 : 0.10)!;
 
   @override
   AppColors copyWith({

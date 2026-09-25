@@ -200,8 +200,10 @@ class _AudiobookAppState extends State<AudiobookApp>
         // two `ThemeData` blocks of raw hex that used to live here are gone
         // — every value now comes from `lib/theme/`, built from
         // `design/tokens.css`.
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
+        theme: AppTheme.light(
+            accent: _settings.accent, background: _settings.background),
+        darkTheme: AppTheme.dark(
+            accent: _settings.accent, background: _settings.background),
         themeMode: _settings.themeMode,
         home: HomeScreen(
           db: _db,

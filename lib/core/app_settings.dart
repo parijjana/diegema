@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'playback_constants.dart';
 import 'player_controls_style.dart';
+import '../theme/app_palettes.dart';
 import 'ui_preferences.dart';
 
 /// Every user-adjustable preference, in one place, read from and written
@@ -31,6 +32,8 @@ class AppSettings extends ChangeNotifier {
   int _skipSeconds;
   PlayerControlsStyle _controlsStyle = PlayerControlsStyle.tiles;
   PlayerControlsStyle _transportStyle = PlayerControlsStyle.round;
+  AccentPalette _accent = AccentPalette.fallback;
+  BackgroundPair _background = BackgroundPair.fallback;
 
   AppSettings({
     required UiPreferences preferences,
@@ -52,23 +55,36 @@ class AppSettings extends ChangeNotifier {
   /// Shape and size of the play, skip and chapter-jump buttons.
   PlayerControlsStyle get transportStyle => _transportStyle;
 
+  /// The accent colour (Settings > Colours).
+  AccentPalette get accent => _accent;
+
+  /// The light/dark background pair (Settings > Colours).
+  BackgroundPair get background => _background;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
     final storedSkip = await _preferences.getSkipSeconds();
     final storedStyle = await _preferences.getPlayerControlsStyle();
     final storedTransport = await _preferences.getTransportStyle();
+    final storedAccent = AccentPalette.byId(await _preferences.getAccentId());
+    final storedBackground =
+        BackgroundPair.byId(await _preferences.getBackgroundId());
 
     if (storedTheme == _themeMode &&
         storedSkip == _skipSeconds &&
         storedStyle == _controlsStyle &&
-        storedTransport == _transportStyle) {
+        storedTransport == _transportStyle &&
+        storedAccent == _accent &&
+        storedBackground == _background) {
       return;
     }
     _themeMode = storedTheme;
     _skipSeconds = storedSkip;
     _controlsStyle = storedStyle;
     _transportStyle = storedTransport;
+    _accent = storedAccent;
+    _background = storedBackground;
     notifyListeners();
   }
 
@@ -100,6 +116,20 @@ class AppSettings extends ChangeNotifier {
     _transportStyle = style;
     notifyListeners();
     await _preferences.setTransportStyle(style);
+  }
+
+  Future<void> setAccent(AccentPalette accent) async {
+    if (accent == _accent) return;
+    _accent = accent;
+    notifyListeners();
+    await _preferences.setAccentId(accent.id);
+  }
+
+  Future<void> setBackground(BackgroundPair background) async {
+    if (background == _background) return;
+    _background = background;
+    notifyListeners();
+    await _preferences.setBackgroundId(background.id);
   }
 }
 

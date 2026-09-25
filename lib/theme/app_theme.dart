@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 import 'app_metrics.dart';
+import 'app_palettes.dart';
 import 'app_typography.dart';
 
 export 'app_colors.dart';
+export 'app_palettes.dart';
 export 'app_metrics.dart';
 export 'app_typography.dart';
 
@@ -28,8 +30,23 @@ extension AppColorsContext on BuildContext {
 /// minimum sizes, card surfaces, input decoration, slider metrics, the
 /// focus ring. Per-call-site `styleFrom` is a bug, not a style choice.
 abstract final class AppTheme {
-  static ThemeData light() => _build(Brightness.light, AppColors.light);
-  static ThemeData dark() => _build(Brightness.dark, AppColors.dark);
+  static ThemeData light({
+    AccentPalette accent = AccentPalette.fallback,
+    BackgroundPair background = BackgroundPair.fallback,
+  }) =>
+      _build(
+          Brightness.light,
+          AppColors.themed(Brightness.light,
+              accent: accent, background: background));
+
+  static ThemeData dark({
+    AccentPalette accent = AccentPalette.fallback,
+    BackgroundPair background = BackgroundPair.fallback,
+  }) =>
+      _build(
+          Brightness.dark,
+          AppColors.themed(Brightness.dark,
+              accent: accent, background: background));
 
   static ThemeData _build(Brightness brightness, AppColors c) {
     final textTheme = AppType.textTheme(c.text, c.textSecondary);

@@ -87,6 +87,32 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
             _Section(
+              title: 'Colours',
+              children: [
+                const _GroupHeading(
+                  label: 'Background',
+                  description: 'Each option pairs a light-mode background '
+                      'with a dark-mode one.',
+                ),
+                _BackgroundPicker(
+                  value: settings.background,
+                  onChanged: settings.setBackground,
+                ),
+                const SizedBox(height: Sp.x5),
+                const _GroupHeading(
+                  label: 'Accent',
+                  description: 'Colours the play button, highlights and '
+                      'links.',
+                ),
+                for (final family in AccentFamily.values)
+                  _AccentFamilyRow(
+                    family: family,
+                    value: settings.accent,
+                    onChanged: settings.setAccent,
+                  ),
+              ],
+            ),
+            _Section(
               title: 'Playback',
               children: [
                 _ChoiceGroup<int>(
@@ -206,6 +232,265 @@ class _Choice<T> {
   final T value;
   final String label;
   const _Choice(this.value, this.label);
+}
+
+class _GroupHeading extends StatelessWidget {
+  final String label;
+  final String description;
+  const _GroupHeading({required this.label, required this.description});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sp.x3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(label, style: AppType.label.copyWith(color: c.text)),
+          const SizedBox(height: Sp.x1),
+          Text(description,
+              style: AppType.caption.copyWith(color: c.textSecondary)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Background pairs as two-up cards, each previewing its light half and
+/// its dark half side by side. One column at large text sizes.
+class _BackgroundPicker extends StatelessWidget {
+  final BackgroundPair value;
+  final ValueChanged<BackgroundPair> onChanged;
+  const _BackgroundPicker({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final scale = MediaQuery.textScalerOf(context).scale(1);
+      final columns = scale > 1.5 || constraints.maxWidth < 300 ? 1 : 2;
+      final width = (constraints.maxWidth - Sp.x3 * (columns - 1)) / columns;
+      return Wrap(
+        spacing: Sp.x3,
+        runSpacing: Sp.x3,
+        children: [
+          for (final pair in BackgroundPair.all)
+            SizedBox(
+              width: width,
+              child: _BackgroundCard(
+                pair: pair,
+                selected: pair == value,
+                onTap: () => onChanged(pair),
+              ),
+            ),
+        ],
+      );
+    });
+  }
+}
+
+class _BackgroundCard extends StatelessWidget {
+  final BackgroundPair pair;
+  final bool selected;
+  final VoidCallback onTap;
+  const _BackgroundCard({
+    required this.pair,
+    required this.selected,
+    required this.onTap,
+  });
+
+  Widget _half(BackgroundTones t, BorderRadius radius) => Expanded(
+        child: Container(
+          height: 56,
+          padding: const EdgeInsets.all(Sp.x2),
+          decoration: BoxDecoration(color: t.bg, borderRadius: radius),
+          alignment: Alignment.bottomLeft,
+          // A little card on the background, the way content sits on it.
+          child: Container(
+            width: 28,
+            height: 18,
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: R.sm,
+              border: Border.all(color: t.border),
+            ),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      inMutuallyExclusiveGroup: true,
+      selected: selected,
+      label: '${pair.name} background',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: R.md,
+        child: Container(
+          padding: const EdgeInsets.all(Sp.x2),
+          decoration: BoxDecoration(
+            color: selected ? c.accentWash : c.surface,
+            borderRadius: R.md,
+            border: Border.all(
+              color: selected ? c.accent : c.border,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius: R.sm,
+                child: Row(children: [
+                  _half(pair.light, BorderRadius.zero),
+                  _half(pair.dark, BorderRadius.zero),
+                ]),
+              ),
+              const SizedBox(height: Sp.x2),
+              Row(
+                children: [
+                  if (selected) ...[
+                    Icon(Icons.check_rounded,
+                        size: Dim.iconSm, color: c.accentText),
+                    const SizedBox(width: Sp.x1),
+                  ],
+                  Expanded(
+                    child: Text(
+                      pair.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppType.label.copyWith(
+                        color: c.text,
+                        fontWeight: selected ? FontWeight.w700 : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One accent family (Matte, Neon or Bold): a caption and a row of named
+/// swatches, each drawn in the fill it would give the play button in the
+/// current brightness.
+class _AccentFamilyRow extends StatelessWidget {
+  final AccentFamily family;
+  final AccentPalette value;
+  final ValueChanged<AccentPalette> onChanged;
+  const _AccentFamilyRow({
+    required this.family,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final brightness = Theme.of(context).brightness;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sp.x4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(family.label,
+              style: AppType.caption.copyWith(
+                  color: c.textSecondary, fontWeight: FontWeight.w700)),
+          const SizedBox(height: Sp.x2),
+          Wrap(
+            spacing: Sp.x2,
+            runSpacing: Sp.x3,
+            children: [
+              for (final palette in AccentPalette.all)
+                if (palette.family == family)
+                  _AccentSwatch(
+                    palette: palette,
+                    tones: palette.tones(brightness),
+                    selected: palette == value,
+                    onTap: () => onChanged(palette),
+                  ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccentSwatch extends StatelessWidget {
+  final AccentPalette palette;
+  final AccentTones tones;
+  final bool selected;
+  final VoidCallback onTap;
+  const _AccentSwatch({
+    required this.palette,
+    required this.tones,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      inMutuallyExclusiveGroup: true,
+      selected: selected,
+      label: '${palette.name}, ${palette.family.label.toLowerCase()} accent',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: R.md,
+        child: SizedBox(
+          width: 64,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: Sp.x1),
+            child: Column(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: tones.accentFill,
+                    // The ring sits outside the swatch so the selection
+                    // reads on every fill, dark or light.
+                    border: Border.all(
+                      color: selected ? c.text : c.border,
+                      width: selected ? 3 : 1,
+                    ),
+                  ),
+                  child: selected
+                      ? Icon(Icons.check_rounded,
+                          size: Dim.iconSm, color: tones.textOnAccent)
+                      : null,
+                ),
+                const SizedBox(height: Sp.x1),
+                Text(
+                  palette.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: AppType.caption.copyWith(
+                    color: c.text,
+                    fontWeight: selected ? FontWeight.w700 : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// A labelled three-way toggle: one rounded track split into equal

@@ -36,6 +36,11 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   drift_dev: ^2.20.0
   build_runner: ^2.4.9
+  # Used directly by test/services/local_book_metadata_test.dart to fake
+  # path_provider's platform channel (same technique as other IO-backed
+  # services' tests).
+  path_provider_platform_interface: ^2.1.2
+  plugin_platform_interface: ^2.1.8
 
 flutter:
   uses-material-design: true

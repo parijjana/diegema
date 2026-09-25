@@ -332,3 +332,97 @@ Uint8List buildNoChaptersM4b({
   ]);
   return Uint8List.fromList([...head, ...moov]);
 }
+
+// --- iTunes-style metadata (moov/udta/meta/ilst) --------------------------
+// Used by `test/core/utils/mp4_metadata_test.dart`.
+
+/// A synthetic (not-a-real-image) JPEG: just the magic bytes plus filler,
+/// enough for the sniffer and for a round-trip byte-equality check.
+Uint8List syntheticJpegBytes({int size = 64}) {
+  final bytes = Uint8List(size);
+  bytes[0] = 0xFF;
+  bytes[1] = 0xD8;
+  bytes[2] = 0xFF;
+  for (int i = 3; i < size; i++) {
+    bytes[i] = i % 256;
+  }
+  return bytes;
+}
+
+/// A synthetic (not-a-real-image) PNG: just the magic bytes plus filler.
+Uint8List syntheticPngBytes({int size = 64}) {
+  final bytes = Uint8List(size);
+  bytes[0] = 0x89;
+  bytes[1] = 0x50;
+  bytes[2] = 0x4E;
+  bytes[3] = 0x47;
+  for (int i = 4; i < size; i++) {
+    bytes[i] = i % 256;
+  }
+  return bytes;
+}
+
+/// An iTunes-style `data` atom: 4-byte well-known type + 4-byte locale +
+/// content.
+List<int> ilstData(int typeCode, List<int> content) {
+  return atom('data', [...u32(typeCode), ...u32(0), ...content]);
+}
+
+/// An `ilst`-child atom whose fourcc may contain a copyright sign (`©nam`,
+/// `©alb`, `©ART`) — `fourcc()`/`atom()` use `ascii.encode`, which rejects
+/// that byte (0xA9), so this writes the type bytes directly via
+/// `latin1.encode` instead.
+List<int> _ilstAtom(String type, List<int> payload) {
+  final typeBytes = latin1.encode(type);
+  return [...u32(8 + payload.length), ...typeBytes, ...payload];
+}
+
+/// A text `ilst` child (e.g. `©nam`, `©alb`, `©ART`, `aART`), type code 1 =
+/// UTF-8.
+List<int> ilstText(String fourccType, String text) {
+  return _ilstAtom(fourccType, [...ilstData(1, utf8.encode(text))]);
+}
+
+/// A `covr` `ilst` child. [typeCode] 13 = JPEG, 14 = PNG, 0 = sniff.
+List<int> ilstCover(List<int> imageBytes, {int typeCode = 13}) {
+  return _ilstAtom('covr', [...ilstData(typeCode, imageBytes)]);
+}
+
+/// `moov/udta/meta/ilst`, with `meta`'s 4-byte full-box header.
+List<int> metaIlst(List<List<int>> ilstChildren) {
+  final ilst = container('ilst', ilstChildren);
+  return atom('meta', [...fullBoxHeader(), ...ilst]);
+}
+
+/// A full M4B with an embedded `moov/udta/meta/ilst` metadata block —
+/// title/album/artist/album-artist tags and/or cover art — and no chapter
+/// data.
+Uint8List buildM4bWithMetadata({
+  String? name,
+  String? album,
+  String? artist,
+  String? albumArtist,
+  List<int>? coverBytes,
+  int coverTypeCode = 13,
+  bool metaUnderMoovDirectly = false,
+  int timescale = 1000,
+  int audioDurationMs = 60000,
+}) {
+  final head = ftyp();
+  final ilstChildren = <List<int>>[
+    if (name != null) ilstText('©nam', name),
+    if (album != null) ilstText('©alb', album),
+    if (artist != null) ilstText('©ART', artist),
+    if (albumArtist != null) ilstText('aART', albumArtist),
+    if (coverBytes != null) ilstCover(coverBytes, typeCode: coverTypeCode),
+  ];
+  final meta = metaIlst(ilstChildren);
+  final udta = container('udta', [meta]);
+
+  final moovChildren = [
+    mvhd(timescale: timescale, durationTicks: (audioDurationMs * timescale) ~/ 1000),
+    if (metaUnderMoovDirectly) meta else udta,
+  ];
+  final moov = container('moov', moovChildren);
+  return Uint8List.fromList([...head, ...moov]);
+}

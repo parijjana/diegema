@@ -6,6 +6,7 @@ import '../core/utils/book_identity.dart';
 import '../core/utils/mp4_chapters.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
+import 'local_book_metadata_io.dart';
 
 /// Builds this book's chapter list from its constituent files, expanding
 /// any `.m4b`/`.m4a` that carries 2+ embedded chapter markers (see
@@ -105,14 +106,26 @@ Future<void> importFolder(
     // core/utils/book_identity.dart for why hashCode must never be a
     // persisted database key.
     final bookId = BookIdentity.localIdForPath(selectedDirectory);
-    final chapters =
-        await chaptersForFiles(bookId, files.map((f) => f.path).toList());
+    final filePaths = files.map((f) => f.path).toList();
+    final chapters = await chaptersForFiles(bookId, filePaths);
+
+    // Embedded tags (title/author/description/cover), read straight off
+    // whichever file in the folder carries them. Filename/foldername stay
+    // the fallback when a file has no tags at all.
+    final metadata = await readEmbeddedMetadataForFiles(filePaths);
+    String? coverPath;
+    if (metadata?.hasCover == true) {
+      coverPath =
+          await saveCoverBytes(metadata!.coverBytes!, metadata.coverMime, bookId);
+    }
 
     final book = UnifiedAudiobook(
       id: bookId,
-      title: folderName.replaceAll('_', ' '),
-      author: 'Local Audiobook',
-      description: 'Imported from folder: $selectedDirectory',
+      title: _nonEmpty(metadata?.title) ?? folderName.replaceAll('_', ' '),
+      author: _nonEmpty(metadata?.author) ?? 'Local Audiobook',
+      description:
+          _nonEmpty(metadata?.description) ?? 'Imported from folder: $selectedDirectory',
+      coverArtUrlOrPath: coverPath,
       source: 'Local Folder',
       origin: BookIdentity.originLocal,
       chapters: chapters,
@@ -174,11 +187,20 @@ Future<void> importFiles(
     final bookId = BookIdentity.localIdForPaths(paths);
     final chapters = await chaptersForFiles(bookId, paths);
 
+    final metadata = await readEmbeddedMetadataForFiles(paths);
+    String? coverPath;
+    if (metadata?.hasCover == true) {
+      coverPath =
+          await saveCoverBytes(metadata!.coverBytes!, metadata.coverMime, bookId);
+    }
+
     final book = UnifiedAudiobook(
       id: bookId,
-      title: defaultTitle.replaceAll('_', ' '),
-      author: 'Local Files',
-      description: 'Imported ${paths.length} local audio files.',
+      title: _nonEmpty(metadata?.title) ?? defaultTitle.replaceAll('_', ' '),
+      author: _nonEmpty(metadata?.author) ?? 'Local Files',
+      description: _nonEmpty(metadata?.description) ??
+          'Imported ${paths.length} local audio files.',
+      coverArtUrlOrPath: coverPath,
       source: 'Local Files',
       origin: BookIdentity.originLocal,
       chapters: chapters,
@@ -202,4 +224,11 @@ Future<void> importFiles(
       );
     }
   }
+}
+
+/// `null`/empty-safe trim, used when deciding whether an embedded tag
+/// value should override the filename/foldername fallback.
+String? _nonEmpty(String? value) {
+  final trimmed = value?.trim();
+  return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
 }

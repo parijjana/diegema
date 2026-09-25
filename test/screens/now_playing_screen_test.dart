@@ -278,4 +278,36 @@ void main() {
       expect(audio.currentBookNotifier.value, isNull);
     });
   });
+
+  group('phone player action row', () {
+    // The "Up next" control used to be a top-left `TextButton` above the
+    // player. It now lives in the bottom action-tile row alongside Speed
+    // and Sleep, in the thumb zone — this asserts the new home works and
+    // the old row is gone.
+    testWidgets('the top-left Up next row is gone; the tile opens the queue',
+        (tester) async {
+      final book =
+          await seedBook(db, id: 'a', title: 'Middlemarch', runtimeSeconds: 600);
+
+      await setSurface(tester, const Size(390, 844));
+      await tester.pumpWidget(wrap());
+      await pumpFrames(tester);
+      await audio.loadBook(book);
+      await pumpFrames(tester);
+
+      // No stray `TextButton` reading "Up next" above the player any more.
+      expect(
+        find.widgetWithText(TextButton, 'Up next'),
+        findsNothing,
+      );
+
+      final upNextTile = find.text('Up next');
+      expect(upNextTile, findsOneWidget);
+      await tester.tap(upNextTile);
+      await pumpFrames(tester);
+
+      // The queue sheet opened over the player.
+      expect(find.text('Middlemarch'), findsWidgets);
+    });
+  });
 }

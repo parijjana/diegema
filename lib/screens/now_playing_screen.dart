@@ -859,126 +859,261 @@ class _ActiveView extends StatelessWidget {
         final wide = constraints.maxWidth >= Dim.wideBreakpoint;
         final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
         // Cover is sized from the *smaller* of the two axes so it can never
-        // push the transport off a short window.
-        final coverSize = (constraints.maxHeight * 0.30)
-            .clamp(120.0, wide ? 280.0 : 220.0)
+        // push the transport off a short window. Phone gets a bigger clamp
+        // (up from 220 to 300, at 0.36 of the height rather than 0.30) —
+        // the cover is the hero of the phone layout now that the scrubber
+        // and transport have moved to the bottom of the screen instead of
+        // sitting right underneath it.
+        final coverSize = (constraints.maxHeight * (wide ? 0.30 : 0.36))
+            .clamp(120.0, wide ? 280.0 : 300.0)
             .toDouble();
+
+        final header = Padding(
+          padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              AppBookCover(
+                bookId: book.id,
+                title: book.title,
+                coverUrl: book.coverArtUrlOrPath,
+                width: coverSize * 0.76,
+                height: coverSize,
+              ),
+              const SizedBox(height: Sp.x5),
+              Text(
+                book.title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.serif(AppType.titleMd).copyWith(color: c.text),
+              ),
+              const SizedBox(height: Sp.x1),
+              ValueListenableBuilder<int>(
+                valueListenable: audioService.chapterIndexNotifier,
+                builder: (context, index, _) {
+                  final chapterLabel = index < book.chapters.length &&
+                          book.chapters.isNotEmpty
+                      ? '${book.author} · ${book.chapters[index].title} of '
+                          '${book.chapters.length}'
+                      : book.author;
+                  return Text(
+                    chapterLabel,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.body.copyWith(color: c.textSecondary),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+
+        final footer = Padding(
+          padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Sp.x6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PlayerScrubber(audioService: audioService),
+              const SizedBox(height: Sp.x5),
+              PlayerTransport(audioService: audioService, book: book),
+              const SizedBox(height: Sp.x5),
+              wide
+                  ? Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: Sp.x3,
+                      runSpacing: Sp.x3,
+                      children: [
+                        SpeedSelector(audioService: audioService),
+                        SleepTimerSelector(audioService: audioService),
+                      ],
+                    )
+                  : _ActionTileRow(
+                      audioService: audioService,
+                      onShowUpNext: onShowUpNext,
+                    ),
+            ],
+          ),
+        );
 
         return Container(
           color: c.bg,
           child: Column(
             children: [
-              // The way back to the list. Never touches playback.
-              Padding(
-                padding: const EdgeInsets.fromLTRB(Sp.x2, Sp.x2, Sp.x4, 0),
-                child: Row(
-                  children: [
-                    Semantics(
-                      button: true,
-                      label: 'Up next. The chapters in this book.',
-                      excludeSemantics: true,
-                      child: TextButton.icon(
-                        onPressed: onShowUpNext,
-                        icon: const Icon(Icons.queue_music_rounded),
-                        label: const Text('Up next'),
-                      ),
-                    ),
-                    const Spacer(),
-                    ValueListenableBuilder<PlaybackState>(
-                      valueListenable: audioService.stateNotifier,
-                      builder: (context, state, _) {
-                        if (state != PlaybackState.error) {
-                          return const SizedBox.shrink();
-                        }
-                        return Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.error_outline_rounded, color: c.danger),
-                            const SizedBox(width: Sp.x2),
-                            Text('Playback failed',
-                                style:
-                                    AppType.label.copyWith(color: c.danger)),
-                          ],
-                        );
-                      },
-                    ),
-                    // Narrow only: the top tab bar holds the wide layout's
-                    // copy, and a bottom NavigationBar has nowhere for it.
-                    if (!wide && headerAction != null) ...[
-                      const SizedBox(width: Sp.x2),
-                      headerAction!,
-                    ],
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(horizontal: gutter),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 640),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppBookCover(
-                            bookId: book.id,
-                            title: book.title,
-                            coverUrl: book.coverArtUrlOrPath,
-                            width: coverSize * 0.76,
-                            height: coverSize,
-                          ),
-                          const SizedBox(height: Sp.x5),
-                          Text(
-                            book.title,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppType.serif(AppType.titleMd)
-                                .copyWith(color: c.text),
-                          ),
-                          const SizedBox(height: Sp.x1),
-                          ValueListenableBuilder<int>(
-                            valueListenable: audioService.chapterIndexNotifier,
-                            builder: (context, index, _) {
-                              final title = index < book.chapters.length
-                                  ? book.chapters[index].title
-                                  : book.author;
-                              return Text(
-                                title,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppType.body
-                                    .copyWith(color: c.textSecondary),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: Sp.x5),
-                          PlayerScrubber(audioService: audioService),
-                          const SizedBox(height: Sp.x5),
-                          PlayerTransport(
-                              audioService: audioService, book: book),
-                          const SizedBox(height: Sp.x6),
-                          Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: Sp.x3,
-                            runSpacing: Sp.x3,
-                            children: [
-                              SpeedSelector(audioService: audioService),
-                              SleepTimerSelector(audioService: audioService),
-                            ],
-                          ),
-                          const SizedBox(height: Sp.x8),
+              // Slim top-right row. It hosts only the playback-error
+              // indicator and (on phone) the theme toggle passed down as
+              // `headerAction` — neither of which touches playback — and
+              // takes no space at all when both are absent. The "Up next"
+              // row that used to live here on phone has moved into the
+              // action tile row at the bottom, in the thumb zone.
+              ValueListenableBuilder<PlaybackState>(
+                valueListenable: audioService.stateNotifier,
+                builder: (context, state, _) {
+                  final showError = state == PlaybackState.error;
+                  final showHeaderAction = !wide && headerAction != null;
+                  if (!showError && !showHeaderAction) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding:
+                        const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (showError) ...[
+                          Icon(Icons.error_outline_rounded,
+                              color: c.danger),
+                          const SizedBox(width: Sp.x2),
+                          Text('Playback failed',
+                              style: AppType.label.copyWith(color: c.danger)),
                         ],
+                        if (showError && showHeaderAction)
+                          const SizedBox(width: Sp.x3),
+                        if (showHeaderAction) headerAction!,
+                      ],
+                    ),
+                  );
+                },
+              ),
+              if (wide)
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(horizontal: gutter),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 640),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [header, const SizedBox(height: Sp.x5), footer],
+                        ),
                       ),
                     ),
                   ),
+                )
+              else
+                // Phone: cover/title/chapter pinned at the top, scrubber
+                // and transport pushed to the BOTTOM of the available
+                // space (the thumb zone).
+                //
+                // `Expanded(SingleChildScrollView(header)) + footer` rather
+                // than the more obvious `ConstrainedBox(minHeight) +
+                // IntrinsicHeight + Spacer`: that combination was tried
+                // first, but a `Spacer`'s intrinsic height contribution is
+                // unbounded, so `IntrinsicHeight` computed an infinite
+                // intrinsic size for the column and crashed layout as soon
+                // as anything below it (the action-tile row's fixed-height
+                // `SizedBox`es) tried to enforce a concrete height against
+                // it. Here the footer is a normal, non-scrolling sibling
+                // pinned below an `Expanded` scroll area: on a tall screen
+                // the header sits at the scroll area's top with blank
+                // space below it and the footer directly under that, and
+                // on a short one the scroll area simply scrolls — no
+                // intrinsic pass involved at all.
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(child: header),
+                      ),
+                      footer,
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Phone-only action row: three equal-width 48px tiles directly above the
+/// bottom nav — Up next, Speed, Sleep. Speed and Sleep reuse
+/// [SpeedSelector]/[SleepTimerSelector] (their popup-menu logic is not
+/// duplicated here); they are only restyled with a square tile radius and
+/// stretched to fill the tile, via the `radius`/`stretch` hooks on
+/// `player_transport.dart`'s chip shell.
+class _ActionTileRow extends StatelessWidget {
+  final AudioPlaybackService audioService;
+  final VoidCallback onShowUpNext;
+  const _ActionTileRow({
+    required this.audioService,
+    required this.onShowUpNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const tileHeight = 48.0;
+    // Fixed-width tiles computed from a `LayoutBuilder`, not `Expanded`:
+    // this row sits under `AnimatedBuilder`/`Opacity`/`Transform.scale`
+    // during the idle<->player cross-fade, and a `PopupMenuButton` (which
+    // both `SpeedSelector` and `SleepTimerSelector` are, under the hood)
+    // runs an internal dry-layout pass to size its overlay that gave an
+    // `Expanded` ancestor here unbounded height and crashed. Three
+    // explicit-width `SizedBox`es sidestep flex layout entirely.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tileWidth = (constraints.maxWidth - Sp.x2 * 2) / 3;
+        return Row(
+          children: [
+            SizedBox(
+              width: tileWidth,
+              height: tileHeight,
+              child: _UpNextTile(onPressed: onShowUpNext),
+            ),
+            const SizedBox(width: Sp.x2),
+            SizedBox(
+              width: tileWidth,
+              height: tileHeight,
+              child: SpeedSelector(audioService: audioService, tile: true),
+            ),
+            const SizedBox(width: Sp.x2),
+            SizedBox(
+              width: tileWidth,
+              height: tileHeight,
+              child: SleepTimerSelector(audioService: audioService, tile: true),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _UpNextTile extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _UpNextTile({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      label: 'Up next. The chapters in this book.',
+      excludeSemantics: true,
+      child: Material(
+        color: c.accentWash,
+        borderRadius: R.md,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: R.md,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.queue_music_rounded, size: Dim.iconSm, color: c.accentText),
+              const SizedBox(width: Sp.x2),
+              Flexible(
+                child: Text('Up next',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.label.copyWith(color: c.accentText)),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

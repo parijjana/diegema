@@ -213,7 +213,17 @@ class _RoundControl extends StatelessWidget {
 /// nothing until opened) and carries an accessible name.
 class SpeedSelector extends StatelessWidget {
   final AudioPlaybackService audioService;
-  const SpeedSelector({super.key, required this.audioService});
+
+  /// True inside the phone Now Playing action-tile row: stretches the chip
+  /// to fill its tile and squares its corners instead of the free-standing
+  /// pill. The popup-menu selection logic below is unchanged either way.
+  final bool tile;
+
+  const SpeedSelector({
+    super.key,
+    required this.audioService,
+    this.tile = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +246,7 @@ class SpeedSelector extends StatelessWidget {
             label: 'Playback speed, currently ${speed}x',
             excludeSemantics: true,
             child: _ChipShell(
+              stretch: tile,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -261,7 +272,15 @@ class SpeedSelector extends StatelessWidget {
 /// well as the fill, never by colour alone.
 class SleepTimerSelector extends StatelessWidget {
   final AudioPlaybackService audioService;
-  const SleepTimerSelector({super.key, required this.audioService});
+
+  /// See [SpeedSelector.tile].
+  final bool tile;
+
+  const SleepTimerSelector({
+    super.key,
+    required this.audioService,
+    this.tile = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -295,6 +314,7 @@ class SleepTimerSelector extends StatelessWidget {
             excludeSemantics: true,
             child: _ChipShell(
               emphasised: active,
+              stretch: tile,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -322,7 +342,18 @@ class SleepTimerSelector extends StatelessWidget {
 class _ChipShell extends StatelessWidget {
   final Widget child;
   final bool emphasised;
-  const _ChipShell({required this.child, this.emphasised = true});
+
+  /// True inside a fixed-size tile slot (the phone action-tile row): fills
+  /// the slot given by the parent `SizedBox`/`Expanded` and uses the
+  /// square `R.md` tile radius instead of the free-standing pill. See
+  /// [SpeedSelector.tile].
+  final bool stretch;
+
+  const _ChipShell({
+    required this.child,
+    this.emphasised = true,
+    this.stretch = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -330,13 +361,16 @@ class _ChipShell extends StatelessWidget {
     // No `alignment:` here. A Container with an alignment expands to fill
     // whatever it is given, which made both chips stretch the full width of
     // the player column instead of hugging their labels. Centring is the
-    // Row's job.
+    // Row's job. When `stretch` is true the parent already gives this a
+    // tight box (a 48px tile), so the Container is forced to fill it
+    // regardless.
     return Container(
+      width: stretch ? double.infinity : null,
       constraints: const BoxConstraints(minHeight: Dim.tapMin),
       padding: const EdgeInsets.symmetric(horizontal: Sp.x4),
       decoration: BoxDecoration(
         color: emphasised ? c.accentWash : c.surfaceSunken,
-        borderRadius: R.pill,
+        borderRadius: stretch ? R.md : R.pill,
         border: Border.all(color: emphasised ? c.accent : c.borderContrast),
       ),
       // `Flexible`, not a bare child: at large text scales the label is

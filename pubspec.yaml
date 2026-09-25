@@ -28,6 +28,7 @@ dependencies:
   # the Now Playing screen is shown). Works on web as well as native, so
   # the DEMO_MODE build keeps the same behaviour.
   shared_preferences: ^2.5.5
+  audio_service: ^0.18.19
 
 dev_dependencies:
   flutter_test:

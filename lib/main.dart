@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'app.dart';
@@ -13,6 +14,7 @@ import 'services/demo_artwork_service.dart';
 import 'services/demo_downloader.dart';
 import 'services/demo_librivox_service.dart';
 import 'services/audio_playback_service.dart';
+import 'services/diegema_audio_handler.dart';
 import 'services/demo_seed.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
@@ -45,8 +47,39 @@ Future<void> main() async {
     await seedDemoLibrary(demoDb);
   }
 
+  // Background playback (`audio_service`) needs one long-lived
+  // `AudioPlaybackService` that exists *before* `runApp` — the plugin's own
+  // requirement, so the lock screen/notification are wired up before the
+  // first frame rather than only once `AppShell` happens to build. That
+  // means the database it saves progress against has to exist this early
+  // too, so it is created here rather than left to `AudiobookApp`'s own
+  // `widget.database ?? AppDatabase()` fallback (which still runs, and is
+  // still what web — `audio_service` has no web support worth wiring up
+  // here — and every widget test continue to use).
+  //
+  // `AppShell.audioService`/`AudiobookApp.audioService` already exist as
+  // injection seams (tests use them to supply `FakePlaybackService`), so
+  // handing this instance down through them rather than letting `AppShell`
+  // construct its own is a wiring change only, not a new seam.
+  AppDatabase? nativeDb;
+  AudioPlaybackService? audioService;
+  if (!kIsWeb) {
+    nativeDb = demoDb ?? AppDatabase();
+    audioService = AudioPlaybackService(db: nativeDb);
+    try {
+      await initDiegemaAudioService(audioService);
+    } catch (e) {
+      // A platform `audio_service` cannot set up on (or a misconfigured
+      // manifest) must not block the app from starting — playback itself
+      // still works through `audioService` directly, just without the
+      // lock-screen/notification surface.
+      debugPrint('main: audio_service init failed: $e');
+    }
+  }
+
   runApp(AudiobookApp(
-    database: demoDb,
+    database: demoDb ?? nativeDb,
+    audioService: audioService,
     deepLink: deepLink,
     // `?theme=` overrides the stored choice when present, and only then —
     // absent a deep link this stays null so the persisted preference (or

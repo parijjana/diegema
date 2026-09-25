@@ -26,6 +26,10 @@ import 'theme/app_theme.dart';
 /// services without forking any widget.
 class AudiobookApp extends StatefulWidget {
   final AppDatabase? database;
+
+  /// Whether to run the once-per-launch cover backfill for imported books.
+  /// Only `main.dart` turns this on.
+  final bool runCoverBackfill;
   final LibriVoxService? libriVoxService;
   final LibriVoxStreamAndDownloader? downloader;
   final ArtworkEnrichmentService? artworkService;
@@ -57,6 +61,7 @@ class AudiobookApp extends StatefulWidget {
     super.key,
     this.initialThemeMode,
     this.database,
+    this.runCoverBackfill = false,
     this.libriVoxService,
     this.downloader,
     this.artworkService,
@@ -93,12 +98,12 @@ class _AudiobookAppState extends State<AudiobookApp>
     _syncHostPageTheme();
 
     // Step 4 of the local-import cover pipeline: once per launch, give
-    // already-imported local books another shot at a cover. Only for a
-    // real, non-injected database — widget/unit tests inject their own
-    // [AppDatabase] (same reason [artworkService]/[libriVoxService] are
-    // injectable) and must never trigger a real network call via
-    // [CoverLookupService]'s default client.
-    if (widget.database == null && !kDemoMode) {
+    // already-imported local books another shot at a cover. Opt-in rather
+    // than inferred from "no injected database": main.dart injects its
+    // native database too (for background playback), which silently
+    // disabled this in the real app. Tests leave it off so they never hit
+    // [CoverLookupService]'s real network client.
+    if (widget.runCoverBackfill && !kDemoMode) {
       unawaited(LocalCoverBackfillService(db: _db).run());
     }
   }

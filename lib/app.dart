@@ -14,6 +14,7 @@ import 'services/artwork_enrichment_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
+import 'services/ambience_service.dart';
 import 'services/local_cover_backfill_service.dart';
 import 'services/local_import_migration_service.dart';
 import 'theme/app_theme.dart';
@@ -51,6 +52,10 @@ class AudiobookApp extends StatefulWidget {
   /// `AppShell.audioService`, which this is threaded straight through to.
   final AudioPlaybackService? audioService;
 
+  /// The background-sound channel. Null on the web demo and in tests that
+  /// don't exercise it; the player then hides the ambience controls.
+  final AmbienceService? ambience;
+
   /// Injectable UI preference store, so widget tests never need the
   /// `shared_preferences` platform channel.
   final UiPreferences preferences;
@@ -79,6 +84,7 @@ class AudiobookApp extends StatefulWidget {
     this.downloader,
     this.artworkService,
     this.audioService,
+    this.ambience,
     this.preferences = const UiPreferences(),
     this.libraryScanner,
     this.deepLink = DemoDeepLink.none,
@@ -108,6 +114,7 @@ class _AudiobookAppState extends State<AudiobookApp>
     _db = widget.database ?? AppDatabase();
     WidgetsBinding.instance.addObserver(this);
     _settings.load();
+    widget.ambience?.init();
     _syncHostPageTheme();
 
     // Once per launch, before the cover backfill: migrate already-imported
@@ -192,7 +199,7 @@ class _AudiobookAppState extends State<AudiobookApp>
   Widget build(BuildContext context) {
     return SettingsScope(
       settings: _settings,
-      child: MaterialApp(
+      child: _withAmbience(MaterialApp(
         title: kAppName,
         debugShowCheckedModeBanner: false,
         // Both themes are supplied so the framework can cross-fade between
@@ -219,7 +226,14 @@ class _AudiobookAppState extends State<AudiobookApp>
           artworkService: widget.artworkService,
           audioService: widget.audioService,
         ),
-      ),
+      )),
     );
+  }
+
+  Widget _withAmbience(Widget app) {
+    final ambience = widget.ambience;
+    return ambience == null
+        ? app
+        : AmbienceScope(service: ambience, child: app);
   }
 }

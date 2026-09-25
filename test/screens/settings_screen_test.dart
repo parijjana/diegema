@@ -7,9 +7,11 @@ import 'package:diegema/app.dart';
 import 'package:diegema/core/network/rate_limit_dispatcher.dart';
 import 'package:diegema/core/ui_preferences.dart';
 import 'package:diegema/database/app_database.dart';
+import 'package:diegema/services/ambience_service.dart';
 import 'package:diegema/services/librivox_service.dart';
 import 'package:diegema/theme/app_theme.dart';
 
+import '../services/ambience_service_test.dart' show FakeChannel;
 import '../support/fake_playback_service.dart';
 import '../support/test_harness.dart';
 
@@ -45,8 +47,9 @@ void main() {
 
   Future<AppDatabase> pumpApp(
     WidgetTester tester,
-    Map<String, Object> store,
-  ) async {
+    Map<String, Object> store, {
+    AmbienceService? ambience,
+  }) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
@@ -59,6 +62,7 @@ void main() {
         rateLimiter: RateLimitDispatcher(cooldownOverride: Duration.zero),
       ),
       preferences: UiPreferences(overrides: store),
+      ambience: ambience,
     ));
     await pumpFrames(tester);
     return db;
@@ -269,6 +273,46 @@ void main() {
     await unmount(tester);
   });
 
+  testWidgets('the player offers Ambience, whose mixer builds a mix',
+      (tester) async {
+    final store = <String, Object>{};
+    final ambience = AmbienceService(
+      book: audio,
+      preferences: UiPreferences(overrides: store),
+      channelFactory: FakeChannel.new,
+      fade: Duration.zero,
+      useAudioSession: false,
+    );
+    final db = await pumpApp(tester, store, ambience: ambience);
+
+    final book = await seedBook(db, id: 'z', title: 'Persuasion');
+    await audio.loadBook(book);
+    await pumpFrames(tester);
+
+    // A fourth action beside Up next, Speed and Sleep.
+    final action = find.bySemanticsLabel(RegExp(r'^Ambience, off'));
+    expect(action, findsOneWidget);
+    await tester.tap(action);
+    await pumpFrames(tester);
+
+    expect(find.text('Play with the book'), findsOneWidget);
+    final rain = find.bySemanticsLabel('Rain');
+    await tester.scrollUntilVisible(rain, 150,
+        scrollable: find.byType(Scrollable).last);
+    await pumpFrames(tester);
+    await tester.tap(rain);
+    await pumpFrames(tester);
+    expect(ambience.state.value.mix.keys, ['rain']);
+    expect(ambience.state.value.on, isTrue);
+    // The master volume, plus a level slider for the sound just added.
+    expect(find.byType(Slider), findsNWidgets(2));
+
+    // Inside the body, not addTearDown: its futures belong to this test's
+    // fake-async zone and would never complete from outside it.
+    await unmount(tester);
+    await ambience.dispose();
+  });
+
   testWidgets('a stored skip interval is applied on launch', (tester) async {
     final db =
         await pumpApp(tester, <String, Object>{'playback.skip_seconds': 60});
@@ -307,11 +351,14 @@ void main() {
     expect(find.text('About'), findsOneWidget);
     await reveal(tester, find.textContaining('Version'));
     expect(find.textContaining('Version'), findsOneWidget);
-    await reveal(tester, find.textContaining('CREDITS.md'));
-    expect(find.textContaining('CREDITS.md'), findsOneWidget,
+    await reveal(tester, find.textContaining('covers/CREDITS.md'));
+    expect(find.textContaining('covers/CREDITS.md'), findsOneWidget,
         reason: 'the bundled covers are public domain but the record of '
             'which item each came from is what was actually missing');
     await reveal(tester, find.text('Open source licences'));
+    await reveal(tester, find.textContaining('BigSoundBank'));
+    expect(find.textContaining('BigSoundBank'), findsOneWidget,
+        reason: 'the ambience recordings are credited to their author');
     expect(find.text('Open source licences'), findsOneWidget);
 
     await unmount(tester);

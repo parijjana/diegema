@@ -13,6 +13,7 @@ import 'services/artwork_enrichment_service.dart';
 import 'services/demo_artwork_service.dart';
 import 'services/demo_downloader.dart';
 import 'services/demo_librivox_service.dart';
+import 'services/ambience_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/diegema_audio_handler.dart';
 import 'services/demo_seed.dart';
@@ -63,11 +64,13 @@ Future<void> main() async {
   // construct its own is a wiring change only, not a new seam.
   AppDatabase? nativeDb;
   AudioPlaybackService? audioService;
+  AmbienceService? ambience;
   if (!kIsWeb) {
     nativeDb = demoDb ?? AppDatabase();
     audioService = AudioPlaybackService(db: nativeDb);
+    ambience = AmbienceService(book: audioService);
     try {
-      await initDiegemaAudioService(audioService);
+      await initDiegemaAudioService(audioService, ambience: ambience);
     } catch (e) {
       // A platform `audio_service` cannot set up on (or a misconfigured
       // manifest) must not block the app from starting — playback itself
@@ -82,6 +85,7 @@ Future<void> main() async {
     runCoverBackfill: nativeDb != null,
     runImportMigration: nativeDb != null,
     audioService: audioService,
+    ambience: ambience,
     deepLink: deepLink,
     // `?theme=` overrides the stored choice when present, and only then —
     // absent a deep link this stays null so the persisted preference (or

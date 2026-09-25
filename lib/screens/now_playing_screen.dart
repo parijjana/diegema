@@ -14,6 +14,8 @@ import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/player_scrubber.dart';
 import '../widgets/player_transport.dart';
+import '../services/ambience_service.dart';
+import '../widgets/ambience_sheet.dart';
 import '../widgets/up_next_sheet.dart';
 
 /// Screen 1 — **Now Playing**, the app's default landing screen.
@@ -429,10 +431,24 @@ class _IdleView extends StatelessWidget {
             headline: 'Nothing in progress',
             body: 'Books you start appear here so you can pick up where '
                 'you left off. Find something to listen to in Discover.',
-            action: FilledButton.icon(
-              onPressed: onGoToDiscover,
-              icon: const Icon(Icons.explore_rounded),
-              label: const Text('Browse Discover'),
+            action: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: Sp.x3,
+              runSpacing: Sp.x3,
+              children: [
+                FilledButton.icon(
+                  onPressed: onGoToDiscover,
+                  icon: const Icon(Icons.explore_rounded),
+                  label: const Text('Browse Discover'),
+                ),
+                // Ambience plays without a book too.
+                if (AmbienceScope.maybeOf(context) case final ambience?)
+                  OutlinedButton.icon(
+                    onPressed: () => showAmbience(context, ambience),
+                    icon: const Icon(Icons.surround_sound_rounded),
+                    label: const Text('Ambience'),
+                  ),
+              ],
             ),
           );
         } else {
@@ -939,6 +955,12 @@ class _ActiveView extends StatelessWidget {
                       children: [
                         SpeedSelector(audioService: audioService),
                         SleepTimerSelector(audioService: audioService),
+                        if (AmbienceScope.maybeOf(context) case final amb?)
+                          OutlinedButton.icon(
+                            onPressed: () => showAmbience(context, amb),
+                            icon: const Icon(Icons.surround_sound_rounded),
+                            label: const Text('Ambience'),
+                          ),
                       ],
                     )
                   : _ActionRow(
@@ -1149,6 +1171,7 @@ class _ActionRow extends StatelessWidget {
     final c = context.colors;
     final style = SettingsScope.maybeOf(context)?.controlsStyle ??
         PlayerControlsStyle.tiles;
+    final ambience = AmbienceScope.maybeOf(context);
     Widget face(BuildContext context, ActionFace f) => switch (style) {
           PlayerControlsStyle.tiles => _TileFace(face: f),
           PlayerControlsStyle.round => _RoundFace(face: f),
@@ -1169,7 +1192,10 @@ class _ActionRow extends StatelessWidget {
       ),
       SpeedSelector(audioService: audioService, face: face),
       SleepTimerSelector(audioService: audioService, face: face),
+      if (ambience != null)
+        _AmbienceButton(service: ambience, face: face, radius: radius),
     ];
+    final count = children.length;
 
     // Fixed-width slots computed from a `LayoutBuilder`, not `Expanded`:
     // this row sits under `AnimatedBuilder`/`Opacity`/`Transform.scale`
@@ -1189,7 +1215,7 @@ class _ActionRow extends StatelessWidget {
             final height = style == PlayerControlsStyle.tiles
                 ? math.max(56.0, 20 + 37 * scale)
                 : null;
-            final width = (constraints.maxWidth - Sp.x2 * 2) / 3;
+            final width = (constraints.maxWidth - Sp.x2 * (count - 1)) / count;
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1200,9 +1226,11 @@ class _ActionRow extends StatelessWidget {
               ],
             );
           case PlayerControlsStyle.bar:
-            const height = 52.0;
-            // 1px border each side, two 1px dividers.
-            final width = (constraints.maxWidth - 2 - 2) / 3;
+            // Icon over label, so four segments still fit; grows with text.
+            final scale = MediaQuery.textScalerOf(context).scale(1);
+            final height = math.max(56.0, 32 + 18 * scale);
+            // 1px border each side, a 1px divider between segments.
+            final width = (constraints.maxWidth - 2 - (count - 1)) / count;
             return Container(
               decoration: BoxDecoration(
                 color: c.glassSurface,
@@ -1223,6 +1251,47 @@ class _ActionRow extends StatelessWidget {
             );
         }
       },
+    );
+  }
+}
+
+class _AmbienceButton extends StatelessWidget {
+  final AmbienceService service;
+  final ActionFaceBuilder face;
+  final BorderRadius radius;
+  const _AmbienceButton({
+    required this.service,
+    required this.face,
+    required this.radius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<AmbienceState>(
+      valueListenable: service.state,
+      builder: (context, s, _) => Semantics(
+        button: true,
+        label: 'Ambience, ${s.playing ? 'playing ${s.summary}' : 'off'}. '
+            'Background sounds.',
+        excludeSemantics: true,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: () => showAmbience(context, service),
+            borderRadius: radius,
+            child: face(
+              context,
+              ActionFace(
+                icon: Icons.surround_sound_rounded,
+                caption: 'Ambience',
+                value: s.summary,
+                short: s.playing ? s.sounds.first.name : 'Ambience',
+                active: s.playing,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1275,7 +1344,8 @@ class _UpNextButton extends StatelessWidget {
   }
 }
 
-/// Style A: a tile with a small caption over the live value.
+/// Style A: a tile with a small icon and caption over the live value.
+/// Stacked rather than side by side, so four tiles fit a phone's width.
 class _TileFace extends StatelessWidget {
   final ActionFace face;
   const _TileFace({required this.face});
@@ -1291,28 +1361,27 @@ class _TileFace extends StatelessWidget {
         border: Border.all(color: face.active ? c.accent : c.border),
         boxShadow: c.shadowUi,
       ),
-      child: Row(
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(face.icon, size: Dim.iconSm, color: c.accentText),
-          const SizedBox(width: Sp.x2),
-          Flexible(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(face.caption,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(face.icon, size: 16, color: c.accentText),
+              const SizedBox(width: Sp.x1),
+              Flexible(
+                child: Text(face.caption,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppType.caption.copyWith(color: c.textSecondary)),
-                Text(face.value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppType.label
-                        .copyWith(color: c.text, fontWeight: FontWeight.w700)),
-              ],
-            ),
+              ),
+            ],
           ),
+          Text(face.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.label
+                  .copyWith(color: c.text, fontWeight: FontWeight.w700)),
         ],
       ),
     );
@@ -1357,7 +1426,7 @@ class _RoundFace extends StatelessWidget {
 }
 
 /// Style C: one segment of a shared bar (the bar itself is drawn by
-/// [_ActionRow]).
+/// [_ActionRow]), icon over a one-word label.
 class _BarFace extends StatelessWidget {
   final ActionFace face;
   const _BarFace({required this.face});
@@ -1367,18 +1436,17 @@ class _BarFace extends StatelessWidget {
     final c = context.colors;
     return Container(
       color: face.active ? c.accentWash : Colors.transparent,
-      padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: Sp.x1),
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(face.icon, size: Dim.iconSm, color: c.accentText),
-          const SizedBox(width: Sp.x2),
-          Flexible(
-            child: Text(face.short,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppType.label.copyWith(color: c.text)),
-          ),
+          const SizedBox(height: 2),
+          Text(face.short,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.caption
+                  .copyWith(color: c.text, fontWeight: FontWeight.w600)),
         ],
       ),
     );

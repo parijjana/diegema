@@ -48,6 +48,9 @@ flutter:
   assets:
     - assets/demo/catalog.json
     - assets/demo/covers/
+    # Background ambience loops, built by tool/ambience/prepare_ambience.py
+    # (CC0 recordings + generated noise; see assets/ambience/CREDITS.md).
+    - assets/ambience/
 
   fonts:
     # Inter 4.0 (SIL Open Font License, assets/fonts/OFL.txt). The type

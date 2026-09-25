@@ -40,6 +40,10 @@ class AudioPlaybackService {
   final ValueNotifier<double> speedNotifier = ValueNotifier(1.0);
   final ValueNotifier<Duration?> sleepTimerNotifier = ValueNotifier(null);
 
+  /// Bumped each time the sleep timer runs out (not when it is cancelled),
+  /// so the ambience channel can stop with the book.
+  final ValueNotifier<int> sleepTimerFired = ValueNotifier(0);
+
   AudioPlaybackService({AudioPlayer? player, AppDatabase? db})
       : _player = player ?? AudioPlayer(),
         _db = db {
@@ -324,6 +328,7 @@ class AudioPlaybackService {
     _sleepTimer = Timer(duration, () async {
       await pause();
       cancelSleepTimer();
+      sleepTimerFired.value++;
     });
 
     _sleepTimerTicker = Timer.periodic(const Duration(seconds: 1), (timer) {

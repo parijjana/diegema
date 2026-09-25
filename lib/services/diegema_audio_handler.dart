@@ -6,6 +6,7 @@ import '../domain/models/audiobook.dart';
 // Prefixed: `PlaybackState` here (the app's play/pause/loading/... enum)
 // would otherwise collide with `audio_service`'s own `PlaybackState` class
 // (the notification/lock-screen state snapshot broadcast below).
+import 'ambience_service.dart';
 import 'audio_playback_service.dart' as playback;
 
 /// Bridges [AudioPlaybackService] to `audio_service`, so the same player
@@ -29,6 +30,11 @@ class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
   /// `NowPlayingScreen` already do — see `core/playback_constants.dart`.
   final int Function() _skipSeconds;
 
+  /// The background-sound channel. When it plays while the book does not,
+  /// the notification (and so Android's foreground service, which keeps
+  /// the audio alive in the background) represents the ambience instead.
+  final AmbienceService? _ambience;
+
   /// Detach closures for every listener registered on the wrapped service's
   /// notifiers, run by [disposeHandler]. A plain list of `VoidCallback`s
   /// rather than `StreamSubscription`s: [ValueNotifier] is listener-based
@@ -39,7 +45,9 @@ class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
   DiegemaAudioHandler(
     this._playbackService, {
     int Function() skipSeconds = _defaultSkipSeconds,
-  }) : _skipSeconds = skipSeconds {
+    AmbienceService? ambience,
+  })  : _skipSeconds = skipSeconds,
+        _ambience = ambience {
     _broadcastMediaItem();
     _broadcastPlaybackState();
 
@@ -49,7 +57,19 @@ class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
     _listen(_playbackService.speedNotifier, _broadcastPlaybackState);
     _listen(_playbackService.currentBookNotifier, _broadcastMediaItem);
     _listen(_playbackService.chapterIndexNotifier, _broadcastMediaItem);
+    final ambience = _ambience;
+    if (ambience != null) {
+      _listen(ambience.state, () {
+        _broadcastMediaItem();
+        _broadcastPlaybackState();
+      });
+    }
   }
+
+  /// Ambience is audible and the book is not.
+  bool get _ambienceOnly =>
+      (_ambience?.state.value.playing ?? false) &&
+      _playbackService.stateNotifier.value != playback.PlaybackState.playing;
 
   void _listen<T>(ValueNotifier<T> notifier, VoidCallback onChange) {
     notifier.addListener(onChange);
@@ -72,6 +92,16 @@ class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   void _broadcastMediaItem() {
+    final ambience = _ambience;
+    if (ambience != null && _ambienceOnly) {
+      mediaItem.add(MediaItem(
+        id: 'diegema.ambience',
+        title: 'Ambience',
+        artist: ambience.state.value.sounds.map((s) => s.name).join(', '),
+        album: 'Diegema',
+      ));
+      return;
+    }
     final book = _book;
     final chapter = _chapter;
     if (book == null || chapter == null) {
@@ -102,6 +132,19 @@ class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   void _broadcastPlaybackState() {
+    if (_ambienceOnly) {
+      playbackState.add(playbackState.value.copyWith(
+        controls: [MediaControl.pause],
+        systemActions: const {},
+        androidCompactActionIndices: const [0],
+        processingState: AudioProcessingState.ready,
+        playing: true,
+        updatePosition: Duration.zero,
+        bufferedPosition: Duration.zero,
+        speed: 1.0,
+      ));
+      return;
+    }
     final state = _playbackService.stateNotifier.value;
     final playing = state == playback.PlaybackState.playing;
 
@@ -135,10 +178,19 @@ class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   @override
-  Future<void> play() => _playbackService.play();
+  Future<void> play() {
+    final ambience = _ambience;
+    // Nothing loaded to resume: the play key brings the ambience back.
+    if (_book == null && ambience != null) return ambience.setOn(true);
+    return _playbackService.play();
+  }
 
   @override
-  Future<void> pause() => _playbackService.pause();
+  Future<void> pause() {
+    final ambience = _ambience;
+    if (ambience != null && _ambienceOnly) return ambience.setOn(false);
+    return _playbackService.pause();
+  }
 
   @override
   Future<void> stop() => _playbackService.pause();
@@ -184,10 +236,11 @@ class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
 Future<DiegemaAudioHandler> initDiegemaAudioService(
   playback.AudioPlaybackService playbackService, {
   int Function() skipSeconds = DiegemaAudioHandler._defaultSkipSeconds,
+  AmbienceService? ambience,
 }) {
   return AudioService.init(
-    builder: () =>
-        DiegemaAudioHandler(playbackService, skipSeconds: skipSeconds),
+    builder: () => DiegemaAudioHandler(playbackService,
+        skipSeconds: skipSeconds, ambience: ambience),
     config: const AudioServiceConfig(
       androidNotificationChannelId:
           'com.overengineeredhobbies.diegema.playback',

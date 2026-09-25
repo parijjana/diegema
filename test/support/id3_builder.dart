@@ -89,6 +89,9 @@ Uint8List buildMp3WithId3(List<List<int>> frames,
     0, // flags
     ..._syncsafe(frameBytes.length),
   ];
-  return Uint8List.fromList(
-      [...header, ...frameBytes, ...(audioPayload ?? const [0xFF, 0xFB, 0, 0])]);
+  return Uint8List.fromList([
+    ...header,
+    ...frameBytes,
+    ...(audioPayload ?? const [0xFF, 0xFB, 0, 0])
+  ]);
 }

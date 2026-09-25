@@ -123,8 +123,7 @@ void main() {
     Widget openable(BuildContext c, AudioPlaybackService svc) => Scaffold(
           body: Center(
             child: ElevatedButton(
-              onPressed: () =>
-                  showUpNext(c, book: book, audioService: svc),
+              onPressed: () => showUpNext(c, book: book, audioService: svc),
               child: const Text('Open'),
             ),
           ),

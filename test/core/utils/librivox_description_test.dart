@@ -47,7 +47,8 @@ void main() {
   });
 
   group('parseLibriVoxDescription — readBy / language', () {
-    test('extracts a single narrator with no period after the name '
+    test(
+        'extracts a single narrator with no period after the name '
         '(castleRackrent)', () {
       final result = parseLibriVoxDescription(_fixture('castleRackrent'));
       expect(result.readBy, 'NoelBadrian');
@@ -61,15 +62,15 @@ void main() {
       expect(result.language, isNull);
     });
 
-    test('extracts a long semicolon-separated narrator list (toTheClouds)',
-        () {
+    test('extracts a long semicolon-separated narrator list (toTheClouds)', () {
       final result = parseLibriVoxDescription(_fixture('toTheClouds'));
       expect(result.readBy, contains('Alan Mapstone'));
       expect(result.readBy, contains('Stacey Malcolm'));
       expect(result.language, 'English');
     });
 
-    test('"LibriVox Volunteers" / multi-reader placeholder is captured '
+    test(
+        '"LibriVox Volunteers" / multi-reader placeholder is captured '
         '(shortPoetryCollection277)', () {
       final result =
           parseLibriVoxDescription(_fixture('shortPoetryCollection277'));
@@ -77,28 +78,31 @@ void main() {
       expect(result.language, 'English');
     });
 
-    test('non-English "Read in <Lang> by" with no period after the name '
+    test(
+        'non-English "Read in <Lang> by" with no period after the name '
         '(historiaDeHerodoto3)', () {
-      final result =
-          parseLibriVoxDescription(_fixture('historiaDeHerodoto3'));
+      final result = parseLibriVoxDescription(_fixture('historiaDeHerodoto3'));
       expect(result.readBy, 'Tux');
       expect(result.language, 'Spanish');
     });
 
-    test('a fully localized (Dutch) opener has no "Read...by" clause to '
+    test(
+        'a fully localized (Dutch) opener has no "Read...by" clause to '
         'find, so readBy/language stay null (zesNovellenEmants)', () {
       final result = parseLibriVoxDescription(_fixture('zesNovellenEmants'));
       expect(result.readBy, isNull);
       expect(result.language, isNull);
     });
 
-    test('narrators only named in free prose are not misdetected as a '
+    test(
+        'narrators only named in free prose are not misdetected as a '
         '"Read...by" clause (lettersOfTwoBrides)', () {
       final result = parseLibriVoxDescription(_fixture('lettersOfTwoBrides'));
       expect(result.readBy, isNull);
     });
 
-    test('a description with no LibriVox template at all has no readBy '
+    test(
+        'a description with no LibriVox template at all has no readBy '
         '(historyOfEngland05)', () {
       final result = parseLibriVoxDescription(_fixture('historyOfEngland05'));
       expect(result.readBy, isNull);
@@ -112,33 +116,34 @@ void main() {
       expect(result.summaryBy, 'Grant Hurlock');
     });
 
-    test('parenthesised "(Summary from Wikipedia)" is extracted '
+    test(
+        'parenthesised "(Summary from Wikipedia)" is extracted '
         '(toTheClouds)', () {
       final result = parseLibriVoxDescription(_fixture('toTheClouds'));
       expect(result.summaryBy, 'Wikipedia');
     });
 
-    test('trailing "- Summary by X" with no parentheses (castleRackrent)',
-        () {
+    test('trailing "- Summary by X" with no parentheses (castleRackrent)', () {
       final result = parseLibriVoxDescription(_fixture('castleRackrent'));
       expect(result.summaryBy, 'Noel Badrian');
     });
 
-    test('trailing "Summary by X" with no dash and no parentheses '
+    test(
+        'trailing "Summary by X" with no dash and no parentheses '
         '(historyOfEngland05)', () {
       final result = parseLibriVoxDescription(_fixture('historyOfEngland05'));
       expect(result.summaryBy, 'Jim Mowatt');
     });
 
-    test('missing entirely, no summaryBy is invented (lettersOfTwoBrides)',
-        () {
+    test('missing entirely, no summaryBy is invented (lettersOfTwoBrides)', () {
       final result = parseLibriVoxDescription(_fixture('lettersOfTwoBrides'));
       expect(result.summaryBy, isNull);
     });
   });
 
   group('parseLibriVoxDescription — contents', () {
-    test('a numbered list of 20 items is fully captured '
+    test(
+        'a numbered list of 20 items is fully captured '
         '(multilingualShortWorks035)', () {
       final result =
           parseLibriVoxDescription(_fixture('multilingualShortWorks035'));
@@ -147,7 +152,8 @@ void main() {
       expect(result.contents.last, contains('Wuhin'));
     });
 
-    test('an "includes:" semicolon-separated list is captured '
+    test(
+        'an "includes:" semicolon-separated list is captured '
         '(firstChapterCollection002)', () {
       final result =
           parseLibriVoxDescription(_fixture('firstChapterCollection002'));
@@ -173,13 +179,13 @@ void main() {
       expect(result.formats, 'M4B audiobook · 141 MB');
     });
 
-    test('lower-case "M4B audio book (155mb)" is parsed (typeWriterGirl)',
-        () {
+    test('lower-case "M4B audio book (155mb)" is parsed (typeWriterGirl)', () {
       final result = parseLibriVoxDescription(_fixture('typeWriterGirl'));
       expect(result.formats, 'M4B audiobook · 155 MB');
     });
 
-    test('missing entirely for a feed description with no tail '
+    test(
+        'missing entirely for a feed description with no tail '
         '(countOfMonteCristo)', () {
       final result = parseLibriVoxDescription(_fixture('countOfMonteCristo'));
       expect(result.formats, isNull);
@@ -187,14 +193,16 @@ void main() {
   });
 
   group('parseLibriVoxDescription — boilerplate stripping', () {
-    test('the "LibriVox recording of X by Y." opener never appears in the '
+    test(
+        'the "LibriVox recording of X by Y." opener never appears in the '
         'summary (castleRackrent)', () {
       final result = parseLibriVoxDescription(_fixture('castleRackrent'));
       final joined = result.summary.join(' ');
       expect(joined, isNot(contains('LibriVox recording of')));
     });
 
-    test('the "For further information..." tail never appears anywhere '
+    test(
+        'the "For further information..." tail never appears anywhere '
         '(typeWriterGirl)', () {
       final result = parseLibriVoxDescription(_fixture('typeWriterGirl'));
       final joined = result.summary.join(' ');
@@ -203,7 +211,8 @@ void main() {
       expect(joined, isNot(contains('become a volunteer reader')));
     });
 
-    test('real prose that merely starts with the word "LibriVox" is kept '
+    test(
+        'real prose that merely starts with the word "LibriVox" is kept '
         '(toTheClouds)', () {
       final result = parseLibriVoxDescription(_fixture('toTheClouds'));
       final joined = result.summary.join(' ');
@@ -225,13 +234,15 @@ void main() {
   });
 
   group('parseLibriVoxDescription — paragraph splitting', () {
-    test('existing blank-line paragraph breaks are honoured '
+    test(
+        'existing blank-line paragraph breaks are honoured '
         '(countOfMonteCristo)', () {
       final result = parseLibriVoxDescription(_fixture('countOfMonteCristo'));
       expect(result.summary.length, greaterThanOrEqualTo(3));
     });
 
-    test('a long single block is re-chunked into readable paragraphs '
+    test(
+        'a long single block is re-chunked into readable paragraphs '
         '(historyOfEngland05)', () {
       final result = parseLibriVoxDescription(_fixture('historyOfEngland05'));
       expect(result.summary.length, greaterThan(1));

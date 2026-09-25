@@ -161,7 +161,8 @@ void main() {
         await seedBook(db, id: 'p$i', title: 'Pinned $i');
         await db.pinBook('p$i');
       }
-      await seedBook(db, id: 'sixth', title: 'Sixth Book', positionSeconds: 100);
+      await seedBook(db,
+          id: 'sixth', title: 'Sixth Book', positionSeconds: 100);
 
       // Accessible names only exist once the semantics tree is built.
       final semantics = tester.ensureSemantics();
@@ -217,7 +218,8 @@ void main() {
       expect(find.text('Pinned Only'), findsOneWidget);
 
       final rowToggle = find.byKey(const ValueKey('pinned-row-toggle'));
-      expect(tester.getSemantics(rowToggle).label, contains('Hide pinned books'));
+      expect(
+          tester.getSemantics(rowToggle).label, contains('Hide pinned books'));
       await tester.tap(rowToggle);
       await pumpFrames(tester);
 
@@ -230,7 +232,8 @@ void main() {
       await pumpFrames(tester);
       expect(find.text('Pinned Only'), findsNothing);
       expect(
-        tester.getSemantics(find.byKey(const ValueKey('pinned-row-toggle')))
+        tester
+            .getSemantics(find.byKey(const ValueKey('pinned-row-toggle')))
             .label,
         contains('Show 1 pinned books'),
       );
@@ -286,8 +289,8 @@ void main() {
     // the old row is gone.
     testWidgets('the top-left Up next row is gone; the tile opens the queue',
         (tester) async {
-      final book =
-          await seedBook(db, id: 'a', title: 'Middlemarch', runtimeSeconds: 600);
+      final book = await seedBook(db,
+          id: 'a', title: 'Middlemarch', runtimeSeconds: 600);
 
       await setSurface(tester, const Size(390, 844));
       await tester.pumpWidget(wrap());

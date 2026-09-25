@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../core/app_settings.dart';
 import '../core/playback_constants.dart';
+import '../core/player_controls_style.dart';
 import '../core/utils/duration_format.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
@@ -37,83 +40,190 @@ class PlayerTransport extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final settings = SettingsScope.maybeOf(context);
     // Read live rather than passed in: the interval is a user setting
     // (`playback.skip_seconds`) and both the seek and the number
     // stamped on the glyph must come from the same value, which is
     // what makes an "icon says 10, code does 15" mismatch impossible.
     // Falls back to the default when no scope is present, so a test
     // pumping this widget alone needs no settings plumbing.
-    final skipSeconds =
-        SettingsScope.maybeOf(context)?.skipSeconds ?? kSkipSeconds;
+    final skipSeconds = settings?.skipSeconds ?? kSkipSeconds;
+    // The shape and size of the cluster (Settings > "Playback controls").
+    final style = settings?.transportStyle ?? PlayerControlsStyle.round;
 
-    return Wrap(
-      alignment: WrapAlignment.center,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: Sp.x2,
-      runSpacing: Sp.x3,
-      children: [
-        _RoundControl(
-          semanticLabel: 'Previous chapter',
-          diameter: Dim.tapMin,
-          onPressed: () {
-            final idx = audioService.chapterIndexNotifier.value;
-            if (idx > 0) {
-              audioService.loadBook(book, initialChapterIndex: idx - 1);
-            }
-          },
-          child: Icon(Icons.skip_previous_rounded,
-              size: Dim.iconSm, color: c.text),
+    final controls = [
+      _TransportSpec(
+        semanticLabel: 'Previous chapter',
+        weight: 1,
+        onPressed: () {
+          final idx = audioService.chapterIndexNotifier.value;
+          if (idx > 0) {
+            audioService.loadBook(book, initialChapterIndex: idx - 1);
+          }
+        },
+        child: Icon(Icons.skip_previous_rounded,
+            size: style == PlayerControlsStyle.round ? Dim.iconSm : Dim.iconMd,
+            color: c.text),
+      ),
+      _TransportSpec(
+        semanticLabel: 'Skip back $skipSeconds seconds',
+        weight: 1.25,
+        onPressed: () => audioService.skipBackward(seconds: skipSeconds),
+        child: SkipIntervalIcon(
+          direction: SkipDirection.backward,
+          seconds: skipSeconds,
+          // iconLg, not iconMd: these two carry a number inside them, so
+          // they need more room than a plain glyph.
+          size: Dim.iconLg,
+          color: c.text,
         ),
-        _RoundControl(
-          semanticLabel: 'Skip back $skipSeconds seconds',
-          diameter: Dim.tapComfy,
-          onPressed: () => audioService.skipBackward(seconds: skipSeconds),
-          child: SkipIntervalIcon(
-            direction: SkipDirection.backward,
-            seconds: skipSeconds,
-            // iconLg, not iconMd: these two carry a number inside them, so
-            // they need more room than a plain glyph. The tap target is
-            // tapComfy (56), which swallows the extra 4px comfortably.
-            size: Dim.iconLg,
-            color: c.text,
-          ),
+      ),
+      null, // play/pause
+      _TransportSpec(
+        semanticLabel: 'Skip forward $skipSeconds seconds',
+        weight: 1.25,
+        onPressed: () => audioService.skipForward(seconds: skipSeconds),
+        child: SkipIntervalIcon(
+          direction: SkipDirection.forward,
+          seconds: skipSeconds,
+          size: Dim.iconLg,
+          color: c.text,
         ),
-        _PlayPauseButton(audioService: audioService),
-        _RoundControl(
-          semanticLabel: 'Skip forward $skipSeconds seconds',
-          diameter: Dim.tapComfy,
-          onPressed: () => audioService.skipForward(seconds: skipSeconds),
-          child: SkipIntervalIcon(
-            direction: SkipDirection.forward,
-            seconds: skipSeconds,
-            size: Dim.iconLg,
-            color: c.text,
-          ),
-        ),
-        _RoundControl(
-          semanticLabel: 'Next chapter',
-          diameter: Dim.tapMin,
-          onPressed: () {
-            final idx = audioService.chapterIndexNotifier.value;
-            if (idx < book.chapters.length - 1) {
-              audioService.loadBook(book, initialChapterIndex: idx + 1);
-            }
-          },
-          child: Icon(Icons.skip_next_rounded, size: Dim.iconSm, color: c.text),
-        ),
-      ],
-    );
+      ),
+      _TransportSpec(
+        semanticLabel: 'Next chapter',
+        weight: 1,
+        onPressed: () {
+          final idx = audioService.chapterIndexNotifier.value;
+          if (idx < book.chapters.length - 1) {
+            audioService.loadBook(book, initialChapterIndex: idx + 1);
+          }
+        },
+        child: Icon(Icons.skip_next_rounded,
+            size: style == PlayerControlsStyle.round ? Dim.iconSm : Dim.iconMd,
+            color: c.text),
+      ),
+    ];
+    const playWeight = 1.5;
+
+    switch (style) {
+      case PlayerControlsStyle.round:
+        // The original cluster. When it does not fit it wraps onto a
+        // second line; it never shrinks controls below the 44px minimum.
+        return Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: Sp.x2,
+          runSpacing: Sp.x3,
+          children: [
+            for (final spec in controls)
+              spec == null
+                  ? _PlayPauseButton(
+                      audioService: audioService,
+                      width: Dim.tapPrimary,
+                      height: Dim.tapPrimary,
+                    )
+                  : _TransportButton(
+                      spec: spec,
+                      width: spec.weight == 1 ? Dim.tapMin : Dim.tapComfy,
+                      height: spec.weight == 1 ? Dim.tapMin : Dim.tapComfy,
+                    ),
+          ],
+        );
+      case PlayerControlsStyle.tiles:
+      case PlayerControlsStyle.bar:
+        final bar = style == PlayerControlsStyle.bar;
+        // Fixed widths from the available space, weighted so play is the
+        // biggest target and the chapter jumps the smallest. Capped so a
+        // wide window does not turn them into slabs.
+        return LayoutBuilder(builder: (context, constraints) {
+          final width = math.min(constraints.maxWidth, 440.0);
+          const gap = Sp.x2;
+          final totalWeight = controls.fold<double>(
+              0, (sum, spec) => sum + (spec?.weight ?? playWeight));
+          final usable = bar ? width - 2 : width - gap * 4;
+          double widthOf(_TransportSpec? spec) =>
+              usable * (spec?.weight ?? playWeight) / totalWeight;
+          final height = bar ? 68.0 : 64.0;
+          final radius = bar ? R.md : R.lg;
+          final row = Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              for (var i = 0; i < controls.length; i++) ...[
+                if (i > 0 && !bar) const SizedBox(width: gap),
+                controls[i] == null
+                    ? Padding(
+                        padding: EdgeInsets.all(bar ? Sp.x1 : 0),
+                        child: _PlayPauseButton(
+                          audioService: audioService,
+                          width: widthOf(null) - (bar ? Sp.x1 * 2 : 0),
+                          height: bar ? height - Sp.x1 * 2 : Dim.tapPrimary,
+                          borderRadius: radius,
+                        ),
+                      )
+                    : _TransportButton(
+                        spec: controls[i]!,
+                        width: widthOf(controls[i]),
+                        height: height,
+                        borderRadius: radius,
+                        decorated: !bar,
+                      ),
+              ],
+            ],
+          );
+          return Center(
+            child: bar
+                ? Container(
+                    decoration: BoxDecoration(
+                      color: c.surface.withValues(alpha: 0.72),
+                      borderRadius: R.lg,
+                      border: Border.all(color: c.border),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: row,
+                  )
+                : row,
+          );
+        });
+    }
   }
 }
 
-/// The 76px primary play/pause target. One toggle, one changing label.
+class _TransportSpec {
+  final String semanticLabel;
+
+  /// Relative width in the tiles and bar shapes.
+  final double weight;
+  final VoidCallback onPressed;
+  final Widget child;
+
+  const _TransportSpec({
+    required this.semanticLabel,
+    required this.weight,
+    required this.onPressed,
+    required this.child,
+  });
+}
+
+/// The primary play/pause target. One toggle, one changing label. A circle
+/// unless [borderRadius] is given (the tiles and bar shapes).
 class _PlayPauseButton extends StatelessWidget {
   final AudioPlaybackService audioService;
-  const _PlayPauseButton({required this.audioService});
+  final double width;
+  final double height;
+  final BorderRadius? borderRadius;
+  const _PlayPauseButton({
+    required this.audioService,
+    required this.width,
+    required this.height,
+    this.borderRadius,
+  });
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final radius = borderRadius;
     return ValueListenableBuilder<PlaybackState>(
       valueListenable: audioService.stateNotifier,
       builder: (context, state, _) {
@@ -130,12 +240,15 @@ class _PlayPauseButton extends StatelessWidget {
             message: label,
             child: InkWell(
               onTap: isLoading ? null : audioService.togglePlayPause,
-              customBorder: const CircleBorder(),
+              customBorder: radius == null
+                  ? const CircleBorder()
+                  : RoundedRectangleBorder(borderRadius: radius),
               child: Container(
-                width: Dim.tapPrimary,
-                height: Dim.tapPrimary,
+                width: width,
+                height: height,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  shape: radius == null ? BoxShape.circle : BoxShape.rectangle,
+                  borderRadius: radius,
                   color: c.accentFill,
                   boxShadow: c.shadow2,
                 ),
@@ -166,40 +279,54 @@ class _PlayPauseButton extends StatelessWidget {
   }
 }
 
-class _RoundControl extends StatelessWidget {
-  final String semanticLabel;
-  final double diameter;
-  final VoidCallback onPressed;
-  final Widget child;
+/// A secondary transport control: a circle by default, a rounded tile when
+/// [borderRadius] is given, and undecorated inside the bar shape (the bar
+/// draws the surface).
+class _TransportButton extends StatelessWidget {
+  final _TransportSpec spec;
+  final double width;
+  final double height;
+  final BorderRadius? borderRadius;
+  final bool decorated;
 
-  const _RoundControl({
-    required this.semanticLabel,
-    required this.diameter,
-    required this.onPressed,
-    required this.child,
+  const _TransportButton({
+    required this.spec,
+    required this.width,
+    required this.height,
+    this.borderRadius,
+    this.decorated = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final radius = borderRadius;
     return Semantics(
       button: true,
-      label: semanticLabel,
+      label: spec.semanticLabel,
       excludeSemantics: true,
       child: Tooltip(
-        message: semanticLabel,
+        message: spec.semanticLabel,
         child: InkWell(
-          onTap: onPressed,
-          customBorder: const CircleBorder(),
+          onTap: spec.onPressed,
+          customBorder: radius == null
+              ? const CircleBorder()
+              : RoundedRectangleBorder(borderRadius: radius),
           child: Container(
-            width: diameter,
-            height: diameter,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: c.surfaceSunken,
-              border: Border.all(color: c.border),
-            ),
-            child: Center(child: child),
+            width: width,
+            height: height,
+            decoration: decorated
+                ? BoxDecoration(
+                    shape:
+                        radius == null ? BoxShape.circle : BoxShape.rectangle,
+                    borderRadius: radius,
+                    color: radius == null
+                        ? c.surfaceSunken
+                        : c.surface.withValues(alpha: 0.72),
+                    border: Border.all(color: c.border),
+                  )
+                : null,
+            child: Center(child: spec.child),
           ),
         ),
       ),

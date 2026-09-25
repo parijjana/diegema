@@ -34,7 +34,8 @@ void main() {
       }
     });
 
-    test('upgrade from v1 to v2 preserves existing rows and '
+    test(
+        'upgrade from v1 to v2 preserves existing rows and '
         'backfills the new columns', () async {
       // Start a real v1 database and seed it exactly the way the
       // pre-migration app would have: a "legacy" locally-imported book
@@ -93,8 +94,7 @@ void main() {
       // sha256-of-path scheme, and every dependent row (chapters,
       // progress, bookmarks) followed it — nothing is left pointing at
       // the old id.
-      final legacyStillPresent =
-          await migratedDb.getAudiobook('local_123456');
+      final legacyStillPresent = await migratedDb.getAudiobook('local_123456');
       expect(legacyStillPresent, isNull,
           reason: 'legacy hashCode-derived id should have been rewritten');
       expect(bookmarks, isEmpty,
@@ -133,8 +133,7 @@ void main() {
       await migratedDb.close();
     });
 
-    test('upgrade from v1 to v2 does not crash on an empty database',
-        () async {
+    test('upgrade from v1 to v2 does not crash on an empty database', () async {
       final v1Schema = await verifier.schemaAt(1);
       final migratedDb = AppDatabase(v1Schema.newConnection());
       await verifier.migrateAndValidate(migratedDb, 2);
@@ -173,7 +172,8 @@ void main() {
       await migratedDb.close();
     });
 
-    test('upgrade from v2 to v3 preserves existing chapters and backfills '
+    test(
+        'upgrade from v2 to v3 preserves existing chapters and backfills '
         'null start/end (M4B chapter markers)', () async {
       // A v2 database has no start_ms/end_ms columns at all — every
       // existing chapter row predates M4B chapter-marker support and must
@@ -210,8 +210,7 @@ void main() {
       await migratedDb.close();
     });
 
-    test('upgrade from v2 to v3 does not crash on an empty database',
-        () async {
+    test('upgrade from v2 to v3 does not crash on an empty database', () async {
       final v2Schema = await verifier.schemaAt(2);
       final migratedDb = AppDatabase(v2Schema.newConnection());
       await verifier.migrateAndValidate(migratedDb, 3);

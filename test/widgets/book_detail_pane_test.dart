@@ -86,8 +86,7 @@ void main() {
     await db.close();
   });
 
-  testWidgets(
-      'phone: sticky footer shows Close and Download with the ZIP size',
+  testWidgets('phone: sticky footer shows Close and Download with the ZIP size',
       (tester) async {
     await setSurface(tester, const Size(390, 844));
     await tester.pumpWidget(

@@ -28,8 +28,8 @@ Future<void> pumpFrames(
   Duration step = const Duration(milliseconds: 100),
 }) async {
   for (var i = 0; i < frames; i++) {
-    await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester
+        .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
     await tester.pump(step);
   }
 }
@@ -49,8 +49,8 @@ Future<void> drainRateLimiter(WidgetTester tester) =>
 Future<void> unmount(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump();
-  await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 20)));
+  await tester
+      .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
 }
 
 /// Seeds [db] with a book, one chapter of [runtimeSeconds], and a progress

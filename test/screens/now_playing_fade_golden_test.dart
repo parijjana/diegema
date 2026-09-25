@@ -79,9 +79,8 @@ void main() {
         ),
       );
 
-  Future<void> expectFrame(WidgetTester tester, String name) =>
-      expectLater(find.byType(NowPlayingScreen),
-          matchesGoldenFile('goldens/$name.png'));
+  Future<void> expectFrame(WidgetTester tester, String name) => expectLater(
+      find.byType(NowPlayingScreen), matchesGoldenFile('goldens/$name.png'));
 
   testWidgets('idle -> playing fades frame by frame', (tester) async {
     await setSurface(tester, surface);
@@ -98,7 +97,8 @@ void main() {
     for (final ms in sampleMs) {
       await tester.pump(Duration(milliseconds: ms - elapsed));
       elapsed = ms;
-      await expectFrame(tester, 'fade_forward_${ms.toString().padLeft(3, '0')}ms');
+      await expectFrame(
+          tester, 'fade_forward_${ms.toString().padLeft(3, '0')}ms');
     }
 
     // The last sample is past the controller's 320ms, so it doubles as the
@@ -136,7 +136,8 @@ void main() {
     for (final ms in sampleMs) {
       await tester.pump(Duration(milliseconds: ms - elapsed));
       elapsed = ms;
-      await expectFrame(tester, 'fade_reverse_${ms.toString().padLeft(3, '0')}ms');
+      await expectFrame(
+          tester, 'fade_reverse_${ms.toString().padLeft(3, '0')}ms');
     }
 
     expect(

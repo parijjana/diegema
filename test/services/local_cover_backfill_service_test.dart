@@ -102,7 +102,8 @@ void main() {
     expect(File(updated.coverArtUrlOrPath!).readAsBytesSync(), equals(jpeg));
   });
 
-  test('replaces a placeholder title and author from embedded tags, '
+  test(
+      'replaces a placeholder title and author from embedded tags, '
       'even when the book was already attempted', () async {
     final filePath = await writeFixture(
       'odyssey.m4b',
@@ -200,7 +201,8 @@ void main() {
 
     expect(lookupCalled, isFalse);
     final updated = await db.getAudiobook('local_3');
-    expect(updated!.coverArtUrlOrPath, equals('https://example.com/existing.jpg'));
+    expect(
+        updated!.coverArtUrlOrPath, equals('https://example.com/existing.jpg'));
   });
 
   test('skips non-local (librivox) origin books', () async {

@@ -179,8 +179,7 @@ void main() {
       await pumpFrames(tester);
       expect(scans, 1);
 
-      await tester.fling(
-          find.text('A Book'), const Offset(0, 300), 1000);
+      await tester.fling(find.text('A Book'), const Offset(0, 300), 1000);
       await pumpFrames(tester, frames: 10);
 
       expect(scans, 2);
@@ -199,8 +198,8 @@ void main() {
             'have.'),
         findsOneWidget,
       );
-      expect(find.widgetWithText(TextButton, 'Browse Discover'),
-          findsOneWidget);
+      expect(
+          find.widgetWithText(TextButton, 'Browse Discover'), findsOneWidget);
     });
   });
 }

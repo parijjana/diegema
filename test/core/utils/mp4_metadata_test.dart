@@ -108,8 +108,7 @@ void main() {
   });
 
   test('returns null for a nonexistent file', () async {
-    final result =
-        await readMp4Metadata(p.join(tempDir.path, 'missing.m4b'));
+    final result = await readMp4Metadata(p.join(tempDir.path, 'missing.m4b'));
 
     expect(result, isNull);
   });

@@ -21,7 +21,8 @@ void main() {
   late Directory tempDir;
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp('local_book_metadata_test_');
+    tempDir =
+        await Directory.systemTemp.createTemp('local_book_metadata_test_');
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
   });
 
@@ -45,8 +46,7 @@ void main() {
       buildM4bWithMetadata(album: 'Found Title', artist: 'Found Author'),
     );
 
-    final result =
-        await readEmbeddedMetadataForFiles([noTags, tagged]);
+    final result = await readEmbeddedMetadataForFiles([noTags, tagged]);
 
     expect(result, isNotNull);
     expect(result!.title, equals('Found Title'));
@@ -63,8 +63,7 @@ void main() {
     expect(result, isNull);
   });
 
-  test('saveCoverBytes writes to <appDocs>/diegema/covers/<id>.jpg',
-      () async {
+  test('saveCoverBytes writes to <appDocs>/diegema/covers/<id>.jpg', () async {
     final jpeg = syntheticJpegBytes();
 
     final savedPath = await saveCoverBytes(jpeg, 'image/jpeg', 'book_123');
@@ -123,8 +122,7 @@ void main() {
     });
 
     test('returns null for a nonexistent folder', () async {
-      final found =
-          await findFolderCoverImage(p.join(tempDir.path, 'missing'));
+      final found = await findFolderCoverImage(p.join(tempDir.path, 'missing'));
 
       expect(found, isNull);
     });

@@ -51,8 +51,8 @@ List<int> container(String type, List<List<int>> children) {
 List<int> fullBoxHeader({int version = 0, int flags = 0}) =>
     [version, (flags >> 16) & 0xFF, (flags >> 8) & 0xFF, flags & 0xFF];
 
-List<int> ftyp() =>
-    atom('ftyp', [...fourcc('M4B '), ...u32(0), ...fourcc('M4B '), ...fourcc('isom')]);
+List<int> ftyp() => atom('ftyp',
+    [...fourcc('M4B '), ...u32(0), ...fourcc('M4B '), ...fourcc('isom')]);
 
 /// `moov/mvhd`. [durationTicks] is in [timescale] units.
 List<int> mvhd({
@@ -110,13 +110,15 @@ List<int> tkhd({int version = 0, required int trackId}) {
   if (version == 1) {
     return atom('tkhd', [
       ...fullBoxHeader(version: 1),
-      ...u64(0), ...u64(0),
+      ...u64(0),
+      ...u64(0),
       ...u32(trackId),
     ]);
   }
   return atom('tkhd', [
     ...fullBoxHeader(),
-    ...u32(0), ...u32(0),
+    ...u32(0),
+    ...u32(0),
     ...u32(trackId),
   ]);
 }
@@ -150,7 +152,8 @@ List<int> mdhd({int version = 0, required int timescale}) {
   }
   return atom('mdhd', [
     ...fullBoxHeader(),
-    ...u32(0), ...u32(0),
+    ...u32(0),
+    ...u32(0),
     ...u32(timescale),
     ...u32(0),
   ]);
@@ -290,7 +293,9 @@ Uint8List buildQuickTimeChapterM4b({
   ]);
 
   final moovChildren = [
-    mvhd(timescale: timescale, durationTicks: (audioDurationMs * timescale) ~/ 1000),
+    mvhd(
+        timescale: timescale,
+        durationTicks: (audioDurationMs * timescale) ~/ 1000),
     audioTrak,
     chapterTrak,
     if (alsoChpl != null) container('udta', [chpl(alsoChpl)]),
@@ -312,7 +317,9 @@ Uint8List buildChplOnlyM4b({
 }) {
   final head = ftyp();
   final moovChildren = [
-    mvhd(timescale: timescale, durationTicks: (audioDurationMs * timescale) ~/ 1000),
+    mvhd(
+        timescale: timescale,
+        durationTicks: (audioDurationMs * timescale) ~/ 1000),
     container('udta', [chpl(chapters)]),
   ];
   final moov = use64BitMoov
@@ -328,7 +335,9 @@ Uint8List buildNoChaptersM4b({
 }) {
   final head = ftyp();
   final moov = container('moov', [
-    mvhd(timescale: timescale, durationTicks: (audioDurationMs * timescale) ~/ 1000),
+    mvhd(
+        timescale: timescale,
+        durationTicks: (audioDurationMs * timescale) ~/ 1000),
   ]);
   return Uint8List.fromList([...head, ...moov]);
 }
@@ -420,7 +429,9 @@ Uint8List buildM4bWithMetadata({
   final udta = container('udta', [meta]);
 
   final moovChildren = [
-    mvhd(timescale: timescale, durationTicks: (audioDurationMs * timescale) ~/ 1000),
+    mvhd(
+        timescale: timescale,
+        durationTicks: (audioDurationMs * timescale) ~/ 1000),
     if (metaUnderMoovDirectly) meta else udta,
   ];
   final moov = container('moov', moovChildren);

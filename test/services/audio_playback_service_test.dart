@@ -26,7 +26,8 @@ void main() {
       service = AudioPlaybackService(player: _RefusingPlayer());
     });
 
-    test('play() leaves the book paused rather than surfacing an error', () async {
+    test('play() leaves the book paused rather than surfacing an error',
+        () async {
       expect(service.stateNotifier.value, PlaybackState.idle);
 
       await service.play();

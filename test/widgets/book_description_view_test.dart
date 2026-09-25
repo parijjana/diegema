@@ -16,7 +16,8 @@ Widget _host(Widget child) {
 
 void main() {
   group('BookDescriptionView', () {
-    testWidgets('renders About / Narrated by / Summary by for a normal '
+    testWidgets(
+        'renders About / Narrated by / Summary by for a normal '
         'novel (castleRackrent)', (tester) async {
       await tester.pumpWidget(_host(BookDescriptionView(
         description: libriVoxDescriptionFixtures['castleRackrent']!,
@@ -32,12 +33,12 @@ void main() {
       expect(find.textContaining('For further information'), findsNothing);
     });
 
-    testWidgets('renders Contents as bullets, collapsed to 6 with a '
+    testWidgets(
+        'renders Contents as bullets, collapsed to 6 with a '
         '"Show all N" button, and expands on tap '
         '(multilingualShortWorks035)', (tester) async {
       await tester.pumpWidget(_host(BookDescriptionView(
-        description:
-            libriVoxDescriptionFixtures['multilingualShortWorks035']!,
+        description: libriVoxDescriptionFixtures['multilingualShortWorks035']!,
       )));
 
       expect(find.text('Contents'), findsOneWidget);
@@ -57,7 +58,8 @@ void main() {
       expect(find.widgetWithText(TextButton, 'Show all 20'), findsNothing);
     });
 
-    testWidgets('renders "Narrated by" with the language suffix for a '
+    testWidgets(
+        'renders "Narrated by" with the language suffix for a '
         'non-English recording (historiaDeHerodoto3)', (tester) async {
       await tester.pumpWidget(_host(BookDescriptionView(
         description: libriVoxDescriptionFixtures['historiaDeHerodoto3']!,
@@ -66,7 +68,8 @@ void main() {
       expect(find.textContaining('Tux (Spanish)'), findsOneWidget);
     });
 
-    testWidgets('omits the language suffix for an English recording '
+    testWidgets(
+        'omits the language suffix for an English recording '
         '(castleRackrent)', (tester) async {
       await tester.pumpWidget(_host(BookDescriptionView(
         description: libriVoxDescriptionFixtures['castleRackrent']!,
@@ -75,7 +78,8 @@ void main() {
       expect(find.textContaining('NoelBadrian (English)'), findsNothing);
     });
 
-    testWidgets('falls back to plain paragraphs with no section headings '
+    testWidgets(
+        'falls back to plain paragraphs with no section headings '
         'when nothing structured was found', (tester) async {
       await tester.pumpWidget(_host(const BookDescriptionView(
         description: 'Just a short, unstructured description with no '
@@ -89,7 +93,8 @@ void main() {
     });
 
     testWidgets('renders nothing for an empty description', (tester) async {
-      await tester.pumpWidget(_host(const BookDescriptionView(description: '')));
+      await tester
+          .pumpWidget(_host(const BookDescriptionView(description: '')));
       expect(find.byType(BookDescriptionView), findsOneWidget);
       expect(find.text('About'), findsNothing);
     });
@@ -107,8 +112,7 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('compact mode still renders the same sections',
-        (tester) async {
+    testWidgets('compact mode still renders the same sections', (tester) async {
       await tester.pumpWidget(_host(BookDescriptionView(
         description: libriVoxDescriptionFixtures['castleRackrent']!,
         compact: true,

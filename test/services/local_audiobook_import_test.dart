@@ -40,12 +40,14 @@ void main() {
     final result = await chaptersForFiles('book_id', [path]);
 
     expect(result, hasLength(3));
-    expect(result.map((c) => c.title), equals(['Intro', 'Part One', 'Part Two']));
+    expect(
+        result.map((c) => c.title), equals(['Intro', 'Part One', 'Part Two']));
     expect(result.map((c) => c.startMs), equals([0, 10000, 25000]));
     expect(result.map((c) => c.endMs), equals([10000, 25000, 40000]));
     expect(result.map((c) => c.durationSeconds), equals([10, 15, 15]));
     expect(result.map((c) => c.audioPathOrUrl), everyElement(equals(path)));
-    expect(result.map((c) => c.id), equals(['book_id_ch_0', 'book_id_ch_1', 'book_id_ch_2']));
+    expect(result.map((c) => c.id),
+        equals(['book_id_ch_0', 'book_id_ch_1', 'book_id_ch_2']));
   });
 
   test('a blank marker title falls back to "Chapter N"', () async {
@@ -107,8 +109,7 @@ void main() {
         equals(['book_id_ch_0', 'book_id_ch_1', 'book_id_ch_2']));
   });
 
-  test('a single embedded chapter marker does not expand (needs 2+)',
-      () async {
+  test('a single embedded chapter marker does not expand (needs 2+)', () async {
     const chapters = [ChapterFixture('Only One', 0)];
     final path = await writeFixture(
       'single_marker.m4b',

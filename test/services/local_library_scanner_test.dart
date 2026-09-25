@@ -21,8 +21,7 @@ void main() {
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
     root = await Directory.systemTemp.createTemp('scanner_test');
-    downloads =
-        Directory(p.join(root.path, 'diegema', 'downloads'));
+    downloads = Directory(p.join(root.path, 'diegema', 'downloads'));
   });
 
   tearDown(() async {
@@ -111,8 +110,8 @@ void main() {
         );
 
     test('is not registered a second time', () async {
-      final dir = bookFolder('Short Science Fiction Collection 032',
-          ['01.mp3', '02.mp3']);
+      final dir = bookFolder(
+          'Short Science Fiction Collection 032', ['01.mp3', '02.mp3']);
       await db.saveAudiobook(discoverDownload(dir));
 
       await scan();
@@ -122,8 +121,8 @@ void main() {
     });
 
     test('drops a duplicate an earlier scan already made', () async {
-      final dir = bookFolder('Short Science Fiction Collection 032',
-          ['01.mp3', '02.mp3']);
+      final dir = bookFolder(
+          'Short Science Fiction Collection 032', ['01.mp3', '02.mp3']);
       await scan(); // the old behaviour: registers the folder by path hash
       await db.saveAudiobook(discoverDownload(dir));
 
@@ -134,8 +133,8 @@ void main() {
     });
 
     test('keeps a duplicate the user has listened to', () async {
-      final dir = bookFolder('Short Science Fiction Collection 032',
-          ['01.mp3', '02.mp3']);
+      final dir = bookFolder(
+          'Short Science Fiction Collection 032', ['01.mp3', '02.mp3']);
       await scan();
       final dupId = BookIdentity.localIdForPath(dir.path);
       await db.saveProgress(

@@ -68,8 +68,10 @@ void main() {
     final url =
         await service.lookupCoverUrl(title: 'Some Book', author: 'Some Author');
 
-    expect(url,
-        equals('https://covers.openlibrary.org/b/id/12345-L.jpg?default=false'));
+    expect(
+        url,
+        equals(
+            'https://covers.openlibrary.org/b/id/12345-L.jpg?default=false'));
   });
 
   test('returns null when both sources have nothing', () async {
@@ -162,8 +164,7 @@ void main() {
     });
 
     final service = CoverLookupService(client: client);
-    final url =
-        await service.lookupCoverUrl(title: 'The Great Expectations');
+    final url = await service.lookupCoverUrl(title: 'The Great Expectations');
 
     expect(url, equals('https://archive.org/services/img/match_id'));
   });

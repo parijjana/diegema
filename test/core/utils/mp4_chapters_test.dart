@@ -91,8 +91,7 @@ void main() {
       expect(result!.durationMs, equals(120000));
       expect(result.chapters.map((c) => c.title),
           equals(['Intro', 'Part One', 'Part Two']));
-      expect(
-          result.chapters.map((c) => c.startMs), equals([0, 12345, 98765]));
+      expect(result.chapters.map((c) => c.startMs), equals([0, 12345, 98765]));
     });
 
     test('reads UTF-16 (BOM-prefixed) titles', () async {
@@ -112,8 +111,7 @@ void main() {
       final result = await readMp4Chapters(path);
 
       expect(result, isNotNull);
-      expect(
-          result!.chapters.map((c) => c.title), equals(['Café', '日本語']));
+      expect(result!.chapters.map((c) => c.title), equals(['Café', '日本語']));
     });
 
     test('accepts an sbtl handler type as well as text', () async {
@@ -162,8 +160,7 @@ void main() {
   });
 
   group('no chapters / malformed input', () {
-    test('returns null for a well-formed M4B with no chapter data',
-        () async {
+    test('returns null for a well-formed M4B with no chapter data', () async {
       final path = await writeFixture(
         'no_chapters.m4b',
         buildNoChaptersM4b(audioDurationMs: 30000),
@@ -199,8 +196,7 @@ void main() {
       expect(result, isNull);
     });
 
-    test('returns null for a nonexistent path rather than throwing',
-        () async {
+    test('returns null for a nonexistent path rather than throwing', () async {
       final path = p.join(tempDir.path, 'does_not_exist.m4b');
 
       final result = await readMp4Chapters(path);

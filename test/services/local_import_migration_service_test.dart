@@ -51,7 +51,8 @@ void main() {
       ? p.join(docsDir.path, 'diegema', 'library', bookId)
       : p.join(docsDir.path, 'diegema', 'library', bookId, file);
 
-  test('copies a cache-dir chapter file into the library dir and rewrites '
+  test(
+      'copies a cache-dir chapter file into the library dir and rewrites '
       'the chapter path', () async {
     final src = File(p.join(cacheDir.path, 'book.m4b'))
       ..writeAsBytesSync([1, 2, 3]);
@@ -77,7 +78,8 @@ void main() {
 
     final updated = await db.getAudiobook('book_1');
     final chapter = updated!.chapters.single;
-    expect(chapter.audioPathOrUrl, equals(libraryPathFor('book_1', 'book.m4b')));
+    expect(
+        chapter.audioPathOrUrl, equals(libraryPathFor('book_1', 'book.m4b')));
     expect(File(chapter.audioPathOrUrl).readAsBytesSync(), equals([1, 2, 3]));
     expect(chapter.startMs, equals(0));
     expect(chapter.endMs, equals(5000));
@@ -122,8 +124,7 @@ void main() {
     expect(paths.single, equals(libraryPathFor('book_2', 'book.m4b')));
   });
 
-  test('leaves a row alone when the chapter file no longer exists',
-      () async {
+  test('leaves a row alone when the chapter file no longer exists', () async {
     await db.saveAudiobook(UnifiedAudiobook(
       id: 'book_3',
       title: 'Book',
@@ -147,8 +148,7 @@ void main() {
         equals(p.join(cacheDir.path, 'gone.mp3')));
   });
 
-  test('a chapter already under diegema/library is left untouched',
-      () async {
+  test('a chapter already under diegema/library is left untouched', () async {
     final durableDir = Directory(libraryPathFor('book_4'))
       ..createSync(recursive: true);
     final already = File(p.join(durableDir.path, 'book.mp3'))
@@ -205,8 +205,7 @@ void main() {
       ..createSync(recursive: true);
     File(p.join(durableDir.path, 'book.mp3')).writeAsBytesSync([1]);
 
-    final src = File(p.join(cacheDir.path, 'book.mp3'))
-      ..writeAsBytesSync([2]);
+    final src = File(p.join(cacheDir.path, 'book.mp3'))..writeAsBytesSync([2]);
     await db.saveAudiobook(UnifiedAudiobook(
       id: 'book_5',
       title: 'Book',

@@ -72,6 +72,18 @@ class SettingsScreen extends StatelessWidget {
                   ],
                   onChanged: settings.setControlsStyle,
                 ),
+                const SizedBox(height: Sp.x5),
+                _ThreeWayToggle<PlayerControlsStyle>(
+                  label: 'Playback controls',
+                  description: 'Shape and size of the play, skip and '
+                      'chapter buttons.',
+                  value: settings.transportStyle,
+                  options: [
+                    for (final style in PlayerControlsStyle.values)
+                      _Choice(style, style.label),
+                  ],
+                  onChanged: settings.setTransportStyle,
+                ),
               ],
             ),
             _Section(

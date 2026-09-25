@@ -8,7 +8,8 @@ void main() {
     final store = BackfillAttemptStore(overrides: overrides);
     final at = DateTime(2026, 3, 1, 12, 30);
 
-    await store.write({'book_a': at, 'book_b': at.add(const Duration(days: 1))});
+    await store
+        .write({'book_a': at, 'book_b': at.add(const Duration(days: 1))});
     final read = await store.read();
 
     expect(read['book_a'], equals(at));

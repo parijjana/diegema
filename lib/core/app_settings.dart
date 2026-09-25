@@ -30,6 +30,7 @@ class AppSettings extends ChangeNotifier {
   ThemeMode _themeMode;
   int _skipSeconds;
   PlayerControlsStyle _controlsStyle = PlayerControlsStyle.tiles;
+  PlayerControlsStyle _transportStyle = PlayerControlsStyle.round;
 
   AppSettings({
     required UiPreferences preferences,
@@ -48,20 +49,26 @@ class AppSettings extends ChangeNotifier {
   /// Shape of the phone Now Playing Up next / Speed / Sleep row.
   PlayerControlsStyle get controlsStyle => _controlsStyle;
 
+  /// Shape and size of the play, skip and chapter-jump buttons.
+  PlayerControlsStyle get transportStyle => _transportStyle;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
     final storedSkip = await _preferences.getSkipSeconds();
     final storedStyle = await _preferences.getPlayerControlsStyle();
+    final storedTransport = await _preferences.getTransportStyle();
 
     if (storedTheme == _themeMode &&
         storedSkip == _skipSeconds &&
-        storedStyle == _controlsStyle) {
+        storedStyle == _controlsStyle &&
+        storedTransport == _transportStyle) {
       return;
     }
     _themeMode = storedTheme;
     _skipSeconds = storedSkip;
     _controlsStyle = storedStyle;
+    _transportStyle = storedTransport;
     notifyListeners();
   }
 
@@ -86,6 +93,13 @@ class AppSettings extends ChangeNotifier {
     _controlsStyle = style;
     notifyListeners();
     await _preferences.setPlayerControlsStyle(style);
+  }
+
+  Future<void> setTransportStyle(PlayerControlsStyle style) async {
+    if (style == _transportStyle) return;
+    _transportStyle = style;
+    notifyListeners();
+    await _preferences.setTransportStyle(style);
   }
 }
 

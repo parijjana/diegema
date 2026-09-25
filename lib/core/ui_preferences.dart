@@ -19,6 +19,7 @@ class UiPreferences {
   static const String _themeModeKey = 'appearance.theme_mode';
   static const String _skipSecondsKey = 'playback.skip_seconds';
   static const String _controlsStyleKey = 'now_playing.controls_style';
+  static const String _transportStyleKey = 'now_playing.transport_style';
 
   /// In-memory store used by tests. When supplied it replaces
   /// `shared_preferences` entirely, so no platform channel is touched.
@@ -155,32 +156,49 @@ class UiPreferences {
         _ => defaultValue,
       };
 
-  /// The Now Playing action-row style. Stored by enum name, so an unknown
-  /// or missing value falls back to [PlayerControlsStyle.tiles].
-  Future<PlayerControlsStyle> getPlayerControlsStyle() async {
+  /// The Now Playing action-row style.
+  Future<PlayerControlsStyle> getPlayerControlsStyle() =>
+      _getStyle(_controlsStyleKey, PlayerControlsStyle.tiles);
+
+  Future<void> setPlayerControlsStyle(PlayerControlsStyle style) =>
+      _setStyle(_controlsStyleKey, style);
+
+  /// The Now Playing transport (play, skip, chapter) style.
+  Future<PlayerControlsStyle> getTransportStyle() =>
+      _getStyle(_transportStyleKey, PlayerControlsStyle.round);
+
+  Future<void> setTransportStyle(PlayerControlsStyle style) =>
+      _setStyle(_transportStyleKey, style);
+
+  /// Styles are stored by enum name, so an unknown or missing value falls
+  /// back to [fallback].
+  Future<PlayerControlsStyle> _getStyle(
+      String key, PlayerControlsStyle fallback) async {
     final overrides = _overrides;
     if (overrides != null) {
-      final value = overrides[_controlsStyleKey];
-      return PlayerControlsStyle.fromName(value is String ? value : null);
+      final value = overrides[key];
+      return PlayerControlsStyle.fromName(value is String ? value : null,
+          fallback: fallback);
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      return PlayerControlsStyle.fromName(prefs.getString(_controlsStyleKey));
+      return PlayerControlsStyle.fromName(prefs.getString(key),
+          fallback: fallback);
     } catch (e) {
       debugPrint('UiPreferences: read failed, using default: $e');
-      return PlayerControlsStyle.tiles;
+      return fallback;
     }
   }
 
-  Future<void> setPlayerControlsStyle(PlayerControlsStyle style) async {
+  Future<void> _setStyle(String key, PlayerControlsStyle style) async {
     final overrides = _overrides;
     if (overrides != null) {
-      overrides[_controlsStyleKey] = style.name;
+      overrides[key] = style.name;
       return;
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_controlsStyleKey, style.name);
+      await prefs.setString(key, style.name);
     } catch (e) {
       debugPrint('UiPreferences: write failed: $e');
     }

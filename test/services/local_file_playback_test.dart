@@ -30,7 +30,8 @@ void main() {
   late String filePath;
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp('local_file_playback_test_');
+    tempDir =
+        await Directory.systemTemp.createTemp('local_file_playback_test_');
     filePath = p.join(tempDir.path, 'chapter.m4b');
     await File(filePath).writeAsBytes([0, 1, 2, 3], flush: true);
   });
@@ -52,7 +53,8 @@ void main() {
     expect(player.lastSource, isNot(isA<ClippingAudioSource>()));
   });
 
-  test('a chapter with start/end reaches the player as a ClippingAudioSource '
+  test(
+      'a chapter with start/end reaches the player as a ClippingAudioSource '
       'with exactly that range', () async {
     final player = _CapturingPlayer();
 

@@ -51,8 +51,7 @@ Future<void> _loadFamily(String family, List<String> paths) async {
     final file = File(path);
     if (!file.existsSync()) continue;
     any = true;
-    loader.addFont(
-        file.readAsBytes().then((b) => ByteData.sublistView(b)));
+    loader.addFont(file.readAsBytes().then((b) => ByteData.sublistView(b)));
   }
   if (any) await loader.load();
 }

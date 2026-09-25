@@ -216,7 +216,7 @@ void main() {
 
       expect(calls, 2);
     });
-  
+
     LibriVoxService relaunch() => LibriVoxService(
           client: MockClient((request) async {
             calls++;

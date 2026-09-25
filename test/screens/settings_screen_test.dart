@@ -126,10 +126,10 @@ void main() {
     expect(find.text('Up next'), findsOneWidget);
 
     await goTo(tester, 'Settings');
-    expect(find.bySemanticsLabel('Tiles'), findsOneWidget);
-    await tester.ensureVisible(find.text('Round'));
+    expect(find.bySemanticsLabel('Tiles'), findsNWidgets(2));
+    await tester.ensureVisible(find.text('Round').first);
     await pumpFrames(tester);
-    await tester.tap(find.text('Round'));
+    await tester.tap(find.text('Round').first);
     await pumpFrames(tester);
     expect(store['now_playing.controls_style'], 'round');
 
@@ -140,9 +140,9 @@ void main() {
     expect(find.text('Sleep'), findsOneWidget);
 
     await goTo(tester, 'Settings');
-    await tester.ensureVisible(find.text('Bar'));
+    await tester.ensureVisible(find.text('Bar').first);
     await pumpFrames(tester);
-    await tester.tap(find.text('Bar'));
+    await tester.tap(find.text('Bar').first);
     await pumpFrames(tester);
     expect(store['now_playing.controls_style'], 'bar');
 
@@ -150,6 +150,48 @@ void main() {
     expect(find.text('Speed'), findsNothing);
     expect(find.bySemanticsLabel('Playback speed, currently 1.0x'),
         findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  testWidgets(
+      'the Playback controls toggle reshapes the transport and persists',
+      (tester) async {
+    final store = <String, Object>{};
+    final db = await pumpApp(tester, store);
+
+    final book = await seedBook(db, id: 'z', title: 'Persuasion');
+    await audio.loadBook(book);
+    await pumpFrames(tester);
+
+    for (final style in ['Tiles', 'Bar', 'Round']) {
+      await goTo(tester, 'Settings');
+      final option = find.text(style).last;
+      await reveal(tester, option);
+      await tester.ensureVisible(option);
+      await pumpFrames(tester);
+      await tester.tap(option);
+      await pumpFrames(tester);
+      expect(store['now_playing.transport_style'], style.toLowerCase());
+      // The first toggle (Player buttons) is untouched.
+      expect(store['now_playing.controls_style'], isNull);
+
+      await goTo(tester, 'Now playing');
+      // Every shape keeps every control and its accessible name.
+      for (final label in [
+        'Previous chapter',
+        'Skip back 15 seconds',
+        'Skip forward 15 seconds',
+        'Next chapter',
+      ]) {
+        expect(find.bySemanticsLabel(label), findsOneWidget,
+            reason: '$label in $style');
+      }
+      expect(find.bySemanticsLabel(RegExp(r'^(Play|Pause|Loading)$')),
+          findsOneWidget,
+          reason: 'play/pause in $style');
+      expect(tester.takeException(), isNull);
+    }
 
     await unmount(tester);
   });

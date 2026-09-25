@@ -244,86 +244,229 @@ class _LibraryScreenState extends State<LibraryScreen> {
           // is exactly what this screen showed before this section
           // existed. A book that is in progress deliberately appears in
           // both sections; see `_inProgress`'s doc comment.
-          body = ListView(
-            padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Sp.x10),
-            children: [
-              if (_inProgress.isNotEmpty) ...[
-                const _SectionHeader(title: 'In progress'),
-                const SizedBox(height: Sp.x3),
-                ..._inProgress.map(
-                  (book) => Padding(
-                    padding: const EdgeInsets.only(bottom: Sp.listGap),
-                    child: _InProgressRow(
-                      book: book,
-                      progress: _progressById[book.id],
-                      onTap: () => _openDetail(context, book, wide: wide),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: Sp.sectionGap),
-                const _SectionHeader(title: 'All books'),
-                const SizedBox(height: Sp.x3),
-              ],
-              ..._books.map(
+          final rows = <Widget>[
+            if (_inProgress.isNotEmpty) ...[
+              const _SectionHeader(title: 'In progress'),
+              const SizedBox(height: Sp.x3),
+              ..._inProgress.map(
                 (book) => Padding(
                   padding: const EdgeInsets.only(bottom: Sp.listGap),
-                  child: _BookRow(
+                  child: _InProgressRow(
                     book: book,
+                    progress: _progressById[book.id],
+                    compact: !wide,
                     onTap: () => _openDetail(context, book, wide: wide),
                   ),
                 ),
               ),
+              const SizedBox(height: Sp.sectionGap),
+              const _SectionHeader(title: 'All books'),
+              const SizedBox(height: Sp.x3),
             ],
-          );
-        }
+            ..._books.map(
+              (book) => Padding(
+                padding: const EdgeInsets.only(bottom: Sp.listGap),
+                child: _BookRow(
+                  book: book,
+                  onTap: () => _openDetail(context, book, wide: wide),
+                ),
+              ),
+            ),
+          ];
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(gutter, Sp.x5, gutter, Sp.x4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Semantics(
-                      header: true,
-                      child: Text(
-                        _books.isEmpty
-                            ? 'Library'
-                            : 'Library (${_books.length} '
-                                '${_books.length == 1 ? 'book' : 'books'})',
-                        style: AppType.serif(AppType.titleLg)
-                            .copyWith(color: c.text),
-                      ),
+          if (wide) {
+            body = ListView(
+              padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Sp.x10),
+              children: rows,
+            );
+          } else {
+            // Phone: pull-to-refresh replaces the header's refresh icon
+            // (removed below), and a `SliverFillRemaining` after the rows
+            // gives a short list a quiet prompt to fill the rest of the
+            // screen instead of trailing off into blank space — it costs
+            // nothing when the list is already tall enough to fill the
+            // viewport, since remaining space is then zero. The extra
+            // bottom padding keeps the floating Import button clear of
+            // the last row.
+            body = RefreshIndicator(
+              onRefresh: _load,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                        gutter, 0, gutter, _LibraryFab.reservedHeight),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate(rows),
                     ),
                   ),
-                  Semantics(
-                    button: true,
-                    label: 'Import a book',
-                    excludeSemantics: true,
-                    child: IconButton(
-                      tooltip: 'Import a book',
-                      onPressed: _import,
-                      icon: const Icon(Icons.add_rounded),
-                    ),
-                  ),
-                  Semantics(
-                    button: true,
-                    label: 'Refresh library',
-                    excludeSemantics: true,
-                    child: IconButton(
-                      tooltip: 'Refresh library',
-                      onPressed: _load,
-                      icon: const Icon(Icons.refresh_rounded),
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _RoomForMorePrompt(
+                      onBrowseDiscover: widget.onGoToDiscover,
                     ),
                   ),
                 ],
               ),
+            );
+          }
+        }
+
+        return Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(gutter, Sp.x5, gutter, Sp.x4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Semantics(
+                          header: true,
+                          child: Text(
+                            _books.isEmpty
+                                ? 'Library'
+                                : 'Library (${_books.length} '
+                                    '${_books.length == 1 ? 'book' : 'books'})',
+                            style: AppType.serif(AppType.titleLg)
+                                .copyWith(color: c.text),
+                          ),
+                        ),
+                      ),
+                      // Wide only: on phone, Import moves to the floating
+                      // button below (in the thumb zone, above the mini
+                      // player) and Refresh becomes pull-to-refresh on the
+                      // list itself.
+                      if (wide) ...[
+                        Semantics(
+                          button: true,
+                          label: 'Import a book',
+                          excludeSemantics: true,
+                          child: IconButton(
+                            tooltip: 'Import a book',
+                            onPressed: _import,
+                            icon: const Icon(Icons.add_rounded),
+                          ),
+                        ),
+                        Semantics(
+                          button: true,
+                          label: 'Refresh library',
+                          excludeSemantics: true,
+                          child: IconButton(
+                            tooltip: 'Refresh library',
+                            onPressed: _load,
+                            icon: const Icon(Icons.refresh_rounded),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Expanded(child: body),
+              ],
             ),
-            Expanded(child: body),
+            if (!wide)
+              Positioned(
+                right: gutter,
+                bottom: Sp.x4,
+                child: _LibraryFab(onPressed: _import),
+              ),
           ],
         );
       },
+    );
+  }
+}
+
+/// Phone-only floating "Import a book" button, replacing the header icon.
+/// Sits above the mini player without any explicit coordination with it:
+/// `AppShell` renders the mini player as a sibling *below* this screen's
+/// own `Expanded` slot, so a `Positioned` bottom-anchored inside this
+/// screen already lands directly above it.
+class _LibraryFab extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _LibraryFab({required this.onPressed});
+
+  /// Vertical space the list must reserve at its end so the last row is
+  /// never covered: the button's own height plus the margin on each side
+  /// of it.
+  static const double reservedHeight = _height + Sp.x4 + Sp.x4;
+  static const double _height = 56;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      label: 'Import a book',
+      excludeSemantics: true,
+      child: Material(
+        color: c.accentFill,
+        elevation: 0,
+        // 18px — the mockup's own figure; it doesn't line up with an
+        // existing `R.*` step (16 or 24), so it's spelled out here rather
+        // than rounded to the nearest token.
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: const BorderRadius.all(Radius.circular(18)),
+          child: Container(
+            height: _height,
+            padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x5, 0),
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.all(Radius.circular(18)),
+              boxShadow: c.shadow2,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_rounded, color: c.textOnAccent),
+                const SizedBox(width: Sp.x2),
+                Text('Import a book',
+                    style: AppType.label.copyWith(color: c.textOnAccent)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fills the space below a short book list with a quiet nudge rather than
+/// leaving it blank, reusing the same callback the empty state's own
+/// "Browse Discover" button calls.
+class _RoomForMorePrompt extends StatelessWidget {
+  final VoidCallback onBrowseDiscover;
+  const _RoomForMorePrompt({required this.onBrowseDiscover});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Sp.x6, vertical: Sp.x4),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text(
+            'Room for more. Find a free classic, or import one you already '
+            'have.',
+            textAlign: TextAlign.center,
+            style: AppType.body.copyWith(color: c.textSecondary),
+          ),
+          const SizedBox(height: Sp.x2),
+          Semantics(
+            button: true,
+            label: 'Browse Discover',
+            excludeSemantics: true,
+            child: TextButton(
+              onPressed: onBrowseDiscover,
+              child: const Text('Browse Discover'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -361,10 +504,15 @@ class _InProgressRow extends StatelessWidget {
   final double? progress;
   final VoidCallback onTap;
 
+  /// Phone gets a tighter card (per the approved mockup: a 64x86 cover
+  /// rather than the 56x74 one wide keeps).
+  final bool compact;
+
   const _InProgressRow({
     required this.book,
     required this.progress,
     required this.onTap,
+    this.compact = false,
   });
 
   @override
@@ -398,8 +546,8 @@ class _InProgressRow extends StatelessWidget {
                   bookId: book.id,
                   title: book.title,
                   coverUrl: book.coverArtUrlOrPath,
-                  width: 56,
-                  height: 74,
+                  width: compact ? 64 : 56,
+                  height: compact ? 86 : 74,
                 ),
                 const SizedBox(width: Sp.x3),
                 Expanded(

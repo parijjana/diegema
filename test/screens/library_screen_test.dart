@@ -144,4 +144,63 @@ void main() {
 
     expect(find.byType(LibraryBookDetailOverlay), findsOneWidget);
   });
+
+  group('phone one-handed layout', () {
+    testWidgets(
+        'the header Import/Refresh icons are gone; a floating button imports',
+        (tester) async {
+      await setSurface(tester, const Size(390, 844));
+      await tester.pumpWidget(wrap(scanLibrary: (db) async {
+        await seedBook(db, id: 'a', title: 'A Book');
+      }));
+      await pumpFrames(tester);
+
+      expect(find.byTooltip('Import a book'), findsNothing);
+      expect(find.byTooltip('Refresh library'), findsNothing);
+
+      final fab = find.bySemanticsLabel('Import a book');
+      expect(fab, findsOneWidget);
+      await tester.tap(fab);
+      await pumpFrames(tester);
+
+      // Wired to the same `LocalAudiobookImporter.showOptionsModal` the
+      // header icon used to call — its options sheet appearing is enough
+      // to show the button drives the real action, not a no-op.
+      expect(find.text('Import Audiobook Folder'), findsOneWidget);
+    });
+
+    testWidgets('pull-to-refresh re-runs the scan', (tester) async {
+      var scans = 0;
+      await setSurface(tester, const Size(390, 844));
+      await tester.pumpWidget(wrap(scanLibrary: (db) async {
+        scans++;
+        await seedBook(db, id: 'a', title: 'A Book');
+      }));
+      await pumpFrames(tester);
+      expect(scans, 1);
+
+      await tester.fling(
+          find.text('A Book'), const Offset(0, 300), 1000);
+      await pumpFrames(tester, frames: 10);
+
+      expect(scans, 2);
+    });
+
+    testWidgets('a short list gets the Room for more prompt', (tester) async {
+      await setSurface(tester, const Size(390, 844));
+      await tester.pumpWidget(wrap(scanLibrary: (db) async {
+        await seedBook(db, id: 'a', title: 'Only Book');
+      }));
+      await pumpFrames(tester);
+
+      expect(
+        find.text(
+            'Room for more. Find a free classic, or import one you already '
+            'have.'),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(TextButton, 'Browse Discover'),
+          findsOneWidget);
+    });
+  });
 }

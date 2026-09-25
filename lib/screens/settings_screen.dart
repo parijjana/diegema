@@ -217,7 +217,9 @@ class SettingsScreen extends StatelessWidget {
         ],
       ),
     ];
-    return _SettingsDeck(groups: groups);
+    // The last card sits at the front of the stack with its face showing, so
+    // the most visited group goes last.
+    return _SettingsDeck(groups: groups.reversed.toList());
   }
 }
 
@@ -257,43 +259,16 @@ class _SettingsGroup {
   String get heroTag => 'settings-card-$title';
 }
 
-/// Settings as a deck of physical cards, after webOS's card view on the
-/// Palm Pre: swipe sideways through the groups (the neighbours peek in at
-/// the edges, a little smaller), and tap one to open it full screen with
-/// its controls. The card grows out of the deck and shrinks back into it.
-class _SettingsDeck extends StatefulWidget {
+/// Settings as a rolodex: the groups are physical cards stacked vertically,
+/// each one covering the card behind it so only its title row shows. The
+/// front card shows its face (the current values). Tap any title to pull that
+/// card out full screen with its controls; it grows out of the stack and
+/// shrinks back into it.
+class _SettingsDeck extends StatelessWidget {
   final List<_SettingsGroup> groups;
   const _SettingsDeck({required this.groups});
 
-  @override
-  State<_SettingsDeck> createState() => _SettingsDeckState();
-}
-
-class _SettingsDeckState extends State<_SettingsDeck> {
-  PageController? _controller;
-  double _fraction = 0;
-  int _page = 0;
-
-  PageController _controllerFor(double fraction) {
-    if (_controller == null || (fraction - _fraction).abs() > 0.001) {
-      final old = _controller;
-      _controller =
-          PageController(viewportFraction: fraction, initialPage: _page);
-      _fraction = fraction;
-      if (old != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
-      }
-    }
-    return _controller!;
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  void _openCard(_SettingsGroup group) {
+  void _openCard(BuildContext context, _SettingsGroup group) {
     Navigator.of(context).push(PageRouteBuilder<void>(
       transitionDuration: const Duration(milliseconds: 380),
       reverseTransitionDuration: const Duration(milliseconds: 320),
@@ -303,82 +278,50 @@ class _SettingsDeckState extends State<_SettingsDeck> {
     ));
   }
 
-  void _goTo(int index) => _controller?.animateToPage(index,
-      duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
-
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final scaler = MediaQuery.textScalerOf(context);
+    // The visible strip of each card: its padding plus the title row, which
+    // grows with the text size so the title is never cut off.
+    final titleRow =
+        math.max(40.0, scaler.scale(AppType.titleMd.fontSize! * 1.4));
+    final peek = Sp.x5 + titleRow + Sp.x4;
     return LayoutBuilder(builder: (context, constraints) {
       final wide = constraints.maxWidth >= Dim.wideBreakpoint;
       final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
-      final cardWidth = math.min(constraints.maxWidth * 0.8, 420.0);
-      final controller = _controllerFor(cardWidth / constraints.maxWidth);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      return ListView(
+        padding: EdgeInsets.fromLTRB(gutter, Sp.x5, gutter, Sp.x8),
         children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(gutter, Sp.x5, gutter, Sp.x2),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text('Settings',
-                      style: AppType.serif(AppType.titleLg)
-                          .copyWith(color: c.text)),
-                ),
-                const SizedBox(height: Sp.x1),
-                Text('Swipe through the cards. Tap one to open it.',
-                    style: AppType.caption.copyWith(color: c.textSecondary)),
-              ],
-            ),
-          ),
-          Expanded(
-            child: PageView.builder(
-              controller: controller,
-              itemCount: widget.groups.length,
-              onPageChanged: (i) => setState(() => _page = i),
-              itemBuilder: (context, i) => AnimatedBuilder(
-                animation: controller,
-                builder: (context, child) {
-                  // Neighbours sit a little smaller and dimmer, like cards
-                  // further back in the stack.
-                  var page = _page.toDouble();
-                  if (controller.hasClients &&
-                      controller.position.haveDimensions) {
-                    page = controller.page ?? page;
-                  }
-                  final t = (page - i).abs().clamp(0.0, 1.0);
-                  return Opacity(
-                    opacity: 1 - 0.35 * t,
-                    child: Transform.scale(scale: 1 - 0.08 * t, child: child),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: Sp.x2, vertical: Sp.x4),
-                  child: _DeckCard(
-                    group: widget.groups[i],
-                    onOpen: () =>
-                        i == _page ? _openCard(widget.groups[i]) : _goTo(i),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text('Settings',
+                        style: AppType.serif(AppType.titleLg)
+                            .copyWith(color: c.text)),
                   ),
-                ),
+                  const SizedBox(height: Sp.x1),
+                  Text('Tap a card to open it.',
+                      style: AppType.caption.copyWith(color: c.textSecondary)),
+                  const SizedBox(height: Sp.x5),
+                  _Rolodex(
+                    peek: peek,
+                    // Cards behind the front one are only ever seen as their
+                    // title strip, so each is just tall enough to stay a card.
+                    frontHeight: math.max(
+                        peek * 2.2,
+                        math.min(
+                            constraints.maxHeight * 0.55, scaler.scale(320))),
+                    groups: groups,
+                    onOpen: (g) => _openCard(context, g),
+                  ),
+                ],
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: Sp.x3),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (var i = 0; i < widget.groups.length; i++)
-                  _DeckDot(
-                    label: 'Show the ${widget.groups[i].title} card',
-                    active: i == _page,
-                    onTap: () => _goTo(i),
-                  ),
-              ],
             ),
           ),
         ],
@@ -387,39 +330,42 @@ class _SettingsDeckState extends State<_SettingsDeck> {
   }
 }
 
-class _DeckDot extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-  const _DeckDot(
-      {required this.label, required this.active, required this.onTap});
+/// Lays the cards out top to bottom, each [peek] below the last and painted
+/// over it, with the ones further back a touch narrower so the stack reads as
+/// depth rather than a list.
+class _Rolodex extends StatelessWidget {
+  final double peek;
+  final double frontHeight;
+  final List<_SettingsGroup> groups;
+  final ValueChanged<_SettingsGroup> onOpen;
+  const _Rolodex({
+    required this.peek,
+    required this.frontHeight,
+    required this.groups,
+    required this.onOpen,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    return Semantics(
-      button: true,
-      selected: active,
-      label: label,
-      excludeSemantics: true,
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: SizedBox(
-          width: Dim.tapMin,
-          height: Dim.tapMin,
-          child: Center(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: active ? 22 : 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: active ? c.accentFill : c.borderContrast,
-                borderRadius: R.pill,
+    final n = groups.length;
+    final behindHeight = peek + Sp.x8;
+    return SizedBox(
+      height: peek * (n - 1) + frontHeight,
+      child: Stack(
+        children: [
+          for (var i = 0; i < n; i++)
+            Positioned(
+              top: peek * i,
+              left: (n - 1 - i) * 6.0,
+              right: (n - 1 - i) * 6.0,
+              height: i == n - 1 ? frontHeight : behindHeight,
+              child: _DeckCard(
+                group: groups[i],
+                front: i == n - 1,
+                onOpen: () => onOpen(groups[i]),
               ),
             ),
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -457,7 +403,8 @@ class _CardSurface extends StatelessWidget {
 class _CardTitle extends StatelessWidget {
   final _SettingsGroup group;
   final Widget? trailing;
-  const _CardTitle({required this.group, this.trailing});
+  final int maxLines;
+  const _CardTitle({required this.group, this.trailing, this.maxLines = 2});
 
   @override
   Widget build(BuildContext context) {
@@ -478,7 +425,7 @@ class _CardTitle extends StatelessWidget {
           child: Semantics(
             header: true,
             child: Text(group.title,
-                maxLines: 2,
+                maxLines: maxLines,
                 overflow: TextOverflow.ellipsis,
                 style: AppType.serif(AppType.titleMd).copyWith(color: c.text)),
           ),
@@ -492,7 +439,12 @@ class _CardTitle extends StatelessWidget {
 class _DeckCard extends StatelessWidget {
   final _SettingsGroup group;
   final VoidCallback onOpen;
-  const _DeckCard({required this.group, required this.onOpen});
+
+  /// Only the front card shows its face; the ones behind are covered below
+  /// their title row, so drawing their faces would be wasted work.
+  final bool front;
+  const _DeckCard(
+      {required this.group, required this.onOpen, required this.front});
 
   @override
   Widget build(BuildContext context) {
@@ -512,54 +464,58 @@ class _DeckCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _CardTitle(group: group),
-                  const SizedBox(height: Sp.x4),
-                  Divider(color: c.border, height: 1),
-                  const SizedBox(height: Sp.x4),
-                  // The face can't scroll (the deck scrolls sideways), so
-                  // at large text sizes it clips rather than overflowing.
-                  Expanded(
-                    child: ClipRect(
-                      child: SingleChildScrollView(
-                        physics: const NeverScrollableScrollPhysics(),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            for (final (label, value) in group.summary)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: Sp.x3),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(label,
-                                        style: AppType.caption
-                                            .copyWith(color: c.textSecondary)),
-                                    Text(value,
-                                        style: AppType.label.copyWith(
-                                            color: c.text,
-                                            fontWeight: FontWeight.w700)),
-                                  ],
+                  _CardTitle(group: group, maxLines: 1),
+                  if (front) ...[
+                    const SizedBox(height: Sp.x4),
+                    Divider(color: c.border, height: 1),
+                    const SizedBox(height: Sp.x4),
+                    // The face has a fixed height, so at large text sizes it
+                    // clips rather than overflowing.
+                    Expanded(
+                      child: ClipRect(
+                        child: SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final (label, value) in group.summary)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: Sp.x3),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(label,
+                                          style: AppType.caption.copyWith(
+                                              color: c.textSecondary)),
+                                      Text(value,
+                                          style: AppType.label.copyWith(
+                                              color: c.text,
+                                              fontWeight: FontWeight.w700)),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            if (group.preview != null) ...[
-                              const SizedBox(height: Sp.x2),
-                              group.preview!,
+                              if (group.preview != null) ...[
+                                const SizedBox(height: Sp.x2),
+                                group.preview!,
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: Sp.x3),
-                  Row(
-                    children: [
-                      Text('Tap to open',
-                          style: AppType.caption.copyWith(color: c.accentText)),
-                      const Spacer(),
-                      Icon(Icons.open_in_full_rounded,
-                          size: 18, color: c.accentText),
-                    ],
-                  ),
+                    const SizedBox(height: Sp.x3),
+                    Row(
+                      children: [
+                        Text('Tap to open',
+                            style:
+                                AppType.caption.copyWith(color: c.accentText)),
+                        const Spacer(),
+                        Icon(Icons.open_in_full_rounded,
+                            size: 18, color: c.accentText),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

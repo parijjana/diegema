@@ -68,11 +68,10 @@ void main() {
     return db;
   }
 
-  /// Brings [title]'s card to the front of the deck and opens it.
+  /// Opens [title]'s card from the stack.
   Future<void> openCard(WidgetTester tester, String title) async {
-    await tester.tap(find.bySemanticsLabel('Show the $title card'));
-    await pumpFrames(tester);
-    await tester.tap(find.bySemanticsLabel(RegExp('^$title settings')));
+    // Cards overlap, so tap the title: the one strip of each that shows.
+    await tester.tap(find.text(title));
     await pumpFrames(tester);
   }
 

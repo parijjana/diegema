@@ -738,7 +738,6 @@ class _LibraryStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     final started = {for (final b in inProgress) b.id};
     final ordered = [
       ...inProgress,
@@ -764,11 +763,8 @@ class _LibraryStack extends StatelessWidget {
               width: 40,
               height: 40,
             ),
-            trailing: percent(book) == null
-                ? null
-                : Text(percent(book)!,
-                    style: AppType.label.copyWith(
-                        color: c.accentText, fontWeight: FontWeight.w700)),
+            trailing:
+                percent(book) == null ? null : CardTrailingText(percent(book)!),
             semanticLabel: [
               book.title,
               'by ${book.author}',
@@ -776,59 +772,6 @@ class _LibraryStack extends StatelessWidget {
               'View details',
             ].join('. '),
             onOpen: () => onOpen(book),
-            face: (context) {
-              final chapters = book.chapters.length;
-              final p =
-                  started.contains(book.id) ? progressById[book.id] : null;
-              return ExcludeSemantics(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppBookCover(
-                      bookId: book.id,
-                      title: book.title,
-                      coverUrl: book.coverArtUrlOrPath,
-                      width: 96,
-                      height: 96,
-                    ),
-                    const SizedBox(width: Sp.x4),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(book.author,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppType.body.copyWith(
-                                  color: c.text, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: Sp.x1),
-                          Text(
-                            chapters == 0
-                                ? (book.source ?? 'Local')
-                                : '$chapters ${chapters == 1 ? 'chapter' : 'chapters'} '
-                                    '· ${book.source ?? 'Local'}',
-                            style: AppType.caption
-                                .copyWith(color: c.textSecondary),
-                          ),
-                          if (p != null) ...[
-                            const SizedBox(height: Sp.x3),
-                            ClipRRect(
-                              borderRadius: R.pill,
-                              child: LinearProgressIndicator(
-                                value: p,
-                                minHeight: 6,
-                                color: c.accentFill,
-                                backgroundColor: c.surfaceSunken,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
           ),
       ],
     );

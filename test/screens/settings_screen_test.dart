@@ -310,7 +310,7 @@ void main() {
   testWidgets(
       'Ambience is its own screen; Now Playing has only a small on/off pill',
       (tester) async {
-    final store = <String, Object>{};
+    final store = <String, Object>{'appearance.card_stacks': 'off'};
     final ambience = AmbienceService(
       book: audio,
       preferences: UiPreferences(overrides: store),

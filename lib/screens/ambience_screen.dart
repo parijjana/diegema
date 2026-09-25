@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../core/ambience_catalog.dart';
+import '../core/app_settings.dart';
 import '../core/utils/duration_format.dart';
 import '../services/ambience_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/card_stack.dart';
 
 /// The Ambience screen: the background-sound channel's own on/off, volume
 /// and sleep timer, whether it follows the book, the user's saved mixes,
@@ -31,35 +33,126 @@ class AmbienceScreen extends StatelessWidget {
           final gutter = constraints.maxWidth >= Dim.wideBreakpoint
               ? Sp.gutterDesktop
               : Sp.gutterPhone;
+          final header = Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Semantics(
+                      header: true,
+                      child: Text('Ambience',
+                          style: AppType.serif(AppType.titleLg)
+                              .copyWith(color: c.text)),
+                    ),
+                    const SizedBox(height: Sp.x1),
+                    Text(status,
+                        style:
+                            AppType.caption.copyWith(color: c.textSecondary)),
+                  ],
+                ),
+              ),
+              Switch(
+                value: s.on,
+                onChanged: s.mix.isEmpty ? null : service.setOn,
+              ),
+            ],
+          );
+          final sections = _sections();
+
+          if (SettingsScope.maybeOf(context)?.cardStacks ?? false) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(gutter, Sp.x5, gutter, Sp.x2),
+                  child: header,
+                ),
+                Expanded(
+                  child: CardStack(
+                    padding: EdgeInsets.fromLTRB(gutter, Sp.x2, gutter, Sp.x5),
+                    cards: [
+                      for (final section in sections)
+                        StackCard(
+                          title: section.title,
+                          leading: CardIconBadge(section.icon),
+                          trailing: section.trailing(s) == null
+                              ? null
+                              : CardTrailingText(section.trailing(s)!),
+                          heroTag: 'ambience-card-${section.title}',
+                          semanticLabel: [
+                            section.title,
+                            if (section.trailing(s) != null)
+                              section.trailing(s)!,
+                          ].join(', '),
+                          onOpen: () => openStackCard(
+                            context,
+                            title: section.title,
+                            leading: CardIconBadge(section.icon),
+                            heroTag: 'ambience-card-${section.title}',
+                            // Live: the controls rebuild as the mix changes.
+                            body: (context) =>
+                                ValueListenableBuilder<AmbienceState>(
+                              valueListenable: service.state,
+                              builder: (context, s, _) => ListView(
+                                padding: EdgeInsets.fromLTRB(
+                                    gutter, Sp.x5, gutter, Sp.x8),
+                                children: [
+                                  ...section.build(context, s),
+                                  if (section.group != null) ...[
+                                    const SizedBox(height: Sp.x5),
+                                    _credit(context),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+
           return ListView(
             padding: EdgeInsets.fromLTRB(gutter, Sp.x5, gutter, Sp.x8),
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Semantics(
-                          header: true,
-                          child: Text('Ambience',
-                              style: AppType.serif(AppType.titleLg)
-                                  .copyWith(color: c.text)),
-                        ),
-                        const SizedBox(height: Sp.x1),
-                        Text(status,
-                            style: AppType.caption
-                                .copyWith(color: c.textSecondary)),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: s.on,
-                    onChanged: s.mix.isEmpty ? null : service.setOn,
-                  ),
-                ],
-              ),
+              header,
               const SizedBox(height: Sp.x4),
+              for (final section in sections) ...[
+                if (section.group != null) ...[
+                  Text(section.title,
+                      style: AppType.caption.copyWith(
+                          color: c.textSecondary, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: Sp.x2),
+                ],
+                ...section.build(context, s),
+                const SizedBox(height: Sp.x5),
+              ],
+              _credit(context),
+            ],
+          );
+        });
+      },
+    );
+  }
+
+  Widget _credit(BuildContext context) => Text(
+        'Recordings by Joseph Sardin, BigSoundBank.com (CC0). '
+        'The noises are generated by Diegema.',
+        style: AppType.caption.copyWith(color: context.colors.textMuted),
+      );
+
+  /// The screen's parts, in order: a list's sections, or a stack's cards.
+  List<_AmbienceSection> _sections() => [
+        _AmbienceSection(
+          title: 'Sound',
+          icon: Icons.tune_rounded,
+          trailing: (s) => '${(s.master * 100).round()}%',
+          build: (context, s) {
+            final c = context.colors;
+            return [
               _LabelledSwitch(
                 label: 'Play with the book',
                 description: s.followBook
@@ -78,42 +171,82 @@ class AmbienceScreen extends StatelessWidget {
                 'Always kept quieter than the narration.',
                 style: AppType.caption.copyWith(color: c.textSecondary),
               ),
-              const SizedBox(height: Sp.x5),
-              _SleepRow(
-                remaining: s.sleepRemaining,
-                options: _sleepOptions,
-                onSet: (m) => service.setSleepTimer(Duration(minutes: m)),
-                onCancel: service.cancelSleepTimer,
-              ),
-              const SizedBox(height: Sp.x5),
-              _MixesRow(service: service, state: s),
-              for (final group in AmbienceGroup.values) ...[
-                const SizedBox(height: Sp.x5),
-                Text(group.label,
-                    style: AppType.caption.copyWith(
-                        color: c.textSecondary, fontWeight: FontWeight.w700)),
-                const SizedBox(height: Sp.x2),
-                for (final sound in AmbienceSound.all)
-                  if (sound.group == group)
-                    _SoundRow(
-                      sound: sound,
-                      level: s.mix[sound.id],
-                      onToggle: () => service.toggleSound(sound.id),
-                      onLevel: (v) => service.setLevel(sound.id, v),
-                    ),
-              ],
-              const SizedBox(height: Sp.x5),
-              Text(
-                'Recordings by Joseph Sardin, BigSoundBank.com (CC0). '
-                'The noises are generated by Diegema.',
-                style: AppType.caption.copyWith(color: c.textMuted),
-              ),
+            ];
+          },
+        ),
+        _AmbienceSection(
+          title: 'Sleep timer',
+          icon: Icons.bedtime_rounded,
+          trailing: (s) => s.sleepRemaining == null
+              ? 'Off'
+              : formatTimecode(s.sleepRemaining!),
+          build: (context, s) => [
+            _SleepRow(
+              remaining: s.sleepRemaining,
+              options: _sleepOptions,
+              onSet: (m) => service.setSleepTimer(Duration(minutes: m)),
+              onCancel: service.cancelSleepTimer,
+            ),
+          ],
+        ),
+        _AmbienceSection(
+          title: 'Your mixes',
+          icon: Icons.library_music_rounded,
+          trailing: (s) => s.saved.isEmpty ? null : '${s.saved.length}',
+          build: (context, s) => [_MixesRow(service: service, state: s)],
+        ),
+        for (final group in AmbienceGroup.values)
+          _AmbienceSection(
+            title: group.label,
+            icon: _groupIcon(group),
+            group: group,
+            trailing: (s) {
+              final on = AmbienceSound.all
+                  .where((x) => x.group == group && s.mix.containsKey(x.id))
+                  .length;
+              return on == 0 ? null : '$on on';
+            },
+            build: (context, s) => [
+              for (final sound in AmbienceSound.all)
+                if (sound.group == group)
+                  _SoundRow(
+                    sound: sound,
+                    level: s.mix[sound.id],
+                    onToggle: () => service.toggleSound(sound.id),
+                    onLevel: (v) => service.setLevel(sound.id, v),
+                  ),
             ],
-          );
-        });
-      },
-    );
-  }
+          ),
+      ];
+
+  static IconData _groupIcon(AmbienceGroup group) => switch (group) {
+        AmbienceGroup.water => Icons.waves_rounded,
+        AmbienceGroup.nature => Icons.forest_rounded,
+        AmbienceGroup.weather => Icons.thunderstorm_rounded,
+        AmbienceGroup.places => Icons.location_city_rounded,
+        AmbienceGroup.noise => Icons.graphic_eq_rounded,
+      };
+}
+
+/// One part of the Ambience screen: a section of the list, or a card.
+class _AmbienceSection {
+  final String title;
+  final IconData icon;
+
+  /// Set for the sound groups, which get a caption heading in the list.
+  final AmbienceGroup? group;
+
+  /// A short current value for the card's title row, or null for none.
+  final String? Function(AmbienceState s) trailing;
+  final List<Widget> Function(BuildContext context, AmbienceState s) build;
+
+  const _AmbienceSection({
+    required this.title,
+    required this.icon,
+    required this.trailing,
+    required this.build,
+    this.group,
+  });
 }
 
 class _LabelledSwitch extends StatelessWidget {

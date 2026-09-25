@@ -47,8 +47,6 @@ class SettingsScreen extends StatelessWidget {
           ('Shadows', settings.shadows.label),
           ('Card stacks', settings.cardStacks ? 'On' : 'Off'),
         ],
-        preview: _ColoursPreview(
-            background: settings.background, accent: settings.accent),
         controls: (context, settings) => [
           _ChoiceGroup<ThemeMode>(
             label: 'Theme',
@@ -245,12 +243,9 @@ class _SettingsGroup {
   final String title;
   final IconData icon;
 
-  /// What the card's face shows while it sits in the deck: the current
-  /// value of each setting inside, so most visits end without opening it.
+  /// The current value of each setting inside, read out with the card's
+  /// name so a screen reader hears the state without opening it.
   final List<(String, String)> summary;
-
-  /// An optional picture of the current state (the colours card).
-  final Widget? preview;
 
   /// The controls, built inside the opened card with live settings so they
   /// rebuild as the user changes them.
@@ -262,7 +257,6 @@ class _SettingsGroup {
     required this.icon,
     required this.summary,
     required this.controls,
-    this.preview,
   });
 
   String get heroTag => 'settings-card-$title';
@@ -276,7 +270,6 @@ class _SettingsDeck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     return LayoutBuilder(builder: (context, constraints) {
       final wide = constraints.maxWidth >= Dim.wideBreakpoint;
       final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
@@ -298,39 +291,6 @@ class _SettingsDeck extends StatelessWidget {
                     heroTag: g.heroTag,
                     semanticLabel: '${g.title} settings. '
                         '${g.summary.map((e) => '${e.$1}: ${e.$2}').join(', ')}',
-                    face: (context) => ExcludeSemantics(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final (label, value) in g.summary)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: Sp.x2),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Text(label,
-                                        style: AppType.caption
-                                            .copyWith(color: c.textSecondary)),
-                                  ),
-                                  const SizedBox(width: Sp.x3),
-                                  Flexible(
-                                    child: Text(value,
-                                        textAlign: TextAlign.end,
-                                        style: AppType.label.copyWith(
-                                            color: c.text,
-                                            fontWeight: FontWeight.w700)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (g.preview != null) ...[
-                            const SizedBox(height: Sp.x2),
-                            g.preview!,
-                          ],
-                        ],
-                      ),
-                    ),
                     onOpen: () => openStackCard(
                       context,
                       title: g.title,
@@ -443,54 +403,6 @@ class _SettingsHeading extends StatelessWidget {
       ),
     );
   }
-}
-
-/// The colours card's face: each background's light and dark halves, with
-/// the chosen accent on each.
-class _ColoursPreview extends StatelessWidget {
-  final BackgroundPair background;
-  final AccentPalette accent;
-  const _ColoursPreview({required this.background, required this.accent});
-
-  Widget _half(BackgroundTones b, AccentTones a) => Expanded(
-        child: Container(
-          height: 64,
-          color: b.bg,
-          padding: const EdgeInsets.all(Sp.x2),
-          child: Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration:
-                    BoxDecoration(color: a.accentFill, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: Sp.x2),
-              Expanded(
-                child: Container(
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: b.surface,
-                    borderRadius: R.sm,
-                    border: Border.all(color: b.border),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-        child: ClipRRect(
-          borderRadius: R.md,
-          child: Row(children: [
-            _half(background.light, accent.light),
-            _half(background.dark, accent.dark),
-          ]),
-        ),
-      );
 }
 
 class _Choice<T> {

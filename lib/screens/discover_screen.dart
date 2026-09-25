@@ -603,9 +603,6 @@ class _ShelfStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final rowHeight =
-        LibriVoxBookItem.coverHeight + Sp.x2 + (26 * 2 + 18) * textScale;
     return CardStack(
       padding: padding,
       cards: [
@@ -613,21 +610,9 @@ class _ShelfStack extends StatelessWidget {
           StackCard(
             title: title,
             leading: const CardIconBadge(Icons.auto_stories_rounded),
+            trailing: CardTrailingText('${books.length}'),
             heroTag: 'discover-shelf-$title',
             semanticLabel: '$title, ${books.length} books. Open the shelf',
-            face: (context) => SizedBox(
-              height: rowHeight,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: books.length,
-                separatorBuilder: (_, __) => const SizedBox(width: Sp.x3),
-                itemBuilder: (context, i) => LibriVoxBookItem(
-                  book: books[i],
-                  isSelected: selected?.id == books[i].id,
-                  onTap: () => onSelect(context, books[i]),
-                ),
-              ),
-            ),
             onOpen: () => openStackCard(
               context,
               title: title,

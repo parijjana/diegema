@@ -62,9 +62,8 @@ class DemoBookEntry {
       author: json['author']?.toString() ?? 'Unknown Author',
       description: json['description']?.toString() ?? '',
       language: json['language']?.toString() ?? 'English',
-      narrators: (json['narrators'] as List? ?? [])
-          .map((n) => n.toString())
-          .toList(),
+      narrators:
+          (json['narrators'] as List? ?? []).map((n) => n.toString()).toList(),
       category: json['category']?.toString() ?? '',
       playable: json['playable'] == true,
       coverUrl: json['coverUrl']?.toString() ?? '',

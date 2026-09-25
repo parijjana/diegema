@@ -129,9 +129,8 @@ class _UpNextSheetState extends State<UpNextSheet> {
               ),
             ),
             _Footer(
-              nextChapterTitle: isLastChapter
-                  ? null
-                  : book.chapters[currentIndex + 1].title,
+              nextChapterTitle:
+                  isLastChapter ? null : book.chapters[currentIndex + 1].title,
               onClose: () => Navigator.of(context).pop(),
               onSkip: () => audioService.nextChapter(),
             ),
@@ -241,8 +240,9 @@ class _CurrentRow extends StatelessWidget {
     final remaining = hasDuration
         ? (rawRemaining.isNegative ? Duration.zero : rawRemaining)
         : null;
-    final progress =
-        hasDuration ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0) : 0.0;
+    final progress = hasDuration
+        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
 
     return Semantics(
       label: remaining == null
@@ -255,8 +255,8 @@ class _CurrentRow extends StatelessWidget {
           color: c.accentWash,
           borderRadius: R.md,
           child: _Row(
-            leading: Icon(Icons.graphic_eq_rounded,
-                color: c.accentText, size: 22),
+            leading:
+                Icon(Icons.graphic_eq_rounded, color: c.accentText, size: 22),
             title: Text(
               chapter.title,
               maxLines: 1,
@@ -327,11 +327,13 @@ class _UpcomingRow extends StatelessWidget {
           chapter.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: AppType.body.copyWith(color: c.text, fontWeight: FontWeight.w500),
+          style:
+              AppType.body.copyWith(color: c.text, fontWeight: FontWeight.w500),
         ),
         subtitle: duration == null
             ? null
-            : Text(duration, style: AppType.caption.copyWith(color: c.textSecondary)),
+            : Text(duration,
+                style: AppType.caption.copyWith(color: c.textSecondary)),
       ),
     );
   }
@@ -362,7 +364,8 @@ class _Row extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 56),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Sp.x4, vertical: Sp.x2),
+          padding:
+              const EdgeInsets.symmetric(horizontal: Sp.x4, vertical: Sp.x2),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -428,7 +431,8 @@ class _Footer extends StatelessWidget {
                   side: BorderSide(color: c.border),
                   padding: EdgeInsets.zero,
                 ),
-                child: Icon(Icons.close_rounded, color: c.text, size: Dim.iconMd),
+                child:
+                    Icon(Icons.close_rounded, color: c.text, size: Dim.iconMd),
               ),
             ),
           ),

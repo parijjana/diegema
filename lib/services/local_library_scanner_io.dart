@@ -35,8 +35,7 @@ Future<void> scanDownloadedLibrary(
   final rootPath = await (documentsRoot ?? _platformDocumentsRoot)();
   if (rootPath == null) return;
 
-  final downloadsDir =
-      Directory(p.join(rootPath, 'diegema', 'downloads'));
+  final downloadsDir = Directory(p.join(rootPath, 'diegema', 'downloads'));
 
   if (!await downloadsDir.exists()) return;
 
@@ -50,8 +49,8 @@ Future<void> scanDownloadedLibrary(
     if (book.id.startsWith(BookIdentity.localIdPrefix)) continue;
     for (final ch in book.chapters) {
       if (ch.isStream) continue;
-      owners.putIfAbsent(p.normalize(p.dirname(ch.audioPathOrUrl)),
-          () => book.id);
+      owners.putIfAbsent(
+          p.normalize(p.dirname(ch.audioPathOrUrl)), () => book.id);
     }
   }
   for (final entity in entities) {
@@ -110,4 +109,3 @@ Future<void> scanDownloadedLibrary(
     await db.saveAudiobook(book);
   }
 }
-

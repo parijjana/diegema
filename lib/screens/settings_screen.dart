@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/app_info.dart';
 import '../core/app_settings.dart';
 import '../core/playback_constants.dart';
+import '../core/player_controls_style.dart';
 import '../theme/app_theme.dart';
 
 /// The settings panel — Phase 1 of `settings_panel_plan.md`.
@@ -45,7 +46,6 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: Sp.x6),
-
             _Section(
               title: 'Appearance',
               children: [
@@ -60,9 +60,20 @@ class SettingsScreen extends StatelessWidget {
                   ],
                   onChanged: settings.setThemeMode,
                 ),
+                const SizedBox(height: Sp.x5),
+                _ThreeWayToggle<PlayerControlsStyle>(
+                  label: 'Player buttons',
+                  description: 'How Up next, Speed and Sleep look on the '
+                      'Now Playing screen.',
+                  value: settings.controlsStyle,
+                  options: [
+                    for (final style in PlayerControlsStyle.values)
+                      _Choice(style, style.label),
+                  ],
+                  onChanged: settings.setControlsStyle,
+                ),
               ],
             ),
-
             _Section(
               title: 'Playback',
               children: [
@@ -79,12 +90,10 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ],
             ),
-
             _Section(
               title: 'About',
               children: [
-                const _InfoRow(
-                    label: kAppName, value: 'Version $kAppVersion'),
+                const _InfoRow(label: kAppName, value: 'Version $kAppVersion'),
                 // Credit as LibriVox asks for it ("we much prefer if you
                 // do credit us (with a link to our site)" —
                 // librivox.org/pages/public-domain), their objective in
@@ -187,6 +196,126 @@ class _Choice<T> {
   const _Choice(this.value, this.label);
 }
 
+/// A labelled three-way toggle: one rounded track split into equal
+/// segments, the chosen one filled. Used where the options are short words
+/// that read as one control (the owner asked for a toggle, not rows).
+///
+/// Large text scales are handled by letting each label wrap to two lines
+/// inside its segment rather than overflowing the track, and the selection
+/// is carried by a check icon and the fill, never colour alone.
+class _ThreeWayToggle<T> extends StatelessWidget {
+  final String label;
+  final String description;
+  final T value;
+  final List<_Choice<T>> options;
+  final ValueChanged<T> onChanged;
+
+  const _ThreeWayToggle({
+    required this.label,
+    required this.description,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(label, style: AppType.label.copyWith(color: c.text)),
+        const SizedBox(height: Sp.x1),
+        Text(
+          description,
+          style: AppType.caption.copyWith(color: c.textSecondary),
+        ),
+        const SizedBox(height: Sp.x3),
+        Container(
+          padding: const EdgeInsets.all(Sp.x1),
+          decoration: BoxDecoration(
+            color: c.surfaceSunken,
+            borderRadius: R.pill,
+            border: Border.all(color: c.borderContrast),
+          ),
+          child: Row(
+            children: [
+              for (final option in options)
+                Expanded(
+                  child: _ToggleSegment(
+                    label: option.label,
+                    selected: option.value == value,
+                    onTap: () => onChanged(option.value),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ToggleSegment extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ToggleSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final foreground = selected ? c.textOnAccent : c.textSecondary;
+    return Semantics(
+      button: true,
+      inMutuallyExclusiveGroup: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? c.accentFill : Colors.transparent,
+        borderRadius: R.pill,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: R.pill,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: Dim.tapMin),
+            padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (selected) ...[
+                  Icon(Icons.check_rounded,
+                      size: Dim.iconSm, color: foreground),
+                  const SizedBox(width: Sp.x1),
+                ],
+                Flexible(
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.label.copyWith(
+                      color: foreground,
+                      fontWeight: selected ? FontWeight.w700 : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A labelled set of mutually exclusive options, one row each.
 ///
 /// Selection is carried by a check icon *and* a bolder label *and* a
@@ -281,7 +410,8 @@ class _ChoiceRow extends StatelessWidget {
                 ),
               ),
               if (selected)
-                Icon(Icons.check_rounded, size: Dim.iconSm, color: c.accentText),
+                Icon(Icons.check_rounded,
+                    size: Dim.iconSm, color: c.accentText),
             ],
           ),
         ),

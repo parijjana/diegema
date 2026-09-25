@@ -42,8 +42,7 @@ Future<void> seedDemoLibrary(AppDatabase db) async {
   final downloader = DemoDownloader();
   for (final entry in playable) {
     try {
-      final book =
-          await downloader.parseStreamableBook(entry.toLibriVoxBook());
+      final book = await downloader.parseStreamableBook(entry.toLibriVoxBook());
       // The demo's audio ships with the build and plays — as good as
       // "downloaded" in demo terms, so it belongs in Library.
       final owned = UnifiedAudiobook(

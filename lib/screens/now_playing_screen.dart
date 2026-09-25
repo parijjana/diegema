@@ -1,7 +1,10 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../core/app_settings.dart';
+import '../core/player_controls_style.dart';
 import '../core/ui_preferences.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
@@ -938,8 +941,9 @@ class _ActiveView extends StatelessWidget {
                         SleepTimerSelector(audioService: audioService),
                       ],
                     )
-                  : _ActionTileRow(
+                  : _ActionRow(
                       audioService: audioService,
+                      book: book,
                       onShowUpNext: onShowUpNext,
                     ),
             ],
@@ -948,108 +952,118 @@ class _ActiveView extends StatelessWidget {
 
         return Container(
           color: c.bg,
-          child: Column(
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              // Slim top-right row. It hosts only the playback-error
-              // indicator and (on phone) the theme toggle passed down as
-              // `headerAction` — neither of which touches playback — and
-              // takes no space at all when both are absent. The "Up next"
-              // row that used to live here on phone has moved into the
-              // action tile row at the bottom, in the thumb zone.
-              ValueListenableBuilder<PlaybackState>(
-                valueListenable: audioService.stateNotifier,
-                builder: (context, state, _) {
-                  final showError = state == PlaybackState.error;
-                  final showHeaderAction = !wide && headerAction != null;
-                  if (!showError && !showHeaderAction) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        if (showError) ...[
-                          Icon(Icons.error_outline_rounded, color: c.danger),
-                          const SizedBox(width: Sp.x2),
-                          Text('Playback failed',
-                              style: AppType.label.copyWith(color: c.danger)),
-                        ],
-                        if (showError && showHeaderAction)
-                          const SizedBox(width: Sp.x3),
-                        if (showHeaderAction) headerAction!,
-                      ],
-                    ),
-                  );
-                },
-              ),
-              if (wide)
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: gutter),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 640),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+              _CoverBackdrop(book: book),
+              Column(
+                children: [
+                  // Slim top-right row. It hosts only the playback-error
+                  // indicator and (on phone) the theme toggle passed down as
+                  // `headerAction` — neither of which touches playback — and
+                  // takes no space at all when both are absent. The "Up next"
+                  // row that used to live here on phone has moved into the
+                  // action tile row at the bottom, in the thumb zone.
+                  ValueListenableBuilder<PlaybackState>(
+                    valueListenable: audioService.stateNotifier,
+                    builder: (context, state, _) {
+                      final showError = state == PlaybackState.error;
+                      final showHeaderAction = !wide && headerAction != null;
+                      if (!showError && !showHeaderAction) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding:
+                            const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            headerFor(coverSize),
-                            const SizedBox(height: Sp.x5),
-                            footer,
+                            if (showError) ...[
+                              Icon(Icons.error_outline_rounded,
+                                  color: c.danger),
+                              const SizedBox(width: Sp.x2),
+                              Text('Playback failed',
+                                  style:
+                                      AppType.label.copyWith(color: c.danger)),
+                            ],
+                            if (showError && showHeaderAction)
+                              const SizedBox(width: Sp.x3),
+                            if (showHeaderAction) headerAction!,
                           ],
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
-                )
-              else
-                // Phone: cover/title/chapter pinned at the top, scrubber
-                // and transport pushed to the BOTTOM of the available
-                // space (the thumb zone).
-                //
-                // `Expanded(SingleChildScrollView(header)) + footer` rather
-                // than the more obvious `ConstrainedBox(minHeight) +
-                // IntrinsicHeight + Spacer`: that combination was tried
-                // first, but a `Spacer`'s intrinsic height contribution is
-                // unbounded, so `IntrinsicHeight` computed an infinite
-                // intrinsic size for the column and crashed layout as soon
-                // as anything below it (the action-tile row's fixed-height
-                // `SizedBox`es) tried to enforce a concrete height against
-                // it. Here the footer is a normal, non-scrolling sibling
-                // pinned below an `Expanded` scroll area: on a tall screen
-                // the header sits at the scroll area's top with blank
-                // space below it and the footer directly under that, and
-                // on a short one the scroll area simply scrolls — no
-                // intrinsic pass involved at all.
-                Expanded(
-                  child: Column(
-                    children: [
-                      // The giant cover: as wide as the screen, and as tall
-                      // as the space left once the title lines are
-                      // reserved, so it grows to fill the phone and only
-                      // ever shrinks (never overflows) on short screens or
-                      // at large text sizes.
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, box) {
-                            final scale =
-                                MediaQuery.textScalerOf(context).scale(1);
-                            final titleReserve =
-                                Sp.x5 + Sp.x1 + Sp.x4 + 84 * scale;
-                            final size = math
-                                .min(box.maxWidth, box.maxHeight - titleReserve)
-                                .clamp(120.0, box.maxWidth)
-                                .toDouble();
-                            return SingleChildScrollView(
-                              child: headerFor(size, bleed: true),
-                            );
-                          },
+                  if (wide)
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.symmetric(horizontal: gutter),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 640),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                headerFor(coverSize),
+                                const SizedBox(height: Sp.x5),
+                                footer,
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      footer,
-                    ],
-                  ),
-                ),
+                    )
+                  else
+                    // Phone: cover/title/chapter pinned at the top, scrubber
+                    // and transport pushed to the BOTTOM of the available
+                    // space (the thumb zone).
+                    //
+                    // `Expanded(SingleChildScrollView(header)) + footer` rather
+                    // than the more obvious `ConstrainedBox(minHeight) +
+                    // IntrinsicHeight + Spacer`: that combination was tried
+                    // first, but a `Spacer`'s intrinsic height contribution is
+                    // unbounded, so `IntrinsicHeight` computed an infinite
+                    // intrinsic size for the column and crashed layout as soon
+                    // as anything below it (the action-tile row's fixed-height
+                    // `SizedBox`es) tried to enforce a concrete height against
+                    // it. Here the footer is a normal, non-scrolling sibling
+                    // pinned below an `Expanded` scroll area: on a tall screen
+                    // the header sits at the scroll area's top with blank
+                    // space below it and the footer directly under that, and
+                    // on a short one the scroll area simply scrolls — no
+                    // intrinsic pass involved at all.
+                    Expanded(
+                      child: Column(
+                        children: [
+                          // The giant cover: as wide as the screen, and as tall
+                          // as the space left once the title lines are
+                          // reserved, so it grows to fill the phone and only
+                          // ever shrinks (never overflows) on short screens or
+                          // at large text sizes.
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, box) {
+                                final scale =
+                                    MediaQuery.textScalerOf(context).scale(1);
+                                final titleReserve =
+                                    Sp.x5 + Sp.x1 + Sp.x4 + 84 * scale;
+                                final size = math
+                                    .min(box.maxWidth,
+                                        box.maxHeight - titleReserve)
+                                    .clamp(120.0, box.maxWidth)
+                                    .toDouble();
+                                return SingleChildScrollView(
+                                  child: headerFor(size, bleed: true),
+                                );
+                              },
+                            ),
+                          ),
+                          footer,
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
         );
@@ -1058,92 +1072,297 @@ class _ActiveView extends StatelessWidget {
   }
 }
 
-/// Phone-only action row: three equal-width 48px tiles directly above the
-/// bottom nav — Up next, Speed, Sleep. Speed and Sleep reuse
-/// [SpeedSelector]/[SleepTimerSelector] (their popup-menu logic is not
-/// duplicated here); they are only restyled with a square tile radius and
-/// stretched to fill the tile, via the `radius`/`stretch` hooks on
-/// `player_transport.dart`'s chip shell.
-class _ActionTileRow extends StatelessWidget {
+/// A blurred, washed-out copy of the cover filling the whole player, so
+/// the screen takes on the book's colours. The scrim keeps text contrast
+/// close to the plain background's; purely decorative, so it is hidden
+/// from screen readers and ignores touches.
+class _CoverBackdrop extends StatelessWidget {
+  final UnifiedAudiobook book;
+  const _CoverBackdrop({required this.book});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ExcludeSemantics(
+      child: IgnorePointer(
+        child: ClipRect(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ImageFiltered(
+                imageFilter: ui.ImageFilter.blur(
+                    sigmaX: 40, sigmaY: 40, tileMode: TileMode.clamp),
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  clipBehavior: Clip.hardEdge,
+                  child: AppBookCover(
+                    bookId: book.id,
+                    title: book.title,
+                    coverUrl: book.coverArtUrlOrPath,
+                    width: 200,
+                    height: 200,
+                  ),
+                ),
+              ),
+              ColoredBox(color: c.bg.withValues(alpha: 0.78)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Phone-only action row directly above the bottom nav: Up next, Speed,
+/// Sleep, drawn in the shape chosen in Settings ("Player buttons": tiles,
+/// round or bar). Speed and Sleep reuse [SpeedSelector]/[SleepTimerSelector]
+/// (their popup-menu logic is not duplicated here) and are only given a
+/// different face via [ActionFaceBuilder], so all three always match.
+class _ActionRow extends StatelessWidget {
   final AudioPlaybackService audioService;
+  final UnifiedAudiobook book;
   final VoidCallback onShowUpNext;
-  const _ActionTileRow({
+  const _ActionRow({
     required this.audioService,
+    required this.book,
     required this.onShowUpNext,
   });
 
   @override
   Widget build(BuildContext context) {
-    const tileHeight = 48.0;
-    // Fixed-width tiles computed from a `LayoutBuilder`, not `Expanded`:
+    final c = context.colors;
+    final style = SettingsScope.maybeOf(context)?.controlsStyle ??
+        PlayerControlsStyle.tiles;
+    Widget face(BuildContext context, ActionFace f) => switch (style) {
+          PlayerControlsStyle.tiles => _TileFace(face: f),
+          PlayerControlsStyle.round => _RoundFace(face: f),
+          PlayerControlsStyle.bar => _BarFace(face: f),
+        };
+    final radius = switch (style) {
+      PlayerControlsStyle.tiles => R.md,
+      PlayerControlsStyle.round => R.md,
+      PlayerControlsStyle.bar => BorderRadius.zero,
+    };
+    final children = [
+      _UpNextButton(
+        audioService: audioService,
+        book: book,
+        onPressed: onShowUpNext,
+        face: face,
+        radius: radius,
+      ),
+      SpeedSelector(audioService: audioService, face: face),
+      SleepTimerSelector(audioService: audioService, face: face),
+    ];
+
+    // Fixed-width slots computed from a `LayoutBuilder`, not `Expanded`:
     // this row sits under `AnimatedBuilder`/`Opacity`/`Transform.scale`
     // during the idle<->player cross-fade, and a `PopupMenuButton` (which
     // both `SpeedSelector` and `SleepTimerSelector` are, under the hood)
     // runs an internal dry-layout pass to size its overlay that gave an
-    // `Expanded` ancestor here unbounded height and crashed. Three
-    // explicit-width `SizedBox`es sidestep flex layout entirely.
+    // `Expanded` ancestor here unbounded height and crashed. Explicit-width
+    // `SizedBox`es sidestep flex layout entirely.
     return LayoutBuilder(
       builder: (context, constraints) {
-        final tileWidth = (constraints.maxWidth - Sp.x2 * 2) / 3;
-        return Row(
-          children: [
-            SizedBox(
-              width: tileWidth,
-              height: tileHeight,
-              child: _UpNextTile(onPressed: onShowUpNext),
-            ),
-            const SizedBox(width: Sp.x2),
-            SizedBox(
-              width: tileWidth,
-              height: tileHeight,
-              child: SpeedSelector(audioService: audioService, tile: true),
-            ),
-            const SizedBox(width: Sp.x2),
-            SizedBox(
-              width: tileWidth,
-              height: tileHeight,
-              child: SleepTimerSelector(audioService: audioService, tile: true),
-            ),
-          ],
-        );
+        switch (style) {
+          case PlayerControlsStyle.tiles:
+          case PlayerControlsStyle.round:
+            // A tile holds two lines (caption over value), so it grows
+            // with the text scale rather than clipping them at 2x.
+            final scale = MediaQuery.textScalerOf(context).scale(1);
+            final height = style == PlayerControlsStyle.tiles
+                ? math.max(56.0, 20 + 37 * scale)
+                : null;
+            final width = (constraints.maxWidth - Sp.x2 * 2) / 3;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < children.length; i++) ...[
+                  if (i > 0) const SizedBox(width: Sp.x2),
+                  SizedBox(width: width, height: height, child: children[i]),
+                ],
+              ],
+            );
+          case PlayerControlsStyle.bar:
+            const height = 52.0;
+            // 1px border each side, two 1px dividers.
+            final width = (constraints.maxWidth - 2 - 2) / 3;
+            return Container(
+              decoration: BoxDecoration(
+                color: c.surface.withValues(alpha: 0.72),
+                borderRadius: R.lg,
+                border: Border.all(color: c.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Row(
+                children: [
+                  for (var i = 0; i < children.length; i++) ...[
+                    if (i > 0)
+                      Container(width: 1, height: height - 20, color: c.border),
+                    SizedBox(width: width, height: height, child: children[i]),
+                  ],
+                ],
+              ),
+            );
+        }
       },
     );
   }
 }
 
-class _UpNextTile extends StatelessWidget {
+class _UpNextButton extends StatelessWidget {
+  final AudioPlaybackService audioService;
+  final UnifiedAudiobook book;
   final VoidCallback onPressed;
-  const _UpNextTile({required this.onPressed});
+  final ActionFaceBuilder face;
+  final BorderRadius radius;
+  const _UpNextButton({
+    required this.audioService,
+    required this.book,
+    required this.onPressed,
+    required this.face,
+    required this.radius,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     return Semantics(
       button: true,
       label: 'Up next. The chapters in this book.',
       excludeSemantics: true,
       child: Material(
-        color: c.accentWash,
-        borderRadius: R.md,
+        type: MaterialType.transparency,
         child: InkWell(
           onTap: onPressed,
-          borderRadius: R.md,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.queue_music_rounded,
-                  size: Dim.iconSm, color: c.accentText),
-              const SizedBox(width: Sp.x2),
-              Flexible(
-                child: Text('Up next',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppType.label.copyWith(color: c.accentText)),
-              ),
-            ],
+          borderRadius: radius,
+          child: ValueListenableBuilder<int>(
+            valueListenable: audioService.chapterIndexNotifier,
+            builder: (context, index, _) {
+              final next = index + 1 < book.chapters.length
+                  ? book.chapters[index + 1].title
+                  : 'Chapters';
+              return face(
+                context,
+                ActionFace(
+                  icon: Icons.queue_music_rounded,
+                  caption: 'Up next',
+                  value: next,
+                  short: 'Up next',
+                ),
+              );
+            },
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Style A: a tile with a small caption over the live value.
+class _TileFace extends StatelessWidget {
+  final ActionFace face;
+  const _TileFace({required this.face});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
+      decoration: BoxDecoration(
+        color: face.active ? c.accentWash : c.surface.withValues(alpha: 0.72),
+        borderRadius: R.md,
+        border: Border.all(color: face.active ? c.accent : c.border),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(face.icon, size: Dim.iconSm, color: c.accentText),
+          const SizedBox(width: Sp.x2),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(face.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.caption.copyWith(color: c.textSecondary)),
+                Text(face.value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.label
+                        .copyWith(color: c.text, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Style B: a round icon button with a caption underneath.
+class _RoundFace extends StatelessWidget {
+  final ActionFace face;
+  const _RoundFace({required this.face});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Sp.x1),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: face.active
+                  ? c.accentWash
+                  : c.surface.withValues(alpha: 0.72),
+              border: Border.all(color: face.active ? c.accent : c.border),
+            ),
+            child: Icon(face.icon, size: Dim.iconMd, color: c.accentText),
+          ),
+          const SizedBox(height: Sp.x1),
+          Text(face.short,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppType.caption
+                  .copyWith(color: c.text, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Style C: one segment of a shared bar (the bar itself is drawn by
+/// [_ActionRow]).
+class _BarFace extends StatelessWidget {
+  final ActionFace face;
+  const _BarFace({required this.face});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      color: face.active ? c.accentWash : Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(face.icon, size: Dim.iconSm, color: c.accentText),
+          const SizedBox(width: Sp.x2),
+          Flexible(
+            child: Text(face.short,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.label.copyWith(color: c.text)),
+          ),
+        ],
       ),
     );
   }

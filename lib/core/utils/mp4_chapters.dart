@@ -285,8 +285,7 @@ Future<List<Mp4Chapter>?> _tryReadQuickTimeChapters(
       final trackId = await _readTkhdTrackId(raf, tkhd);
       if (trackId != referencedTrackId) continue;
 
-      final chapters =
-          await _readQuickTimeChapterTrack(raf, candidateChildren);
+      final chapters = await _readQuickTimeChapterTrack(raf, candidateChildren);
       if (chapters != null) return chapters;
     }
   }
@@ -335,7 +334,8 @@ Future<List<Mp4Chapter>?> _readQuickTimeChapterTrack(
   final chunkOffsets =
       stco != null ? await _readStco(raf, stco) : await _readCo64(raf, co64!);
 
-  final samplesPerChunk = _samplesPerChunkByChunk(stscEntries, chunkOffsets.length);
+  final samplesPerChunk =
+      _samplesPerChunkByChunk(stscEntries, chunkOffsets.length);
   final sampleOffsets =
       _computeSampleOffsets(chunkOffsets, samplesPerChunk, sampleSizes);
 
@@ -348,8 +348,7 @@ Future<List<Mp4Chapter>?> _readQuickTimeChapterTrack(
 
   final chapters = <Mp4Chapter>[];
   for (int i = 0; i < count; i++) {
-    final title =
-        await _readTextSample(raf, sampleOffsets[i], sampleSizes[i]);
+    final title = await _readTextSample(raf, sampleOffsets[i], sampleSizes[i]);
     final startMs = (sampleStartTicks[i] * 1000) ~/ timescale;
     chapters.add(Mp4Chapter(title: title, startMs: startMs));
   }

@@ -54,8 +54,8 @@ class LibriVoxService {
       return hit.books;
     }
     // A second caller for the same shelf joins the request already out.
-    return _inFlight[key] ??= _fetchBooks(query, limit: limit, offset: offset)
-        .then((books) {
+    return _inFlight[key] ??=
+        _fetchBooks(query, limit: limit, offset: offset).then((books) {
       // Empty usually means a timeout or outage; retry it next visit.
       if (books.isNotEmpty) {
         _cache[key] = (at: _now(), books: books);

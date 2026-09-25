@@ -209,9 +209,10 @@ class AppDatabase {
   }
 
   Future<List<Bookmark>> getBookmarks(String audiobookId) async {
-    final matches =
-        _bookmarks.where((b) => b.audiobookId == audiobookId).toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final matches = _bookmarks
+        .where((b) => b.audiobookId == audiobookId)
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return matches;
   }
 
@@ -259,8 +260,7 @@ class AppDatabase {
       String chapterId, String newAudioPathOrUrl) async {
     for (final entry in _audiobooks.entries) {
       final book = entry.value;
-      final chapterIndex =
-          book.chapters.indexWhere((c) => c.id == chapterId);
+      final chapterIndex = book.chapters.indexWhere((c) => c.id == chapterId);
       if (chapterIndex == -1) continue;
       final oldChapter = book.chapters[chapterIndex];
       final newChapters = List<domain.AudiobookChapter>.from(book.chapters);

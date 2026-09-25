@@ -56,7 +56,9 @@ class LocalImportMigrationService {
     final usedNames = <String>{};
     if (await bookLibraryDir.exists()) {
       await for (final entity in bookLibraryDir.list()) {
-        if (entity is File) usedNames.add(p.basename(entity.path).toLowerCase());
+        if (entity is File) {
+          usedNames.add(p.basename(entity.path).toLowerCase());
+        }
       }
     }
 
@@ -80,7 +82,8 @@ class LocalImportMigrationService {
         }
         try {
           await bookLibraryDir.create(recursive: true);
-          newPath = await copyFileIntoDirectory(path, bookLibraryDir, usedNames);
+          newPath =
+              await copyFileIntoDirectory(path, bookLibraryDir, usedNames);
           pathMap[path] = newPath;
         } catch (e) {
           developer.log(

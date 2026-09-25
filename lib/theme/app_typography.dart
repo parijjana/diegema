@@ -40,37 +40,61 @@ abstract final class AppType {
 
   static const display = TextStyle(
       fontFamily: sans,
-      fontSize: 34, height: 40 / 34, fontWeight: FontWeight.w700, letterSpacing: 0);
+      fontSize: 34,
+      height: 40 / 34,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0);
   static const titleLg = TextStyle(
       fontFamily: sans,
-      fontSize: 28, height: 34 / 28, fontWeight: FontWeight.w700, letterSpacing: 0);
+      fontSize: 28,
+      height: 34 / 28,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0);
   static const titleMd = TextStyle(
       fontFamily: sans,
-      fontSize: 22, height: 28 / 22, fontWeight: FontWeight.w600, letterSpacing: 0);
+      fontSize: 22,
+      height: 28 / 22,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0);
   static const titleSm = TextStyle(
       fontFamily: sans,
-      fontSize: 18, height: 24 / 18, fontWeight: FontWeight.w600, letterSpacing: 0);
+      fontSize: 18,
+      height: 24 / 18,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0);
 
   /// The default body size.
   static const bodyLg = TextStyle(
       fontFamily: sans,
-      fontSize: 17, height: 26 / 17, fontWeight: FontWeight.w400, letterSpacing: 0);
+      fontSize: 17,
+      height: 26 / 17,
+      fontWeight: FontWeight.w400,
+      letterSpacing: 0);
   static const body = TextStyle(
       fontFamily: sans,
-      fontSize: 16, height: 24 / 16, fontWeight: FontWeight.w400, letterSpacing: 0);
+      fontSize: 16,
+      height: 24 / 16,
+      fontWeight: FontWeight.w400,
+      letterSpacing: 0);
   static const label = TextStyle(
       fontFamily: sans,
-      fontSize: 15, height: 20 / 15, fontWeight: FontWeight.w600, letterSpacing: 0);
+      fontSize: 15,
+      height: 20 / 15,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0);
 
   /// The floor. Permitted only for information that also appears elsewhere
   /// or is non-essential.
   static const caption = TextStyle(
       fontFamily: sans,
-      fontSize: 13, height: 18 / 13, fontWeight: FontWeight.w500, letterSpacing: 0);
+      fontSize: 13,
+      height: 18 / 13,
+      fontWeight: FontWeight.w500,
+      letterSpacing: 0);
 
   /// A [caption]/[body]-sized style with tabular figures, for timecodes.
-  static TextStyle tabularCaption(Color color) =>
-      caption.copyWith(color: color, fontFeatures: tabular, letterSpacing: 0.13);
+  static TextStyle tabularCaption(Color color) => caption.copyWith(
+      color: color, fontFeatures: tabular, letterSpacing: 0.13);
 
   static TextStyle tabularBody(Color color) =>
       body.copyWith(color: color, fontFeatures: tabular, letterSpacing: 0.16);

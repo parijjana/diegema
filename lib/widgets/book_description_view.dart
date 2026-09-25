@@ -88,7 +88,8 @@ class _BookDescriptionViewState extends State<BookDescriptionView> {
               if (i > 0) const SizedBox(height: Sp.x3),
               Text(
                 parsed.summary[i],
-                style: AppType.body.copyWith(color: c.textSecondary, height: 1.5),
+                style:
+                    AppType.body.copyWith(color: c.textSecondary, height: 1.5),
               ),
             ],
           ],
@@ -97,16 +98,18 @@ class _BookDescriptionViewState extends State<BookDescriptionView> {
     }
 
     if (parsed.contents.isNotEmpty) {
-      final showAll =
-          _contentsExpanded || parsed.contents.length <= _contentsCollapsedLimit;
-      final shown =
-          showAll ? parsed.contents : parsed.contents.take(_contentsCollapsedLimit).toList();
+      final showAll = _contentsExpanded ||
+          parsed.contents.length <= _contentsCollapsedLimit;
+      final shown = showAll
+          ? parsed.contents
+          : parsed.contents.take(_contentsCollapsedLimit).toList();
       sections.add(_Section(
         heading: 'Contents',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final item in shown) _ContentsBullet(text: item, color: c.textSecondary),
+            for (final item in shown)
+              _ContentsBullet(text: item, color: c.textSecondary),
             if (!showAll) ...[
               const SizedBox(height: Sp.x1),
               TextButton(
@@ -130,7 +133,8 @@ class _BookDescriptionViewState extends State<BookDescriptionView> {
 
     if (parsed.readBy != null) {
       final language = parsed.language;
-      final showLanguage = language != null && language.toLowerCase() != 'english';
+      final showLanguage =
+          language != null && language.toLowerCase() != 'english';
       sections.add(_Section(
         heading: 'Narrated by',
         child: Text(

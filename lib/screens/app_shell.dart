@@ -174,7 +174,8 @@ class _AppShellState extends State<AppShell> {
         (e) => e.id == idOrFlag,
         orElse: () => playable.first,
       );
-      final book = await _downloader.parseStreamableBook(entry.toLibriVoxBook());
+      final book =
+          await _downloader.parseStreamableBook(entry.toLibriVoxBook());
       if (!mounted) return;
       await _audioService.loadBook(book);
     } catch (e) {
@@ -196,7 +197,8 @@ class _AppShellState extends State<AppShell> {
   /// (`?screen=`), so Settings is appended rather than slotted in — 0/1/2
   /// keep meaning what every existing demo URL says they mean.
   static const List<_Destination> _destinations = [
-    _Destination('Now playing', Icons.headphones_outlined, Icons.headphones_rounded),
+    _Destination(
+        'Now playing', Icons.headphones_outlined, Icons.headphones_rounded),
     _Destination('Library', Icons.book_outlined, Icons.book_rounded),
     _Destination('Discover', Icons.explore_outlined, Icons.explore_rounded),
     _Destination('Settings', Icons.settings_outlined, Icons.settings_rounded),

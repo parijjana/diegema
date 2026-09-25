@@ -131,7 +131,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     if (totalSeconds <= 0) return null;
 
     var elapsedSeconds = progress.positionSeconds;
-    for (var i = 0; i < progress.chapterIndex && i < book.chapters.length; i++) {
+    for (var i = 0;
+        i < progress.chapterIndex && i < book.chapters.length;
+        i++) {
       elapsedSeconds += book.chapters[i].durationSeconds;
     }
     return (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);

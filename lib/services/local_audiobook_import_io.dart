@@ -119,15 +119,16 @@ Future<void> importFolder(
     final metadata = await readEmbeddedMetadataForFiles(filePaths);
     String? embeddedCoverPath;
     if (metadata?.hasCover == true) {
-      embeddedCoverPath =
-          await saveCoverBytes(metadata!.coverBytes!, metadata.coverMime, bookId);
+      embeddedCoverPath = await saveCoverBytes(
+          metadata!.coverBytes!, metadata.coverMime, bookId);
     }
     // Step 2: no embedded art — look for a cover/folder/front/albumart
     // image file (or a lone image) sitting in the folder itself. Unlike
     // the embedded cover (already durable under `diegema/covers/`), this
     // is a loose file in the picked folder, so it gets copied below too.
-    final folderCoverPath =
-        embeddedCoverPath == null ? await findFolderCoverImage(selectedDirectory) : null;
+    final folderCoverPath = embeddedCoverPath == null
+        ? await findFolderCoverImage(selectedDirectory)
+        : null;
 
     // Copy the picked audio files (and the folder cover, if any) into
     // `diegema/library/<bookId>/` so the book survives Android reclaiming
@@ -138,15 +139,16 @@ Future<void> importFolder(
       audioPaths: filePaths,
       coverPath: folderCoverPath,
     );
-    final durableChapters = _rewriteChapterPaths(chapters, copyResult.audioPaths);
+    final durableChapters =
+        _rewriteChapterPaths(chapters, copyResult.audioPaths);
     final coverPath = embeddedCoverPath ?? copyResult.coverPath;
 
     final book = UnifiedAudiobook(
       id: bookId,
       title: _nonEmpty(metadata?.title) ?? folderName.replaceAll('_', ' '),
       author: _nonEmpty(metadata?.author) ?? 'Local Audiobook',
-      description:
-          _nonEmpty(metadata?.description) ?? 'Imported from folder: $selectedDirectory',
+      description: _nonEmpty(metadata?.description) ??
+          'Imported from folder: $selectedDirectory',
       coverArtUrlOrPath: coverPath,
       source: 'Local Folder',
       origin: BookIdentity.originLocal,
@@ -220,8 +222,8 @@ Future<void> importFiles(
     final metadata = await readEmbeddedMetadataForFiles(paths);
     String? embeddedCoverPath;
     if (metadata?.hasCover == true) {
-      embeddedCoverPath =
-          await saveCoverBytes(metadata!.coverBytes!, metadata.coverMime, bookId);
+      embeddedCoverPath = await saveCoverBytes(
+          metadata!.coverBytes!, metadata.coverMime, bookId);
     }
     // Step 2: no embedded art — check each picked file's own folder. As in
     // importFolder, this is a loose file outside the app's own storage, so
@@ -237,7 +239,8 @@ Future<void> importFiles(
       audioPaths: paths,
       coverPath: folderCoverPath,
     );
-    final durableChapters = _rewriteChapterPaths(chapters, copyResult.audioPaths);
+    final durableChapters =
+        _rewriteChapterPaths(chapters, copyResult.audioPaths);
     final coverPath = embeddedCoverPath ?? copyResult.coverPath;
 
     final book = UnifiedAudiobook(
@@ -263,8 +266,7 @@ Future<void> importFiles(
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content:
-                Text('Imported "${book.title}" (${paths.length} files)!')),
+            content: Text('Imported "${book.title}" (${paths.length} files)!')),
       );
     }
   } catch (e) {

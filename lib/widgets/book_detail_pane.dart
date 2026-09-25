@@ -115,8 +115,7 @@ class _BookDetailPaneState extends State<BookDetailPane> {
 
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      final savePath =
-          p.join(appDir.path, 'diegema', 'downloads');
+      final savePath = p.join(appDir.path, 'diegema', 'downloads');
 
       final extractedFiles = await widget.downloader.downloadAndExtractZip(
         widget.book,
@@ -430,7 +429,8 @@ class _BookDetailPaneState extends State<BookDetailPane> {
                     dense: true,
                     leading: Icon(
                       playable ? Icons.play_circle_fill : Icons.lock_rounded,
-                      color: playable ? theme.colorScheme.primary : disabledColor,
+                      color:
+                          playable ? theme.colorScheme.primary : disabledColor,
                       size: playable ? 26 : 20,
                     ),
                     title: Text(ch.title,
@@ -447,8 +447,7 @@ class _BookDetailPaneState extends State<BookDetailPane> {
                             color: playable ? null : disabledColor)),
                     onTap: playable
                         ? () async {
-                            await widget.audioService.loadBook(
-                                _streamableBook!,
+                            await widget.audioService.loadBook(_streamableBook!,
                                 initialChapterIndex: idx);
                           }
                         : null,
@@ -494,13 +493,15 @@ class EmptyChaptersNote extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.menu_book_outlined, color: c.textSecondary, size: Dim.iconSm),
+          Icon(Icons.menu_book_outlined,
+              color: c.textSecondary, size: Dim.iconSm),
           const SizedBox(width: Sp.x3),
           Expanded(
             child: Text(
               "The chapter list isn't available yet. Download the book to "
               'get every chapter.',
-              style: AppType.body.copyWith(color: c.textSecondary, height: 1.45),
+              style:
+                  AppType.body.copyWith(color: c.textSecondary, height: 1.45),
             ),
           ),
         ],
@@ -583,7 +584,8 @@ class _DownloadFooter extends StatelessWidget {
                       side: BorderSide(color: c.border),
                       padding: EdgeInsets.zero,
                     ),
-                    child: Icon(Icons.close_rounded, color: c.text, size: Dim.iconMd),
+                    child: Icon(Icons.close_rounded,
+                        color: c.text, size: Dim.iconMd),
                   ),
                 ),
               ),
@@ -611,14 +613,16 @@ class _DownloadFooter extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text(title,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
                           if (subtitle != null)
                             Text(
                               subtitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: AppType.caption.copyWith(
-                                  color: c.textOnAccent.withValues(alpha: 0.85)),
+                                  color:
+                                      c.textOnAccent.withValues(alpha: 0.85)),
                             ),
                         ],
                       ),

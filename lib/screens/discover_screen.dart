@@ -166,8 +166,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       _error = null;
     });
     try {
-      final results =
-          await widget.libriVoxService.searchBooks(term, limit: 20);
+      final results = await widget.libriVoxService.searchBooks(term, limit: 20);
       if (!mounted) return;
       setState(() {
         _results = results;
@@ -344,11 +343,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         }
 
         final header = Padding(
-          padding: EdgeInsets.fromLTRB(
-              wide ? Sp.gutterDesktop : Sp.gutterPhone,
-              Sp.x5,
-              wide ? Sp.gutterDesktop : Sp.gutterPhone,
-              Sp.x4),
+          padding: EdgeInsets.fromLTRB(wide ? Sp.gutterDesktop : Sp.gutterPhone,
+              Sp.x5, wide ? Sp.gutterDesktop : Sp.gutterPhone, Sp.x4),
           child: Row(
             children: [
               Expanded(

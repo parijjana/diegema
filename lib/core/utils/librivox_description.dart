@@ -70,8 +70,27 @@ class LibriVoxDescription {
 // sentence/name-list on their own, so a period after one of them is not
 // treated as a stop/sentence boundary.
 const Set<String> _abbreviations = {
-  'mr', 'mrs', 'ms', 'dr', 'st', 'jr', 'sr', 'prof', 'rev', 'messrs', 'mt',
-  'vs', 'etc', 'inc', 'ltd', 'co', 'gen', 'col', 'capt', 'sgt', 'no',
+  'mr',
+  'mrs',
+  'ms',
+  'dr',
+  'st',
+  'jr',
+  'sr',
+  'prof',
+  'rev',
+  'messrs',
+  'mt',
+  'vs',
+  'etc',
+  'inc',
+  'ltd',
+  'co',
+  'gen',
+  'col',
+  'capt',
+  'sgt',
+  'no',
 };
 
 // Common function words that signal we have run past the end of a narrator
@@ -79,9 +98,29 @@ const Set<String> _abbreviations = {
 // our 35th collection..." — no punctuation separates the list from the
 // next sentence at all in some real descriptions).
 const Set<String> _proseStopwords = {
-  'is', 'was', 'were', 'are', 'this', 'these', 'the', 'a', 'an', 'which',
-  'who', 'that', 'has', 'have', 'his', 'her', 'their', 'one', 'recounts',
-  'describes', 'tells', 'says', 'so',
+  'is',
+  'was',
+  'were',
+  'are',
+  'this',
+  'these',
+  'the',
+  'a',
+  'an',
+  'which',
+  'who',
+  'that',
+  'has',
+  'have',
+  'his',
+  'her',
+  'their',
+  'one',
+  'recounts',
+  'describes',
+  'tells',
+  'says',
+  'so',
 };
 
 bool _isAbbreviation(String word) {
@@ -286,8 +325,7 @@ _ListResult? _extractNumberedList(String body) {
   // RegExpMatch has no per-group start offset, so recover the digit run's
   // start (excluding the optional leading whitespace in the full match)
   // by locating the captured number text within the full match text.
-  int digitStart(RegExpMatch m) =>
-      m.start + m.group(0)!.indexOf(m.group(1)!);
+  int digitStart(RegExpMatch m) => m.start + m.group(0)!.indexOf(m.group(1)!);
 
   final intro = body.substring(0, digitStart(markers.first)).trim();
   final items = <String>[];

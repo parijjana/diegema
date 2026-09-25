@@ -71,6 +71,15 @@ void main() {
     await pumpFrames(tester);
   }
 
+  // The panel is a lazy `ListView` taller than a phone, so a row further
+  // down has to be scrolled into view before it exists to be found.
+  Future<void> reveal(WidgetTester tester, Finder finder) =>
+      tester.scrollUntilVisible(finder, 120,
+          scrollable: find
+              .descendant(
+                  of: find.byType(ListView), matching: find.byType(Scrollable))
+              .first);
+
   testWidgets('the skip interval reaches the transport controls',
       (tester) async {
     final store = <String, Object>{};
@@ -84,6 +93,9 @@ void main() {
     expect(find.bySemanticsLabel('Skip forward 15 seconds'), findsOneWidget);
 
     await goTo(tester, 'Settings');
+    await reveal(tester, find.text('30 seconds'));
+    await tester.ensureVisible(find.text('30 seconds'));
+    await pumpFrames(tester);
     await tester.tap(find.text('30 seconds'));
     await pumpFrames(tester);
 
@@ -100,8 +112,51 @@ void main() {
     await unmount(tester);
   });
 
+  testWidgets('the Player buttons toggle reshapes the action row and persists',
+      (tester) async {
+    final store = <String, Object>{};
+    final db = await pumpApp(tester, store);
+
+    final book = await seedBook(db, id: 'z', title: 'Persuasion');
+    await audio.loadBook(book);
+    await pumpFrames(tester);
+
+    // Tiles by default: every action carries a caption over its value.
+    expect(find.text('Speed'), findsOneWidget);
+    expect(find.text('Up next'), findsOneWidget);
+
+    await goTo(tester, 'Settings');
+    expect(find.bySemanticsLabel('Tiles'), findsOneWidget);
+    await tester.ensureVisible(find.text('Round'));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Round'));
+    await pumpFrames(tester);
+    expect(store['now_playing.controls_style'], 'round');
+
+    await goTo(tester, 'Now playing');
+    // Round and bar show one short word each, so no "Speed" caption.
+    expect(find.text('Speed'), findsNothing);
+    expect(find.text('Up next'), findsOneWidget);
+    expect(find.text('Sleep'), findsOneWidget);
+
+    await goTo(tester, 'Settings');
+    await tester.ensureVisible(find.text('Bar'));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Bar'));
+    await pumpFrames(tester);
+    expect(store['now_playing.controls_style'], 'bar');
+
+    await goTo(tester, 'Now playing');
+    expect(find.text('Speed'), findsNothing);
+    expect(find.bySemanticsLabel('Playback speed, currently 1.0x'),
+        findsOneWidget);
+
+    await unmount(tester);
+  });
+
   testWidgets('a stored skip interval is applied on launch', (tester) async {
-    final db = await pumpApp(tester, <String, Object>{'playback.skip_seconds': 60});
+    final db =
+        await pumpApp(tester, <String, Object>{'playback.skip_seconds': 60});
 
     final book = await seedBook(db, id: 'z', title: 'Persuasion');
     await audio.loadBook(book);
@@ -116,7 +171,8 @@ void main() {
       (tester) async {
     // Otherwise a value written by a build with different options would be
     // stuck on the device with no UI able to change it.
-    final db = await pumpApp(tester, <String, Object>{'playback.skip_seconds': 7});
+    final db =
+        await pumpApp(tester, <String, Object>{'playback.skip_seconds': 7});
 
     final book = await seedBook(db, id: 'z', title: 'Persuasion');
     await audio.loadBook(book);
@@ -132,11 +188,15 @@ void main() {
     await pumpApp(tester, <String, Object>{});
     await goTo(tester, 'Settings');
 
+    await reveal(tester, find.text('About'));
     expect(find.text('About'), findsOneWidget);
+    await reveal(tester, find.textContaining('Version'));
     expect(find.textContaining('Version'), findsOneWidget);
+    await reveal(tester, find.textContaining('CREDITS.md'));
     expect(find.textContaining('CREDITS.md'), findsOneWidget,
         reason: 'the bundled covers are public domain but the record of '
             'which item each came from is what was actually missing');
+    await reveal(tester, find.text('Open source licences'));
     expect(find.text('Open source licences'), findsOneWidget);
 
     await unmount(tester);
@@ -147,13 +207,20 @@ void main() {
     await pumpApp(tester, <String, Object>{});
     await goTo(tester, 'Settings');
 
+    await reveal(
+        tester, find.textContaining('come from LibriVox (librivox.org)'));
     expect(find.textContaining('come from LibriVox (librivox.org)'),
         findsOneWidget);
+    await reveal(tester, find.text('Visit librivox.org'));
     expect(find.text('Visit librivox.org'), findsOneWidget,
         reason: 'LibriVox asks for credit with a link to its site');
+    await reveal(tester, find.textContaining('strongly support LibriVox'));
     expect(find.textContaining('strongly support LibriVox'), findsOneWidget);
+    await reveal(tester,
+        find.textContaining('not affiliated with or endorsed by LibriVox'));
     expect(find.textContaining('not affiliated with or endorsed by LibriVox'),
         findsOneWidget);
+    await reveal(tester, find.text('Volunteer for LibriVox'));
     expect(find.text('Volunteer for LibriVox'), findsOneWidget);
 
     await unmount(tester);

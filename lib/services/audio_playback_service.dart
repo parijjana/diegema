@@ -155,7 +155,8 @@ class AudioPlaybackService {
 
     if (book.chapters.isEmpty) return;
 
-    await _playCurrentChapter(seekToPosition: targetPosition, autoPlay: autoPlay);
+    await _playCurrentChapter(
+        seekToPosition: targetPosition, autoPlay: autoPlay);
   }
 
   Future<void> _playCurrentChapter(
@@ -212,8 +213,7 @@ class AudioPlaybackService {
         try {
           await _player.play();
         } catch (e) {
-          debugPrint(
-              'AudioPlaybackService: start refused, leaving paused: $e');
+          debugPrint('AudioPlaybackService: start refused, leaving paused: $e');
           stateNotifier.value = PlaybackState.paused;
         }
       } else {
@@ -245,6 +245,7 @@ class AudioPlaybackService {
       stateNotifier.value = PlaybackState.paused;
     }
   }
+
   Future<void> pause() async {
     await _player.pause();
     await _persistCurrentProgress();

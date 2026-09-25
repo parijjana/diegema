@@ -40,7 +40,8 @@ class AppBookCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final letter = title.trim().isNotEmpty ? title.trim()[0].toUpperCase() : '?';
+    final letter =
+        title.trim().isNotEmpty ? title.trim()[0].toUpperCase() : '?';
 
     final Widget procedural = Container(
       width: width,
@@ -61,8 +62,8 @@ class AppBookCover extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: c.accent.withValues(alpha: 0.18),
-                borderRadius: const BorderRadius.horizontal(
-                    left: Radius.circular(2)),
+                borderRadius:
+                    const BorderRadius.horizontal(left: Radius.circular(2)),
               ),
             ),
           ),

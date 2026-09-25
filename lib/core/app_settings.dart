@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'playback_constants.dart';
+import 'player_controls_style.dart';
 import 'ui_preferences.dart';
 
 /// Every user-adjustable preference, in one place, read from and written
@@ -28,6 +29,7 @@ class AppSettings extends ChangeNotifier {
 
   ThemeMode _themeMode;
   int _skipSeconds;
+  PlayerControlsStyle _controlsStyle = PlayerControlsStyle.tiles;
 
   AppSettings({
     required UiPreferences preferences,
@@ -43,15 +45,23 @@ class AppSettings extends ChangeNotifier {
   /// [kSkipSecondsOptions].
   int get skipSeconds => _skipSeconds;
 
+  /// Shape of the phone Now Playing Up next / Speed / Sleep row.
+  PlayerControlsStyle get controlsStyle => _controlsStyle;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
-    final storedTheme =
-        _forcedThemeMode ?? await _preferences.getThemeMode();
+    final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
     final storedSkip = await _preferences.getSkipSeconds();
+    final storedStyle = await _preferences.getPlayerControlsStyle();
 
-    if (storedTheme == _themeMode && storedSkip == _skipSeconds) return;
+    if (storedTheme == _themeMode &&
+        storedSkip == _skipSeconds &&
+        storedStyle == _controlsStyle) {
+      return;
+    }
     _themeMode = storedTheme;
     _skipSeconds = storedSkip;
+    _controlsStyle = storedStyle;
     notifyListeners();
   }
 
@@ -69,6 +79,13 @@ class AppSettings extends ChangeNotifier {
     _skipSeconds = seconds;
     notifyListeners();
     await _preferences.setSkipSeconds(seconds);
+  }
+
+  Future<void> setControlsStyle(PlayerControlsStyle style) async {
+    if (style == _controlsStyle) return;
+    _controlsStyle = style;
+    notifyListeners();
+    await _preferences.setPlayerControlsStyle(style);
   }
 }
 

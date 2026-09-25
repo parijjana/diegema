@@ -1,4 +1,3 @@
-
 // Description: Capture-mode flags for the store screenshot harness.
 //
 // EVERYTHING here is inert in the shipped app: `kScreenshotCaptureMode`
@@ -32,4 +31,5 @@ bool kScreenshotCaptureMode = false;
 ScreenshotLayout kScreenshotLayout = ScreenshotLayout.desktop;
 
 /// Active window-control style while [kScreenshotCaptureMode] is true. Ignored otherwise.
-ScreenshotWindowControls kScreenshotWindowControls = ScreenshotWindowControls.macOS;
+ScreenshotWindowControls kScreenshotWindowControls =
+    ScreenshotWindowControls.macOS;

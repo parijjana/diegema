@@ -99,8 +99,7 @@ class PlayerTransport extends StatelessWidget {
               audioService.loadBook(book, initialChapterIndex: idx + 1);
             }
           },
-          child:
-              Icon(Icons.skip_next_rounded, size: Dim.iconSm, color: c.text),
+          child: Icon(Icons.skip_next_rounded, size: Dim.iconSm, color: c.text),
         ),
       ],
     );
@@ -120,8 +119,7 @@ class _PlayPauseButton extends StatelessWidget {
       builder: (context, state, _) {
         final isPlaying = state == PlaybackState.playing;
         final isLoading = state == PlaybackState.loading;
-        final label =
-            isLoading ? 'Loading' : (isPlaying ? 'Pause' : 'Play');
+        final label = isLoading ? 'Loading' : (isPlaying ? 'Pause' : 'Play');
 
         return Semantics(
           button: true,
@@ -209,20 +207,50 @@ class _RoundControl extends StatelessWidget {
   }
 }
 
+/// What one Now Playing action shows, independent of the shape it is drawn
+/// in (the Settings "Player buttons" toggle picks the shape).
+class ActionFace {
+  final IconData icon;
+
+  /// What the control is: "Up next", "Speed", "Sleep".
+  final String caption;
+
+  /// Its live state: the next chapter, "1.0x", the time left or "Off".
+  final String value;
+
+  /// One short word for the compact shapes (round, bar): "Up next",
+  /// "1.0x", "Sleep" or the time left.
+  final String short;
+
+  /// Something is running (a sleep timer) and deserves emphasis.
+  final bool active;
+
+  const ActionFace({
+    required this.icon,
+    required this.caption,
+    required this.value,
+    required this.short,
+    this.active = false,
+  });
+}
+
+typedef ActionFaceBuilder = Widget Function(
+    BuildContext context, ActionFace face);
+
 /// Playback speed selector. Shows the current value (the old popup showed
 /// nothing until opened) and carries an accessible name.
 class SpeedSelector extends StatelessWidget {
   final AudioPlaybackService audioService;
 
-  /// True inside the phone Now Playing action-tile row: stretches the chip
-  /// to fill its tile and squares its corners instead of the free-standing
-  /// pill. The popup-menu selection logic below is unchanged either way.
-  final bool tile;
+  /// Draws the control in the phone Now Playing action row's chosen shape
+  /// instead of the free-standing pill. The popup-menu selection logic
+  /// below is unchanged either way.
+  final ActionFaceBuilder? face;
 
   const SpeedSelector({
     super.key,
     required this.audioService,
-    this.tile = false,
+    this.face,
   });
 
   @override
@@ -245,22 +273,33 @@ class SpeedSelector extends StatelessWidget {
             button: true,
             label: 'Playback speed, currently ${speed}x',
             excludeSemantics: true,
-            child: _ChipShell(
-              stretch: tile,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.speed_rounded, size: Dim.iconSm, color: c.accentText),
-                  const SizedBox(width: Sp.x2),
-                  Flexible(
-                    child: Text('${speed}x',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppType.label.copyWith(color: c.accentText)),
+            child: face != null
+                ? face!(
+                    context,
+                    ActionFace(
+                      icon: Icons.speed_rounded,
+                      caption: 'Speed',
+                      value: '${speed}x',
+                      short: '${speed}x',
+                    ),
+                  )
+                : _ChipShell(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.speed_rounded,
+                            size: Dim.iconSm, color: c.accentText),
+                        const SizedBox(width: Sp.x2),
+                        Flexible(
+                          child: Text('${speed}x',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style:
+                                  AppType.label.copyWith(color: c.accentText)),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-            ),
           ),
         );
       },
@@ -273,13 +312,13 @@ class SpeedSelector extends StatelessWidget {
 class SleepTimerSelector extends StatelessWidget {
   final AudioPlaybackService audioService;
 
-  /// See [SpeedSelector.tile].
-  final bool tile;
+  /// See [SpeedSelector.face].
+  final ActionFaceBuilder? face;
 
   const SleepTimerSelector({
     super.key,
     required this.audioService,
-    this.tile = false,
+    this.face,
   });
 
   @override
@@ -308,30 +347,39 @@ class SleepTimerSelector extends StatelessWidget {
           ],
           child: Semantics(
             button: true,
-            label: active
-                ? 'Sleep timer, $text remaining'
-                : 'Sleep timer, off',
+            label: active ? 'Sleep timer, $text remaining' : 'Sleep timer, off',
             excludeSemantics: true,
-            child: _ChipShell(
-              emphasised: active,
-              stretch: tile,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.bedtime_rounded,
-                      size: Dim.iconSm,
-                      color: active ? c.accentText : c.textSecondary),
-                  const SizedBox(width: Sp.x2),
-                  Flexible(
-                    child: Text(text,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppType.label.copyWith(
-                            color: active ? c.accentText : c.textSecondary)),
+            child: face != null
+                ? face!(
+                    context,
+                    ActionFace(
+                      icon: Icons.bedtime_rounded,
+                      caption: 'Sleep',
+                      value: active ? text : 'Off',
+                      short: active ? text : 'Sleep',
+                      active: active,
+                    ),
+                  )
+                : _ChipShell(
+                    emphasised: active,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bedtime_rounded,
+                            size: Dim.iconSm,
+                            color: active ? c.accentText : c.textSecondary),
+                        const SizedBox(width: Sp.x2),
+                        Flexible(
+                          child: Text(text,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppType.label.copyWith(
+                                  color:
+                                      active ? c.accentText : c.textSecondary)),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-            ),
           ),
         );
       },
@@ -343,16 +391,9 @@ class _ChipShell extends StatelessWidget {
   final Widget child;
   final bool emphasised;
 
-  /// True inside a fixed-size tile slot (the phone action-tile row): fills
-  /// the slot given by the parent `SizedBox`/`Expanded` and uses the
-  /// square `R.md` tile radius instead of the free-standing pill. See
-  /// [SpeedSelector.tile].
-  final bool stretch;
-
   const _ChipShell({
     required this.child,
     this.emphasised = true,
-    this.stretch = false,
   });
 
   @override
@@ -361,16 +402,13 @@ class _ChipShell extends StatelessWidget {
     // No `alignment:` here. A Container with an alignment expands to fill
     // whatever it is given, which made both chips stretch the full width of
     // the player column instead of hugging their labels. Centring is the
-    // Row's job. When `stretch` is true the parent already gives this a
-    // tight box (a 48px tile), so the Container is forced to fill it
-    // regardless.
+    // Row's job.
     return Container(
-      width: stretch ? double.infinity : null,
       constraints: const BoxConstraints(minHeight: Dim.tapMin),
       padding: const EdgeInsets.symmetric(horizontal: Sp.x4),
       decoration: BoxDecoration(
         color: emphasised ? c.accentWash : c.surfaceSunken,
-        borderRadius: stretch ? R.md : R.pill,
+        borderRadius: R.pill,
         border: Border.all(color: emphasised ? c.accent : c.borderContrast),
       ),
       // `Flexible`, not a bare child: at large text scales the label is

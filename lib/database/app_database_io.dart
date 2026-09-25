@@ -236,7 +236,8 @@ class AppDatabase extends _$AppDatabase {
           .get();
       if (chapterRows.isEmpty) continue;
 
-      final newId = BookIdentity.localIdForPath(chapterRows.first.audioPathOrUrl);
+      final newId =
+          BookIdentity.localIdForPath(chapterRows.first.audioPathOrUrl);
       if (newId == book.id) continue;
 
       final oldId = book.id;
@@ -440,11 +441,10 @@ class AppDatabase extends _$AppDatabase {
     int limit = 5,
   }) async {
     final progressQuery = select(playbackProgress)
-      ..where((p) => p.positionSeconds.isBiggerThanValue(
-          continueListeningMinPositionSeconds))
+      ..where((p) => p.positionSeconds
+          .isBiggerThanValue(continueListeningMinPositionSeconds))
       ..orderBy([
-        (p) =>
-            OrderingTerm(expression: p.updatedAt, mode: OrderingMode.desc)
+        (p) => OrderingTerm(expression: p.updatedAt, mode: OrderingMode.desc)
       ]);
     final progressRows = await progressQuery.get();
 
@@ -458,7 +458,8 @@ class AppDatabase extends _$AppDatabase {
       if (bookRow == null) continue;
       if (bookRow.hiddenFromContinue) continue;
 
-      final totalRuntime = await _totalKnownRuntimeSeconds(progress.audiobookId);
+      final totalRuntime =
+          await _totalKnownRuntimeSeconds(progress.audiobookId);
       if (totalRuntime > 0) {
         final threshold = totalRuntime * continueListeningMaxProgressFraction;
         if (progress.positionSeconds >= threshold) continue;

@@ -34,7 +34,11 @@ class DemoLibriVoxService extends LibriVoxService {
           e.author.toLowerCase().contains(term));
     }
 
-    return matches.skip(offset).take(limit).map((e) => e.toLibriVoxBook()).toList();
+    return matches
+        .skip(offset)
+        .take(limit)
+        .map((e) => e.toLibriVoxBook())
+        .toList();
   }
 
   @override

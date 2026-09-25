@@ -101,8 +101,8 @@ class LocalCoverBackfillService {
 
   List<String> _localPaths(UnifiedAudiobook book) => book.chapters
       .map((c) => c.audioPathOrUrl)
-      .where((path) =>
-          !path.startsWith('http://') && !path.startsWith('https://'))
+      .where(
+          (path) => !path.startsWith('http://') && !path.startsWith('https://'))
       .toSet()
       .toList();
 

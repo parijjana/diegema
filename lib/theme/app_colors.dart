@@ -194,22 +194,17 @@ class AppColors extends ThemeExtension<AppColors> {
     warning: Ramp.amber700,
     success: Ramp.green600,
     shadow1: [
-      BoxShadow(
-          color: Color(0x0F22201C), blurRadius: 2, offset: Offset(0, 1)),
-      BoxShadow(
-          color: Color(0x0A22201C), blurRadius: 1, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x0F22201C), blurRadius: 2, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x0A22201C), blurRadius: 1, offset: Offset(0, 1)),
     ],
     shadow2: [
-      BoxShadow(
-          color: Color(0x1422201C), blurRadius: 6, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x1422201C), blurRadius: 6, offset: Offset(0, 2)),
     ],
     shadow3: [
-      BoxShadow(
-          color: Color(0x1F22201C), blurRadius: 24, offset: Offset(0, 8)),
+      BoxShadow(color: Color(0x1F22201C), blurRadius: 24, offset: Offset(0, 8)),
     ],
     shadowCover: [
-      BoxShadow(
-          color: Color(0x2E22201C), blurRadius: 6, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x2E22201C), blurRadius: 6, offset: Offset(0, 2)),
     ],
   );
 
@@ -239,20 +234,17 @@ class AppColors extends ThemeExtension<AppColors> {
     warning: Ramp.amber300,
     success: Ramp.green300,
     shadow1: [
-      BoxShadow(
-          color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
     ],
     shadow2: [
-      BoxShadow(
-          color: Color(0x80000000), blurRadius: 8, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x80000000), blurRadius: 8, offset: Offset(0, 2)),
     ],
     shadow3: [
       BoxShadow(
           color: Color(0x99000000), blurRadius: 28, offset: Offset(0, 10)),
     ],
     shadowCover: [
-      BoxShadow(
-          color: Color(0x8C000000), blurRadius: 8, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x8C000000), blurRadius: 8, offset: Offset(0, 2)),
     ],
   );
 
@@ -321,8 +313,7 @@ class AppColors extends ThemeExtension<AppColors> {
   AppColors lerp(ThemeExtension<AppColors>? other, double t) {
     if (other is! AppColors) return this;
     Color c(Color a, Color b) => Color.lerp(a, b, t)!;
-    List<BoxShadow> s(List<BoxShadow> a, List<BoxShadow> b) =>
-        t < 0.5 ? a : b;
+    List<BoxShadow> s(List<BoxShadow> a, List<BoxShadow> b) => t < 0.5 ? a : b;
     return AppColors(
       bg: c(bg, other.bg),
       surface: c(surface, other.surface),

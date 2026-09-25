@@ -35,7 +35,8 @@ class CoverLookupService {
   /// Looks up a cover URL for a book titled [title] by [author] (optional).
   /// Returns `null` when neither source has a strong match, or on any
   /// failure.
-  Future<String?> lookupCoverUrl({required String title, String? author}) async {
+  Future<String?> lookupCoverUrl(
+      {required String title, String? author}) async {
     if (title.trim().isEmpty) return null;
 
     final ia = await _lookupInternetArchive(title, author);
@@ -48,7 +49,8 @@ class CoverLookupService {
 
     final ol = await _lookupOpenLibrary(title, author);
     if (ol != null) {
-      debugPrint('CoverLookupService: cover for "$title" found via Open Library');
+      debugPrint(
+          'CoverLookupService: cover for "$title" found via Open Library');
       return ol;
     }
 

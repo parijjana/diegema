@@ -166,8 +166,7 @@ class _Atom {
   const _Atom(this.type, this.start, this.end, this.dataStart);
 }
 
-Future<List<_Atom>> _readAtoms(
-    RandomAccessFile raf, int start, int end) async {
+Future<List<_Atom>> _readAtoms(RandomAccessFile raf, int start, int end) async {
   final atoms = <_Atom>[];
   int pos = start;
   while (pos + 8 <= end) {

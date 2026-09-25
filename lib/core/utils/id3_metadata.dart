@@ -22,9 +22,9 @@ Future<LocalMediaMetadata?> readId3Metadata(String path) async {
     await raf.setPosition(0);
     final header = await raf.read(10);
     if (header.length < 10 ||
-        header[0] != 0x49 || // 'I'
-        header[1] != 0x44 || // 'D'
-        header[2] != 0x33 // '3'
+            header[0] != 0x49 || // 'I'
+            header[1] != 0x44 || // 'D'
+            header[2] != 0x33 // '3'
         ) {
       return null;
     }
@@ -46,9 +46,8 @@ Future<LocalMediaMetadata?> readId3Metadata(String path) async {
       await raf.setPosition(pos);
       final extHeader = await raf.read(4);
       if (extHeader.length < 4) return null;
-      final extSize = majorVersion == 4
-          ? _syncsafe(extHeader, 0)
-          : _readU32(extHeader, 0);
+      final extSize =
+          majorVersion == 4 ? _syncsafe(extHeader, 0) : _readU32(extHeader, 0);
       // v2.3's extended header size does not include the 4 size bytes
       // themselves; v2.4's does.
       pos += majorVersion == 4 ? extSize : 4 + extSize;
@@ -163,7 +162,8 @@ Future<LocalMediaMetadata?> readId3Metadata(String path) async {
   i = mimeEnd + 1;
   if (i >= data.length) return null;
   i += 1; // picture type byte
-  final descEnd = _findTerminator(data, i, wide: encoding == 1 || encoding == 2);
+  final descEnd =
+      _findTerminator(data, i, wide: encoding == 1 || encoding == 2);
   if (descEnd > data.length) return null;
   i = descEnd + (encoding == 1 || encoding == 2 ? 2 : 1);
   if (i > data.length) return null;
@@ -185,7 +185,8 @@ Future<LocalMediaMetadata?> readId3Metadata(String path) async {
   final format = _ascii(data, 1, 3).toUpperCase();
   int i = 4; // picture type byte
   i += 1;
-  final descEnd = _findTerminator(data, i, wide: encoding == 1 || encoding == 2);
+  final descEnd =
+      _findTerminator(data, i, wide: encoding == 1 || encoding == 2);
   if (descEnd > data.length) return null;
   i = descEnd + (encoding == 1 || encoding == 2 ? 2 : 1);
   if (i > data.length) return null;
@@ -254,7 +255,8 @@ String _stripTrailingNulls(String s) {
   return s.substring(0, end);
 }
 
-String? _decodeUtf16(Uint8List body, {required bool hasBom, bool bigEndianDefault = false}) {
+String? _decodeUtf16(Uint8List body,
+    {required bool hasBom, bool bigEndianDefault = false}) {
   if (body.isEmpty) return '';
   int start = 0;
   bool bigEndian = bigEndianDefault;
@@ -315,5 +317,6 @@ int _readU24(Uint8List data, int offset) {
 }
 
 int _readU32(Uint8List data, int offset) {
-  return ByteData.sublistView(data, offset, offset + 4).getUint32(0, Endian.big);
+  return ByteData.sublistView(data, offset, offset + 4)
+      .getUint32(0, Endian.big);
 }

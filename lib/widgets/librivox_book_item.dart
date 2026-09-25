@@ -22,6 +22,9 @@ class LibriVoxBookItem extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
+  /// Tile (and square cover) width; [tileWidth] unless a grid sizes it.
+  final double width;
+
   static const double tileWidth = 148;
   static const double coverHeight = tileWidth;
 
@@ -30,6 +33,7 @@ class LibriVoxBookItem extends StatelessWidget {
     required this.book,
     this.isSelected = false,
     required this.onTap,
+    this.width = tileWidth,
   });
 
   @override
@@ -53,7 +57,7 @@ class LibriVoxBookItem extends StatelessWidget {
         onTap: onTap,
         borderRadius: R.md,
         child: SizedBox(
-          width: tileWidth,
+          width: width,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -68,8 +72,8 @@ class LibriVoxBookItem extends StatelessWidget {
                       bookId: book.id,
                       title: book.title,
                       coverUrl: book.coverArtUrl,
-                      width: tileWidth,
-                      height: coverHeight,
+                      width: width,
+                      height: width,
                       isSelected: isSelected,
                     ),
                   ),

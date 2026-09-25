@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../widgets/card_stack.dart';
 import '../core/app_settings.dart';
@@ -327,6 +329,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                         ? 'Featured classics'
                         : 'Top ${cat.name.toLowerCase()}',
                     _shelves[cat.query]!,
+                    // An opened shelf has room for more than the row.
+                    () => widget.libriVoxService
+                        .searchBooks(cat.query, limit: 36),
                   ),
             ],
             selected: _selected,
@@ -582,7 +587,9 @@ class _SearchResults extends StatelessWidget {
 /// titled with its heading. The front card carries its books in a sideways
 /// row; tapping a card opens the whole shelf full screen.
 class _ShelfStack extends StatelessWidget {
-  final List<(String, List<LibriVoxBook>)> shelves;
+  final List<
+          (String, List<LibriVoxBook>, Future<List<LibriVoxBook>> Function())>
+      shelves;
   final LibriVoxBook? selected;
   final EdgeInsets padding;
   final void Function(BuildContext context, LibriVoxBook book) onSelect;
@@ -602,7 +609,7 @@ class _ShelfStack extends StatelessWidget {
     return CardStack(
       padding: padding,
       cards: [
-        for (final (title, books) in shelves)
+        for (final (title, books, loadMore) in shelves)
           StackCard(
             title: title,
             leading: const CardIconBadge(Icons.auto_stories_rounded),
@@ -626,25 +633,104 @@ class _ShelfStack extends StatelessWidget {
               title: title,
               leading: const CardIconBadge(Icons.auto_stories_rounded),
               heroTag: 'discover-shelf-$title',
-              body: (context) => SingleChildScrollView(
-                padding: const EdgeInsets.all(Sp.x5),
-                child: Wrap(
-                  spacing: Sp.x3,
-                  runSpacing: Sp.x5,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    for (final book in books)
-                      LibriVoxBookItem(
-                        book: book,
-                        isSelected: selected?.id == book.id,
-                        onTap: () => onSelect(context, book),
-                      ),
-                  ],
-                ),
+              body: (context) => _ShelfGrid(
+                initial: books,
+                loadMore: loadMore,
+                selected: selected,
+                onSelect: onSelect,
               ),
             ),
           ),
       ],
     );
+  }
+}
+
+/// An opened shelf: its books three across (more on wide screens). Starts
+/// with the books the row already has and fetches a longer list.
+class _ShelfGrid extends StatefulWidget {
+  final List<LibriVoxBook> initial;
+  final Future<List<LibriVoxBook>> Function() loadMore;
+  final LibriVoxBook? selected;
+  final void Function(BuildContext context, LibriVoxBook book) onSelect;
+
+  const _ShelfGrid({
+    required this.initial,
+    required this.loadMore,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  State<_ShelfGrid> createState() => _ShelfGridState();
+}
+
+class _ShelfGridState extends State<_ShelfGrid> {
+  late List<LibriVoxBook> _books = widget.initial;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final more = await widget.loadMore();
+      if (!mounted) return;
+      if (more.length > _books.length) setState(() => _books = more);
+    } catch (_) {
+      // The shelf's own books are still shown.
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    return LayoutBuilder(builder: (context, constraints) {
+      const pad = Sp.x4;
+      const gap = Sp.x3;
+      final columns = math.max(3, (constraints.maxWidth / 180).floor());
+      final tile =
+          (constraints.maxWidth - pad * 2 - gap * (columns - 1)) / columns;
+      return CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(pad, Sp.x5, pad, Sp.x5),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                crossAxisSpacing: gap,
+                mainAxisSpacing: Sp.x4,
+                mainAxisExtent: tile + Sp.x2 + (26 * 2 + 18) * textScale,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                childCount: _books.length,
+                (context, i) => LibriVoxBookItem(
+                  book: _books[i],
+                  width: tile,
+                  isSelected: widget.selected?.id == _books[i].id,
+                  onTap: () => widget.onSelect(context, _books[i]),
+                ),
+              ),
+            ),
+          ),
+          if (_loading)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: Sp.x8),
+                child: Center(
+                  child: SizedBox.square(
+                    dimension: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    });
   }
 }

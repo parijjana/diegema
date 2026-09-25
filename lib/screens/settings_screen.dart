@@ -304,17 +304,23 @@ class _SettingsDeck extends StatelessWidget {
                         children: [
                           for (final (label, value) in g.summary)
                             Padding(
-                              padding: const EdgeInsets.only(bottom: Sp.x3),
-                              child: Column(
+                              padding: const EdgeInsets.only(bottom: Sp.x2),
+                              child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(label,
-                                      style: AppType.caption
-                                          .copyWith(color: c.textSecondary)),
-                                  Text(value,
-                                      style: AppType.label.copyWith(
-                                          color: c.text,
-                                          fontWeight: FontWeight.w700)),
+                                  Expanded(
+                                    child: Text(label,
+                                        style: AppType.caption
+                                            .copyWith(color: c.textSecondary)),
+                                  ),
+                                  const SizedBox(width: Sp.x3),
+                                  Flexible(
+                                    child: Text(value,
+                                        textAlign: TextAlign.end,
+                                        style: AppType.label.copyWith(
+                                            color: c.text,
+                                            fontWeight: FontWeight.w700)),
+                                  ),
                                 ],
                               ),
                             ),

@@ -75,8 +75,15 @@ void main() {
   Future<void> openCard(WidgetTester tester, String title) async {
     // Only with Card stacks on; the default list shows every group inline.
     if (find.byType(CardStack).evaluate().isEmpty) return;
-    // Cards overlap, so tap the title: the one strip of each that shows.
-    await tester.tap(find.text(title));
+    // Turn the wheel until the card's title strip is in view, then tap
+    // it: cards overlap, so the title is the one part of each that shows.
+    for (var i = 0;
+        i < 8 && find.text(title).hitTestable().evaluate().isEmpty;
+        i++) {
+      await tester.drag(find.byType(CardStack), const Offset(0, 90));
+      await pumpFrames(tester);
+    }
+    await tester.tap(find.text(title).hitTestable());
     await pumpFrames(tester);
   }
 

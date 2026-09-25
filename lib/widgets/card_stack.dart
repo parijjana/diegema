@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -40,13 +42,13 @@ class StackCard {
 /// stacked top to bottom, each covering the one behind it so only its title
 /// row shows, and the front card showing its face.
 ///
-/// The stack sits at the bottom of the screen, in thumb reach, and scrolls:
-/// it is laid out in a reversed scroll view, so a short stack rests on the
-/// bottom edge and a tall one starts scrolled to the front card, with the
-/// cards behind reached by scrolling up.
+/// The stack rests on the bottom edge, in thumb reach, and turns like a
+/// rolodex wheel: drag it down (or fling, or use the mouse wheel) and the
+/// card behind slides forward while the front one drops away to the back.
+/// It wraps, so it scrolls through its cards endlessly in either direction.
 ///
 /// [cards] is front first.
-class CardStack extends StatelessWidget {
+class CardStack extends StatefulWidget {
   final List<StackCard> cards;
   final EdgeInsets padding;
 
@@ -66,42 +68,141 @@ class CardStack extends StatelessWidget {
   }
 
   @override
+  State<CardStack> createState() => _CardStackState();
+}
+
+class _CardStackState extends State<CardStack>
+    with SingleTickerProviderStateMixin {
+  /// The wheel's position in cards: its integer part is the front card
+  /// (mod the card count), the fraction how far the next one has come
+  /// forward.
+  late final AnimationController _pos =
+      AnimationController.unbounded(vsync: this);
+
+  @override
+  void dispose() {
+    _pos.dispose();
+    super.dispose();
+  }
+
+  void _settle(double target) => _pos.animateTo(target,
+      duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
+
+  void _step(int by) => _settle(
+      (_pos.isAnimating ? _pos.value : _pos.value.roundToDouble()).round() +
+          by.toDouble());
+
+  @override
   Widget build(BuildContext context) {
+    final cards = widget.cards;
     if (cards.isEmpty) return const SizedBox.shrink();
-    final peek = peekFor(context);
     final n = cards.length;
-    // Cards behind are only ever seen as their title strip, so each is just
-    // tall enough to tuck under the next one. The front card is in normal
-    // flow and takes whatever height its face needs, which sizes the stack.
-    final behindHeight = peek + Sp.x8;
-    return SingleChildScrollView(
-      reverse: true,
-      padding: padding,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Stack(
-            children: [
-              // Back to front: the card furthest back is at the top.
-              for (var j = 0; j < n - 1; j++)
-                Positioned(
-                  top: peek * j,
-                  // Further back is a touch narrower, so the pile reads as
-                  // depth rather than a list.
-                  left: math.min(n - 1 - j, 4) * 6.0,
-                  right: math.min(n - 1 - j, 4) * 6.0,
-                  height: behindHeight,
-                  child: _StackCardView(card: cards[n - 1 - j], front: false),
+    final peek = CardStack.peekFor(context);
+    final scaler = MediaQuery.textScalerOf(context);
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final pad = widget.padding;
+      final avail = math.max(peek * 2, constraints.maxHeight - pad.vertical);
+      final width = math.min(560.0, constraints.maxWidth - pad.horizontal);
+      // As many title strips as fit above a front card big enough for its
+      // face; the rest wait their turn round the wheel.
+      final minFront = math.min(avail, scaler.scale(220));
+      var visible = n;
+      while (visible > 1 && avail - (visible - 1) * peek < minFront) {
+        visible--;
+      }
+      final frontHeight = math.min(
+          math.max(scaler.scale(300), minFront), avail - (visible - 1) * peek);
+      final frontTop = avail - frontHeight;
+
+      return Semantics(
+        customSemanticsActions: n < 2
+            ? null
+            : {
+                const CustomSemanticsAction(label: 'Next card'): () => _step(1),
+                const CustomSemanticsAction(label: 'Previous card'): () =>
+                    _step(-1),
+              },
+        child: Listener(
+          onPointerSignal: (e) {
+            if (n > 1 && e is PointerScrollEvent) {
+              _step(e.scrollDelta.dy > 0 ? 1 : -1);
+            }
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onVerticalDragStart: n < 2 ? null : (_) => _pos.stop(),
+            onVerticalDragUpdate:
+                n < 2 ? null : (d) => _pos.value += d.primaryDelta! / peek,
+            onVerticalDragEnd: n < 2
+                ? null
+                : (d) {
+                    final velocity = d.primaryVelocity! / peek;
+                    _settle((_pos.value + velocity * 0.18).roundToDouble());
+                  },
+            child: ClipRect(
+              child: Padding(
+                padding: pad,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: SizedBox(
+                    width: width,
+                    height: avail,
+                    child: AnimatedBuilder(
+                      animation: _pos,
+                      builder: (context, _) =>
+                          _buildCards(n, visible, peek, frontTop, frontHeight),
+                    ),
+                  ),
                 ),
-              Padding(
-                padding: EdgeInsets.only(top: peek * (n - 1)),
-                child: _StackCardView(card: cards[0], front: true),
               ),
-            ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    });
+  }
+
+  Widget _buildCards(
+      int n, int visible, double peek, double frontTop, double frontHeight) {
+    final pos = n < 2 ? 0.0 : _pos.value;
+    final base = pos.floor();
+    final f = pos - base;
+    final children = <Widget>[];
+    // Back to front. Slot 0 is the front card; slot `visible` is the one
+    // coming round the wheel into the back, drawn only mid-turn.
+    for (var s = visible; s >= 0; s--) {
+      if (s == visible && (f == 0 || n < 2)) continue;
+      final index = ((base + s) % n + n) % n;
+      final depth = math.max(0.0, s - f);
+      final inset = math.min(depth, 4.0) * 6.0;
+      final double top;
+      var opacity = 1.0;
+      if (s == 0) {
+        // The front card drops away as the next one comes forward.
+        top = frontTop + f * frontHeight * 0.5;
+        opacity = 1 - f;
+      } else {
+        top = frontTop - (s - f) * peek;
+        if (s == visible) opacity = f;
+      }
+      children.add(Positioned(
+        top: top,
+        left: inset,
+        right: inset,
+        height: frontHeight,
+        child: Opacity(
+          opacity: opacity.clamp(0.0, 1.0),
+          child: _StackCardView(
+            card: widget.cards[index],
+            front: s == 0,
+            // Only a settled front card flies into an opened page.
+            hero: s == 0 && f == 0,
+          ),
+        ),
+      ));
+    }
+    return Stack(clipBehavior: Clip.none, children: children);
   }
 }
 
@@ -193,7 +294,9 @@ class CardIconBadge extends StatelessWidget {
 class _StackCardView extends StatelessWidget {
   final StackCard card;
   final bool front;
-  const _StackCardView({required this.card, required this.front});
+  final bool hero;
+  const _StackCardView(
+      {required this.card, required this.front, required this.hero});
 
   @override
   Widget build(BuildContext context) {
@@ -204,7 +307,6 @@ class _StackCardView extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(Sp.x5),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               CardTitleRow(
@@ -213,30 +315,40 @@ class _StackCardView extends StatelessWidget {
                 trailing: card.trailing,
                 maxLines: 1,
               ),
-              if (front) ...[
-                if (card.face != null) ...[
-                  const SizedBox(height: Sp.x4),
-                  Divider(color: c.border, height: 1),
-                  const SizedBox(height: Sp.x4),
-                  card.face!(context),
-                ],
-                const SizedBox(height: Sp.x3),
-                Row(
-                  children: [
-                    Text('Tap to open',
-                        style: AppType.caption.copyWith(color: c.accentText)),
-                    const Spacer(),
-                    Icon(Icons.open_in_full_rounded,
-                        size: 18, color: c.accentText),
-                  ],
-                ),
+              if (card.face != null) ...[
+                const SizedBox(height: Sp.x4),
+                Divider(color: c.border, height: 1),
+                const SizedBox(height: Sp.x4),
               ],
+              // Every card is the front card's height (so one slides into
+              // its place whole); a face taller than that clips rather
+              // than overflowing.
+              Expanded(
+                child: card.face == null
+                    ? const SizedBox.shrink()
+                    : ClipRect(
+                        child: SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: card.face!(context),
+                        ),
+                      ),
+              ),
+              const SizedBox(height: Sp.x3),
+              Row(
+                children: [
+                  Text('Tap to open',
+                      style: AppType.caption.copyWith(color: c.accentText)),
+                  const Spacer(),
+                  Icon(Icons.open_in_full_rounded,
+                      size: 18, color: c.accentText),
+                ],
+              ),
             ],
           ),
         ),
       ),
     );
-    if (card.heroTag != null) {
+    if (hero && card.heroTag != null) {
       surface = Hero(tag: card.heroTag!, child: surface);
     }
     // The front card's face may hold its own buttons (a shelf of books), so

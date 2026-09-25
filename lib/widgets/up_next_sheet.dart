@@ -101,8 +101,18 @@ class _UpNextSheetState extends State<UpNextSheet> {
                 padding: const EdgeInsets.symmetric(vertical: Sp.x2),
                 itemCount: book.chapters.length,
                 itemBuilder: (context, i) {
+                  // Any chapter, played or not, is a place to go: the list
+                  // is for free navigation, not only for looking ahead.
+                  void jumpTo(int index) {
+                    Navigator.of(context).pop();
+                    audioService.loadBook(book, initialChapterIndex: index);
+                  }
+
                   if (i < currentIndex) {
-                    return _PlayedRow(chapter: book.chapters[i]);
+                    return _PlayedRow(
+                      chapter: book.chapters[i],
+                      onTap: () => jumpTo(i),
+                    );
                   }
                   if (i == currentIndex) {
                     return _CurrentRow(
@@ -113,10 +123,7 @@ class _UpNextSheetState extends State<UpNextSheet> {
                   return _UpcomingRow(
                     index: i,
                     chapter: book.chapters[i],
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      audioService.loadBook(book, initialChapterIndex: i);
-                    },
+                    onTap: () => jumpTo(i),
                   );
                 },
               ),
@@ -183,7 +190,8 @@ class _Header extends StatelessWidget {
 /// A chapter already heard: dimmed, a check mark instead of its number.
 class _PlayedRow extends StatelessWidget {
   final AudiobookChapter chapter;
-  const _PlayedRow({required this.chapter});
+  final VoidCallback onTap;
+  const _PlayedRow({required this.chapter, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -193,11 +201,13 @@ class _PlayedRow extends StatelessWidget {
         : null;
 
     return Semantics(
+      button: true,
       label: duration == null
           ? '${chapter.title}. Played.'
           : '${chapter.title}. Played, $duration.',
       excludeSemantics: true,
       child: _Row(
+        onTap: onTap,
         leading: Icon(Icons.check_rounded, color: c.textMuted, size: 20),
         title: Text(
           chapter.title,

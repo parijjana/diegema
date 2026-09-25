@@ -148,4 +148,30 @@ void main() {
 
     expect(find.text('Up next'), findsNothing);
   });
+
+  testWidgets('a played chapter can be jumped back to', (tester) async {
+    await setSurface(tester, const Size(390, 844));
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () =>
+                  showUpNext(context, book: book, audioService: audio),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Letter 1'));
+    await tester.pumpAndSettle();
+
+    expect(audio.loadCalls, 1);
+    expect(audio.chapterIndexNotifier.value, 0);
+    expect(find.text('Up next'), findsNothing);
+  });
 }

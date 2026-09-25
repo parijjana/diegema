@@ -68,7 +68,24 @@ void main() {
     return db;
   }
 
+  /// Brings [title]'s card to the front of the deck and opens it.
+  Future<void> openCard(WidgetTester tester, String title) async {
+    await tester.tap(find.bySemanticsLabel('Show the $title card'));
+    await pumpFrames(tester);
+    await tester.tap(find.bySemanticsLabel(RegExp('^$title settings')));
+    await pumpFrames(tester);
+  }
+
+  Future<void> closeCard(WidgetTester tester) async {
+    final close = find.byTooltip('Close');
+    if (close.evaluate().isEmpty) return;
+    await tester.tap(close);
+    await pumpFrames(tester);
+  }
+
   Future<void> goTo(WidgetTester tester, String destination) async {
+    // An opened settings card is a pushed route over the navigation bar.
+    await closeCard(tester);
     await tester.tap(find.descendant(
       of: find.byType(NavigationBar),
       matching: find.text(destination),
@@ -98,6 +115,7 @@ void main() {
     expect(find.bySemanticsLabel('Skip forward 15 seconds'), findsOneWidget);
 
     await goTo(tester, 'Settings');
+    await openCard(tester, 'Playback');
     await reveal(tester, find.text('30 seconds'));
     await tester.ensureVisible(find.text('30 seconds'));
     await pumpFrames(tester);
@@ -131,6 +149,7 @@ void main() {
     expect(find.text('Up next'), findsOneWidget);
 
     await goTo(tester, 'Settings');
+    await openCard(tester, 'Player layout');
     expect(find.bySemanticsLabel('Tiles'), findsNWidgets(2));
     await tester.ensureVisible(find.text('Round').first);
     await pumpFrames(tester);
@@ -145,6 +164,7 @@ void main() {
     expect(find.text('Sleep'), findsOneWidget);
 
     await goTo(tester, 'Settings');
+    await openCard(tester, 'Player layout');
     await tester.ensureVisible(find.text('Bar').first);
     await pumpFrames(tester);
     await tester.tap(find.text('Bar').first);
@@ -171,6 +191,7 @@ void main() {
 
     for (final style in ['Tiles', 'Bar', 'Round']) {
       await goTo(tester, 'Settings');
+      await openCard(tester, 'Player layout');
       final option = find.text(style).last;
       await reveal(tester, option);
       await tester.ensureVisible(option);
@@ -206,11 +227,12 @@ void main() {
     final store = <String, Object>{};
     await pumpApp(tester, store);
     await goTo(tester, 'Settings');
+    await openCard(tester, 'Theme & colours');
 
-    Color bg() => Theme.of(tester.element(find.text('Settings').last))
+    Color bg() => Theme.of(tester.element(find.byTooltip('Close')))
         .extension<AppColors>()!
         .bg;
-    Color fill() => Theme.of(tester.element(find.text('Settings').last))
+    Color fill() => Theme.of(tester.element(find.byTooltip('Close')))
         .extension<AppColors>()!
         .accentFill;
     expect(bg(), AppColors.light.bg);
@@ -241,9 +263,10 @@ void main() {
     final store = <String, Object>{};
     await pumpApp(tester, store);
     await goTo(tester, 'Settings');
+    await openCard(tester, 'Theme & colours');
 
     List<BoxShadow> shadows() =>
-        Theme.of(tester.element(find.text('Settings').last))
+        Theme.of(tester.element(find.byTooltip('Close')))
             .extension<AppColors>()!
             .shadowUi;
     expect(shadows(), isEmpty);
@@ -362,6 +385,7 @@ void main() {
       (tester) async {
     await pumpApp(tester, <String, Object>{});
     await goTo(tester, 'Settings');
+    await openCard(tester, 'About');
 
     await reveal(tester, find.text('About'));
     expect(find.text('About'), findsOneWidget);
@@ -384,6 +408,7 @@ void main() {
       (tester) async {
     await pumpApp(tester, <String, Object>{});
     await goTo(tester, 'Settings');
+    await openCard(tester, 'About');
 
     await reveal(
         tester, find.textContaining('come from LibriVox (librivox.org)'));

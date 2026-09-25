@@ -62,6 +62,13 @@ class Chapters extends Table {
   IntColumn get durationSeconds => integer().withDefault(const Constant(0))();
   BoolColumn get isStream => boolean().withDefault(const Constant(false))();
 
+  /// Offsets in milliseconds into [audioPathOrUrl] (schema v3), for a
+  /// chapter that is a marker inside a shared M4B file rather than its own
+  /// file. `null` means "the whole file" — see
+  /// `domain/models/audiobook.dart`'s `AudiobookChapter.startMs`/`endMs`.
+  IntColumn get startMs => integer().nullable()();
+  IntColumn get endMs => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -148,7 +155,7 @@ class AppDatabase extends _$AppDatabase {
   static const double continueListeningMaxProgressFraction = 0.95;
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -156,7 +163,13 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
         },
         onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
+          // Each block is also gated on `to` (not just `from`) so that
+          // `SchemaVerifier.migrateAndValidate(db, N)` — which spoofs the
+          // *target* version to validate an intermediate step in isolation
+          // (see test/database/migration_test.dart) — only ever applies the
+          // migrations up to that spoofed target, not every block written
+          // since.
+          if (from < 2 && to >= 2) {
             await m.addColumn(audiobooks, audiobooks.origin);
             await m.addColumn(audiobooks, audiobooks.userCoverPath);
             await m.addColumn(audiobooks, audiobooks.isPinned);
@@ -174,6 +187,14 @@ class AppDatabase extends _$AppDatabase {
             // legacy row, no audiobooks at all, etc).
             await _rekeyLegacyLocalIds();
             await _backfillOrigin();
+          }
+          if (from < 3 && to >= 3) {
+            // M4B chapter markers (schema v3) — see
+            // `core/utils/mp4_chapters.dart`. Existing chapter rows are
+            // untouched: null start/end continues to mean "the whole
+            // file", exactly as it did before this column existed.
+            await m.addColumn(chapters, chapters.startMs);
+            await m.addColumn(chapters, chapters.endMs);
           }
         },
         beforeOpen: (details) async {
@@ -289,6 +310,8 @@ class AppDatabase extends _$AppDatabase {
           audioPathOrUrl: ch.audioPathOrUrl,
           durationSeconds: Value(ch.durationSeconds),
           isStream: Value(ch.isStream),
+          startMs: Value(ch.startMs),
+          endMs: Value(ch.endMs),
         ),
       );
     }
@@ -312,6 +335,8 @@ class AppDatabase extends _$AppDatabase {
             audioPathOrUrl: c.audioPathOrUrl,
             durationSeconds: c.durationSeconds,
             isStream: c.isStream,
+            startMs: c.startMs,
+            endMs: c.endMs,
           ),
         )
         .toList();

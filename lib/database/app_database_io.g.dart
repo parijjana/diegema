@@ -722,6 +722,17 @@ class $ChaptersTable extends Chapters with TableInfo<$ChaptersTable, Chapter> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_stream" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _startMsMeta =
+      const VerificationMeta('startMs');
+  @override
+  late final GeneratedColumn<int> startMs = GeneratedColumn<int>(
+      'start_ms', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _endMsMeta = const VerificationMeta('endMs');
+  @override
+  late final GeneratedColumn<int> endMs = GeneratedColumn<int>(
+      'end_ms', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -730,7 +741,9 @@ class $ChaptersTable extends Chapters with TableInfo<$ChaptersTable, Chapter> {
         title,
         audioPathOrUrl,
         durationSeconds,
-        isStream
+        isStream,
+        startMs,
+        endMs
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -787,6 +800,14 @@ class $ChaptersTable extends Chapters with TableInfo<$ChaptersTable, Chapter> {
       context.handle(_isStreamMeta,
           isStream.isAcceptableOrUnknown(data['is_stream']!, _isStreamMeta));
     }
+    if (data.containsKey('start_ms')) {
+      context.handle(_startMsMeta,
+          startMs.isAcceptableOrUnknown(data['start_ms']!, _startMsMeta));
+    }
+    if (data.containsKey('end_ms')) {
+      context.handle(
+          _endMsMeta, endMs.isAcceptableOrUnknown(data['end_ms']!, _endMsMeta));
+    }
     return context;
   }
 
@@ -810,6 +831,10 @@ class $ChaptersTable extends Chapters with TableInfo<$ChaptersTable, Chapter> {
           .read(DriftSqlType.int, data['${effectivePrefix}duration_seconds'])!,
       isStream: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_stream'])!,
+      startMs: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}start_ms']),
+      endMs: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}end_ms']),
     );
   }
 
@@ -827,6 +852,13 @@ class Chapter extends DataClass implements Insertable<Chapter> {
   final String audioPathOrUrl;
   final int durationSeconds;
   final bool isStream;
+
+  /// Offsets in milliseconds into [audioPathOrUrl] (schema v3), for a
+  /// chapter that is a marker inside a shared M4B file rather than its own
+  /// file. `null` means "the whole file" — see
+  /// `domain/models/audiobook.dart`'s `AudiobookChapter.startMs`/`endMs`.
+  final int? startMs;
+  final int? endMs;
   const Chapter(
       {required this.id,
       required this.audiobookId,
@@ -834,7 +866,9 @@ class Chapter extends DataClass implements Insertable<Chapter> {
       required this.title,
       required this.audioPathOrUrl,
       required this.durationSeconds,
-      required this.isStream});
+      required this.isStream,
+      this.startMs,
+      this.endMs});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -845,6 +879,12 @@ class Chapter extends DataClass implements Insertable<Chapter> {
     map['audio_path_or_url'] = Variable<String>(audioPathOrUrl);
     map['duration_seconds'] = Variable<int>(durationSeconds);
     map['is_stream'] = Variable<bool>(isStream);
+    if (!nullToAbsent || startMs != null) {
+      map['start_ms'] = Variable<int>(startMs);
+    }
+    if (!nullToAbsent || endMs != null) {
+      map['end_ms'] = Variable<int>(endMs);
+    }
     return map;
   }
 
@@ -857,6 +897,11 @@ class Chapter extends DataClass implements Insertable<Chapter> {
       audioPathOrUrl: Value(audioPathOrUrl),
       durationSeconds: Value(durationSeconds),
       isStream: Value(isStream),
+      startMs: startMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startMs),
+      endMs:
+          endMs == null && nullToAbsent ? const Value.absent() : Value(endMs),
     );
   }
 
@@ -871,6 +916,8 @@ class Chapter extends DataClass implements Insertable<Chapter> {
       audioPathOrUrl: serializer.fromJson<String>(json['audioPathOrUrl']),
       durationSeconds: serializer.fromJson<int>(json['durationSeconds']),
       isStream: serializer.fromJson<bool>(json['isStream']),
+      startMs: serializer.fromJson<int?>(json['startMs']),
+      endMs: serializer.fromJson<int?>(json['endMs']),
     );
   }
   @override
@@ -884,6 +931,8 @@ class Chapter extends DataClass implements Insertable<Chapter> {
       'audioPathOrUrl': serializer.toJson<String>(audioPathOrUrl),
       'durationSeconds': serializer.toJson<int>(durationSeconds),
       'isStream': serializer.toJson<bool>(isStream),
+      'startMs': serializer.toJson<int?>(startMs),
+      'endMs': serializer.toJson<int?>(endMs),
     };
   }
 
@@ -894,7 +943,9 @@ class Chapter extends DataClass implements Insertable<Chapter> {
           String? title,
           String? audioPathOrUrl,
           int? durationSeconds,
-          bool? isStream}) =>
+          bool? isStream,
+          Value<int?> startMs = const Value.absent(),
+          Value<int?> endMs = const Value.absent()}) =>
       Chapter(
         id: id ?? this.id,
         audiobookId: audiobookId ?? this.audiobookId,
@@ -903,6 +954,8 @@ class Chapter extends DataClass implements Insertable<Chapter> {
         audioPathOrUrl: audioPathOrUrl ?? this.audioPathOrUrl,
         durationSeconds: durationSeconds ?? this.durationSeconds,
         isStream: isStream ?? this.isStream,
+        startMs: startMs.present ? startMs.value : this.startMs,
+        endMs: endMs.present ? endMs.value : this.endMs,
       );
   Chapter copyWithCompanion(ChaptersCompanion data) {
     return Chapter(
@@ -920,6 +973,8 @@ class Chapter extends DataClass implements Insertable<Chapter> {
           ? data.durationSeconds.value
           : this.durationSeconds,
       isStream: data.isStream.present ? data.isStream.value : this.isStream,
+      startMs: data.startMs.present ? data.startMs.value : this.startMs,
+      endMs: data.endMs.present ? data.endMs.value : this.endMs,
     );
   }
 
@@ -932,14 +987,16 @@ class Chapter extends DataClass implements Insertable<Chapter> {
           ..write('title: $title, ')
           ..write('audioPathOrUrl: $audioPathOrUrl, ')
           ..write('durationSeconds: $durationSeconds, ')
-          ..write('isStream: $isStream')
+          ..write('isStream: $isStream, ')
+          ..write('startMs: $startMs, ')
+          ..write('endMs: $endMs')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(id, audiobookId, chapterIndex, title,
-      audioPathOrUrl, durationSeconds, isStream);
+      audioPathOrUrl, durationSeconds, isStream, startMs, endMs);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -950,7 +1007,9 @@ class Chapter extends DataClass implements Insertable<Chapter> {
           other.title == this.title &&
           other.audioPathOrUrl == this.audioPathOrUrl &&
           other.durationSeconds == this.durationSeconds &&
-          other.isStream == this.isStream);
+          other.isStream == this.isStream &&
+          other.startMs == this.startMs &&
+          other.endMs == this.endMs);
 }
 
 class ChaptersCompanion extends UpdateCompanion<Chapter> {
@@ -961,6 +1020,8 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
   final Value<String> audioPathOrUrl;
   final Value<int> durationSeconds;
   final Value<bool> isStream;
+  final Value<int?> startMs;
+  final Value<int?> endMs;
   final Value<int> rowid;
   const ChaptersCompanion({
     this.id = const Value.absent(),
@@ -970,6 +1031,8 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
     this.audioPathOrUrl = const Value.absent(),
     this.durationSeconds = const Value.absent(),
     this.isStream = const Value.absent(),
+    this.startMs = const Value.absent(),
+    this.endMs = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChaptersCompanion.insert({
@@ -980,6 +1043,8 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
     required String audioPathOrUrl,
     this.durationSeconds = const Value.absent(),
     this.isStream = const Value.absent(),
+    this.startMs = const Value.absent(),
+    this.endMs = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         audiobookId = Value(audiobookId),
@@ -994,6 +1059,8 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
     Expression<String>? audioPathOrUrl,
     Expression<int>? durationSeconds,
     Expression<bool>? isStream,
+    Expression<int>? startMs,
+    Expression<int>? endMs,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1004,6 +1071,8 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
       if (audioPathOrUrl != null) 'audio_path_or_url': audioPathOrUrl,
       if (durationSeconds != null) 'duration_seconds': durationSeconds,
       if (isStream != null) 'is_stream': isStream,
+      if (startMs != null) 'start_ms': startMs,
+      if (endMs != null) 'end_ms': endMs,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1016,6 +1085,8 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
       Value<String>? audioPathOrUrl,
       Value<int>? durationSeconds,
       Value<bool>? isStream,
+      Value<int?>? startMs,
+      Value<int?>? endMs,
       Value<int>? rowid}) {
     return ChaptersCompanion(
       id: id ?? this.id,
@@ -1025,6 +1096,8 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
       audioPathOrUrl: audioPathOrUrl ?? this.audioPathOrUrl,
       durationSeconds: durationSeconds ?? this.durationSeconds,
       isStream: isStream ?? this.isStream,
+      startMs: startMs ?? this.startMs,
+      endMs: endMs ?? this.endMs,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1053,6 +1126,12 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
     if (isStream.present) {
       map['is_stream'] = Variable<bool>(isStream.value);
     }
+    if (startMs.present) {
+      map['start_ms'] = Variable<int>(startMs.value);
+    }
+    if (endMs.present) {
+      map['end_ms'] = Variable<int>(endMs.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1069,6 +1148,8 @@ class ChaptersCompanion extends UpdateCompanion<Chapter> {
           ..write('audioPathOrUrl: $audioPathOrUrl, ')
           ..write('durationSeconds: $durationSeconds, ')
           ..write('isStream: $isStream, ')
+          ..write('startMs: $startMs, ')
+          ..write('endMs: $endMs, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2100,7 +2181,11 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$AudiobooksTable, Audiobook>(table),
+                    BaseReferences<_$AppDatabase, $AudiobooksTable, Audiobook>(
+                        db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -2126,6 +2211,8 @@ typedef $$ChaptersTableCreateCompanionBuilder = ChaptersCompanion Function({
   required String audioPathOrUrl,
   Value<int> durationSeconds,
   Value<bool> isStream,
+  Value<int?> startMs,
+  Value<int?> endMs,
   Value<int> rowid,
 });
 typedef $$ChaptersTableUpdateCompanionBuilder = ChaptersCompanion Function({
@@ -2136,6 +2223,8 @@ typedef $$ChaptersTableUpdateCompanionBuilder = ChaptersCompanion Function({
   Value<String> audioPathOrUrl,
   Value<int> durationSeconds,
   Value<bool> isStream,
+  Value<int?> startMs,
+  Value<int?> endMs,
   Value<int> rowid,
 });
 
@@ -2170,6 +2259,12 @@ class $$ChaptersTableFilterComposer
 
   ColumnFilters<bool> get isStream => $composableBuilder(
       column: $table.isStream, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get startMs => $composableBuilder(
+      column: $table.startMs, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get endMs => $composableBuilder(
+      column: $table.endMs, builder: (column) => ColumnFilters(column));
 }
 
 class $$ChaptersTableOrderingComposer
@@ -2204,6 +2299,12 @@ class $$ChaptersTableOrderingComposer
 
   ColumnOrderings<bool> get isStream => $composableBuilder(
       column: $table.isStream, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get startMs => $composableBuilder(
+      column: $table.startMs, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get endMs => $composableBuilder(
+      column: $table.endMs, builder: (column) => ColumnOrderings(column));
 }
 
 class $$ChaptersTableAnnotationComposer
@@ -2235,6 +2336,12 @@ class $$ChaptersTableAnnotationComposer
 
   GeneratedColumn<bool> get isStream =>
       $composableBuilder(column: $table.isStream, builder: (column) => column);
+
+  GeneratedColumn<int> get startMs =>
+      $composableBuilder(column: $table.startMs, builder: (column) => column);
+
+  GeneratedColumn<int> get endMs =>
+      $composableBuilder(column: $table.endMs, builder: (column) => column);
 }
 
 class $$ChaptersTableTableManager extends RootTableManager<
@@ -2267,6 +2374,8 @@ class $$ChaptersTableTableManager extends RootTableManager<
             Value<String> audioPathOrUrl = const Value.absent(),
             Value<int> durationSeconds = const Value.absent(),
             Value<bool> isStream = const Value.absent(),
+            Value<int?> startMs = const Value.absent(),
+            Value<int?> endMs = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ChaptersCompanion(
@@ -2277,6 +2386,8 @@ class $$ChaptersTableTableManager extends RootTableManager<
             audioPathOrUrl: audioPathOrUrl,
             durationSeconds: durationSeconds,
             isStream: isStream,
+            startMs: startMs,
+            endMs: endMs,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -2287,6 +2398,8 @@ class $$ChaptersTableTableManager extends RootTableManager<
             required String audioPathOrUrl,
             Value<int> durationSeconds = const Value.absent(),
             Value<bool> isStream = const Value.absent(),
+            Value<int?> startMs = const Value.absent(),
+            Value<int?> endMs = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ChaptersCompanion.insert(
@@ -2297,10 +2410,16 @@ class $$ChaptersTableTableManager extends RootTableManager<
             audioPathOrUrl: audioPathOrUrl,
             durationSeconds: durationSeconds,
             isStream: isStream,
+            startMs: startMs,
+            endMs: endMs,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$ChaptersTable, Chapter>(table),
+                    BaseReferences<_$AppDatabase, $ChaptersTable, Chapter>(
+                        db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -2460,7 +2579,12 @@ class $$PlaybackProgressTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$PlaybackProgressTable, PlaybackProgressData>(
+                        table),
+                    BaseReferences<_$AppDatabase, $PlaybackProgressTable,
+                        PlaybackProgressData>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -2679,7 +2803,11 @@ class $$BookmarksTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$BookmarksTable, Bookmark>(table),
+                    BaseReferences<_$AppDatabase, $BookmarksTable, Bookmark>(
+                        db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));

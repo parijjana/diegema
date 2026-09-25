@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../core/network/rate_limit_dispatcher.dart';
 import '../core/network/user_agent.dart';
 import '../domain/models/librivox_book.dart';
+import 'search_cache_store.dart';
 
 class LibriVoxService {
   final http.Client _client;
@@ -17,11 +18,27 @@ class LibriVoxService {
     'Accept': 'application/json, text/plain, */*',
   };
 
+  /// How long a search result is reused. The shell rebuilds Discover on
+  /// every visit, and LibriVox's feed takes 10-20s, so without this each
+  /// visit re-downloaded every shelf. The catalog changes slowly, so a day
+  /// is fine, and it lets the disk copy outlive an overnight restart.
+  final Duration cacheTtl;
+  final DateTime Function() _now;
+  final SearchCacheStore _store;
+  final Map<String, ({DateTime at, List<LibriVoxBook> books})> _cache = {};
+  final Map<String, Future<List<LibriVoxBook>>> _inFlight = {};
+  late final Future<void> _diskLoaded = _loadFromDisk();
+
   LibriVoxService({
     http.Client? client,
     RateLimitDispatcher? rateLimiter,
+    this.cacheTtl = const Duration(hours: 24),
+    DateTime Function()? now,
+    SearchCacheStore? cacheStore,
   })  : _client = client ?? http.Client(),
-        _rateLimiter = rateLimiter ?? RateLimitDispatcher();
+        _rateLimiter = rateLimiter ?? RateLimitDispatcher(),
+        _now = now ?? DateTime.now,
+        _store = cacheStore ?? const SearchCacheStore();
 
   /// Search LibriVox audiobooks. If term is empty, fetch LibriVox's featured feed.
   /// If searching, query Internet Archive's LibriVox collection for 100% reliable keyword matching.
@@ -29,6 +46,67 @@ class LibriVoxService {
     String query, {
     int limit = 20,
     int offset = 0,
+  }) async {
+    await _diskLoaded;
+    final key = '${query.trim().toLowerCase()}|$limit|$offset';
+    final hit = _cache[key];
+    if (hit != null && _now().difference(hit.at) < cacheTtl) {
+      return hit.books;
+    }
+    // A second caller for the same shelf joins the request already out.
+    return _inFlight[key] ??= _fetchBooks(query, limit: limit, offset: offset)
+        .then((books) {
+      // Empty usually means a timeout or outage; retry it next visit.
+      if (books.isNotEmpty) {
+        _cache[key] = (at: _now(), books: books);
+        _saveToDisk();
+      }
+      return books;
+    }).whenComplete(() {
+      // Block body on purpose: an arrow would return the removed future,
+      // and whenComplete would then wait on the very future it completes.
+      _inFlight.remove(key);
+    });
+  }
+
+  Future<void> _loadFromDisk() async {
+    try {
+      final raw = await _store.read();
+      if (raw == null) return;
+      final data = json.decode(raw) as JsonMap;
+      for (final entry in data.entries) {
+        final value = entry.value as JsonMap;
+        final at = DateTime.fromMillisecondsSinceEpoch(value['at'] as int);
+        if (_now().difference(at) >= cacheTtl) continue;
+        final books = (value['books'] as List)
+            .whereType<JsonMap>()
+            .map(LibriVoxBook.fromJson)
+            .toList();
+        _cache.putIfAbsent(entry.key, () => (at: at, books: books));
+      }
+    } catch (e) {
+      // A corrupt or old-format cache is just a cold start.
+      debugPrint('Discover cache unreadable, ignoring: $e');
+    }
+  }
+
+  void _saveToDisk() {
+    final now = _now();
+    final data = {
+      for (final e in _cache.entries)
+        if (now.difference(e.value.at) < cacheTtl)
+          e.key: {
+            'at': e.value.at.millisecondsSinceEpoch,
+            'books': e.value.books.map((b) => b.toJson()).toList(),
+          },
+    };
+    _store.write(json.encode(data));
+  }
+
+  Future<List<LibriVoxBook>> _fetchBooks(
+    String query, {
+    required int limit,
+    required int offset,
   }) async {
     final term = query.trim();
 

@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:diegema/core/network/rate_limit_dispatcher.dart';
 import 'package:diegema/services/librivox_service.dart';
+import 'package:diegema/services/search_cache_store.dart';
 
 void main() {
   group('LibriVoxService TDD Unit Tests', () {
@@ -147,6 +149,107 @@ void main() {
       final bytes = await service.zipSizeBytes('no-mp3');
 
       expect(bytes, isNull);
+    });
+  });
+
+  group('search cache', () {
+    const feed = '''{"books":[{"id":"101","title":"Dracula","description":"",
+      "totaltimesecs":"36000","authors":[],"url_rss":"","url_zip_file":"",
+      "url_iarchive":"http://www.archive.org/details/dracula_librivox",
+      "language":"English"}]}''';
+
+    late int calls;
+    late DateTime now;
+    late LibriVoxService service;
+    late Map<String, String> disk;
+
+    setUp(() {
+      calls = 0;
+      disk = {};
+      now = DateTime(2026, 9, 24, 12);
+      service = LibriVoxService(
+        client: MockClient((request) async {
+          calls++;
+          return http.Response(feed, 200);
+        }),
+        rateLimiter: RateLimitDispatcher(cooldownOverride: Duration.zero),
+        now: () => now,
+        cacheStore: SearchCacheStore(overrides: disk),
+      );
+    });
+
+    test('a revisit within the TTL makes no request', () async {
+      await service.searchBooks('');
+      now = now.add(const Duration(hours: 23));
+      final again = await service.searchBooks('');
+
+      expect(calls, 1);
+      expect(again.single.title, 'Dracula');
+    });
+
+    test('an expired entry is fetched again', () async {
+      await service.searchBooks('');
+      now = now.add(const Duration(hours: 25));
+      await service.searchBooks('');
+
+      expect(calls, 2);
+    });
+
+    test('concurrent callers share one request', () async {
+      await Future.wait([service.searchBooks(''), service.searchBooks('')]);
+
+      expect(calls, 1);
+    });
+
+    test('an empty result is not cached', () async {
+      final scratch = <String, String>{};
+      final empty = LibriVoxService(
+        client: MockClient((request) async {
+          calls++;
+          return http.Response('oops', 500);
+        }),
+        rateLimiter: RateLimitDispatcher(cooldownOverride: Duration.zero),
+        cacheStore: SearchCacheStore(overrides: scratch),
+      );
+      await empty.searchBooks('');
+      await empty.searchBooks('');
+
+      expect(calls, 2);
+    });
+  
+    LibriVoxService relaunch() => LibriVoxService(
+          client: MockClient((request) async {
+            calls++;
+            return http.Response(feed, 200);
+          }),
+          rateLimiter: RateLimitDispatcher(cooldownOverride: Duration.zero),
+          now: () => now,
+          cacheStore: SearchCacheStore(overrides: disk),
+        );
+
+    test('a fresh launch serves the shelf from disk', () async {
+      await service.searchBooks('');
+      now = now.add(const Duration(hours: 10));
+      final books = await relaunch().searchBooks('');
+
+      expect(calls, 1);
+      expect(books.single.title, 'Dracula');
+    });
+
+    test('a stale disk entry is fetched again after a launch', () async {
+      await service.searchBooks('');
+      now = now.add(const Duration(hours: 25));
+      await relaunch().searchBooks('');
+
+      expect(calls, 2);
+    });
+
+    test('a corrupt disk cache is a cold start, not a crash', () async {
+      disk['discover.search_cache.v1'] = '{not json';
+      final books = await relaunch().searchBooks('');
+
+      expect(books.single.title, 'Dracula');
+      expect(calls, 1);
     });
   });
 }

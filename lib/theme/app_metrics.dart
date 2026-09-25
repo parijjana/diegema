@@ -32,14 +32,16 @@ abstract final class R {
   static const xl = BorderRadius.all(Radius.circular(24));
   static const pill = BorderRadius.all(Radius.circular(999));
 
-  /// Book covers — spine on the left. One token instead of the four
-  /// repeated `BorderRadius.only(...)` literals the old build carried.
-  static const cover = BorderRadius.only(
-    topLeft: Radius.circular(2),
-    bottomLeft: Radius.circular(2),
-    topRight: Radius.circular(10),
-    bottomRight: Radius.circular(10),
-  );
+  /// Book covers: the same radius on all four corners, scaled with the
+  /// cover (4px on a thumbnail, up to 12px on the big player cover).
+  ///
+  /// Covers used to carry a "spine" radius (2px left, 10px right) from when
+  /// they were drawn book-shaped. Square covers inside rounded cards made
+  /// that clash: a near-square left edge next to the card's round corner,
+  /// an over-rounded right one. Uniform, and never rounder than the 12px
+  /// card around it.
+  static BorderRadius coverFor(double size) =>
+      BorderRadius.circular((size * 0.06).clamp(4.0, 12.0));
 }
 
 /// Sizing and touch targets (`design/tokens.md` §7).

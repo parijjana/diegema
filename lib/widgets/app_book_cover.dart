@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'book_cover_image.dart';
 
-/// A book cover at the design system's cover treatment: the `r-cover`
-/// spine radius (2px left / 10px right), a `shadow-cover` drop shadow, and
-/// a procedural fallback carrying the serif letter emblem.
+/// A book cover at the design system's cover treatment: a uniform corner
+/// radius scaled with its size ([R.coverFor]), a `shadow-cover` drop
+/// shadow, and a procedural fallback carrying the serif letter emblem.
 ///
 /// Deliberately gone from the old `librivox_book_item` cover: the neon
 /// accent strip, the glossy sheen gradient, and the per-book hue bloom
@@ -40,6 +40,7 @@ class AppBookCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final radius = R.coverFor(width < height ? width : height);
     final letter =
         title.trim().isNotEmpty ? title.trim()[0].toUpperCase() : '?';
 
@@ -48,7 +49,7 @@ class AppBookCover extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: c.surfaceAccent,
-        borderRadius: R.cover,
+        borderRadius: radius,
       ),
       child: Stack(
         fit: StackFit.expand,
@@ -62,8 +63,7 @@ class AppBookCover extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: c.accent.withValues(alpha: 0.18),
-                borderRadius:
-                    const BorderRadius.horizontal(left: Radius.circular(2)),
+                borderRadius: BorderRadius.horizontal(left: radius.topLeft),
               ),
             ),
           ),
@@ -84,7 +84,10 @@ class AppBookCover extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        borderRadius: R.cover,
+        // Opaque under the image, so the shadow can never show through a
+        // cover with transparent pixels.
+        color: c.surfaceSunken,
+        borderRadius: radius,
         boxShadow: c.shadowCover,
         border: Border.all(
           color: isSelected ? c.accent : c.border,
@@ -92,7 +95,7 @@ class AppBookCover extends StatelessWidget {
         ),
       ),
       child: ClipRRect(
-        borderRadius: R.cover,
+        borderRadius: radius,
         child: BookCoverImage(
           bookId: bookId,
           networkUrl: coverUrl,

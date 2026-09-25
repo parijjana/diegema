@@ -175,7 +175,16 @@ class AudioPlaybackService {
           chapter.audioPathOrUrl.startsWith('https://')) {
         await _player.setUrl(chapter.audioPathOrUrl);
       } else {
-        final loaded = await playLocalFile(_player, chapter.audioPathOrUrl);
+        final loaded = await playLocalFile(
+          _player,
+          chapter.audioPathOrUrl,
+          start: chapter.startMs != null
+              ? Duration(milliseconds: chapter.startMs!)
+              : null,
+          end: chapter.endMs != null
+              ? Duration(milliseconds: chapter.endMs!)
+              : null,
+        );
         if (!loaded) {
           stateNotifier.value = PlaybackState.error;
           return;

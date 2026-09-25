@@ -15,7 +15,6 @@ import '../widgets/app_state_view.dart';
 import '../widgets/player_scrubber.dart';
 import '../widgets/player_transport.dart';
 import '../services/ambience_service.dart';
-import '../widgets/ambience_sheet.dart';
 import '../widgets/up_next_sheet.dart';
 
 /// Screen 1 — **Now Playing**, the app's default landing screen.
@@ -79,12 +78,17 @@ class NowPlayingScreen extends StatefulWidget {
   /// side rail to hold it. Supplied by the shell.
   final Widget? headerAction;
 
+  /// Opens the Ambience screen (from the small on/off pill at the top of
+  /// the player, when there is no mix yet to switch on, or on long press).
+  final VoidCallback? onOpenAmbience;
+
   const NowPlayingScreen({
     super.key,
     required this.db,
     required this.audioService,
     required this.onGoToDiscover,
     this.headerAction,
+    this.onOpenAmbience,
     this.preferences = const UiPreferences(),
   });
 
@@ -342,6 +346,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             audioService: widget.audioService,
                             onShowUpNext: _showUpNext,
                             headerAction: widget.headerAction,
+                            onOpenAmbience: widget.onOpenAmbience,
                           ),
                         ),
                       ),
@@ -431,24 +436,10 @@ class _IdleView extends StatelessWidget {
             headline: 'Nothing in progress',
             body: 'Books you start appear here so you can pick up where '
                 'you left off. Find something to listen to in Discover.',
-            action: Wrap(
-              alignment: WrapAlignment.center,
-              spacing: Sp.x3,
-              runSpacing: Sp.x3,
-              children: [
-                FilledButton.icon(
-                  onPressed: onGoToDiscover,
-                  icon: const Icon(Icons.explore_rounded),
-                  label: const Text('Browse Discover'),
-                ),
-                // Ambience plays without a book too.
-                if (AmbienceScope.maybeOf(context) case final ambience?)
-                  OutlinedButton.icon(
-                    onPressed: () => showAmbience(context, ambience),
-                    icon: const Icon(Icons.surround_sound_rounded),
-                    label: const Text('Ambience'),
-                  ),
-              ],
+            action: FilledButton.icon(
+              onPressed: onGoToDiscover,
+              icon: const Icon(Icons.explore_rounded),
+              label: const Text('Browse Discover'),
             ),
           );
         } else {
@@ -862,12 +853,14 @@ class _ActiveView extends StatelessWidget {
   /// layout entirely for as long as a book was loaded. The idle view's
   /// title bar is the only other place it lives.
   final Widget? headerAction;
+  final VoidCallback? onOpenAmbience;
 
   const _ActiveView({
     required this.book,
     required this.audioService,
     required this.onShowUpNext,
     this.headerAction,
+    this.onOpenAmbience,
   });
 
   @override
@@ -955,12 +948,6 @@ class _ActiveView extends StatelessWidget {
                       children: [
                         SpeedSelector(audioService: audioService),
                         SleepTimerSelector(audioService: audioService),
-                        if (AmbienceScope.maybeOf(context) case final amb?)
-                          OutlinedButton.icon(
-                            onPressed: () => showAmbience(context, amb),
-                            icon: const Icon(Icons.surround_sound_rounded),
-                            label: const Text('Ambience'),
-                          ),
                       ],
                     )
                   : _ActionRow(
@@ -991,7 +978,8 @@ class _ActiveView extends StatelessWidget {
                     builder: (context, state, _) {
                       final showError = state == PlaybackState.error;
                       final showHeaderAction = !wide && headerAction != null;
-                      if (!showError && !showHeaderAction) {
+                      final ambience = AmbienceScope.maybeOf(context);
+                      if (!showError && !showHeaderAction && ambience == null) {
                         return const SizedBox.shrink();
                       }
                       return Padding(
@@ -1008,8 +996,17 @@ class _ActiveView extends StatelessWidget {
                                   style:
                                       AppType.label.copyWith(color: c.danger)),
                             ],
-                            if (showError && showHeaderAction)
+                            if (showError &&
+                                (showHeaderAction || ambience != null))
                               const SizedBox(width: Sp.x3),
+                            // The quick ambience switch: small and up here,
+                            // out of the thumb zone and away from the book's
+                            // own controls. The full mixer is its own screen.
+                            if (ambience != null)
+                              _AmbienceToggle(
+                                  service: ambience, onOpen: onOpenAmbience),
+                            if (ambience != null && showHeaderAction)
+                              const SizedBox(width: Sp.x2),
                             if (showHeaderAction) headerAction!,
                           ],
                         ),
@@ -1171,7 +1168,6 @@ class _ActionRow extends StatelessWidget {
     final c = context.colors;
     final style = SettingsScope.maybeOf(context)?.controlsStyle ??
         PlayerControlsStyle.tiles;
-    final ambience = AmbienceScope.maybeOf(context);
     Widget face(BuildContext context, ActionFace f) => switch (style) {
           PlayerControlsStyle.tiles => _TileFace(face: f),
           PlayerControlsStyle.round => _RoundFace(face: f),
@@ -1192,8 +1188,6 @@ class _ActionRow extends StatelessWidget {
       ),
       SpeedSelector(audioService: audioService, face: face),
       SleepTimerSelector(audioService: audioService, face: face),
-      if (ambience != null)
-        _AmbienceButton(service: ambience, face: face, radius: radius),
     ];
     final count = children.length;
 
@@ -1255,43 +1249,66 @@ class _ActionRow extends StatelessWidget {
   }
 }
 
-class _AmbienceButton extends StatelessWidget {
+/// A small pill that switches the ambience mix on and off. With no mix
+/// chosen yet (or on long press) it opens the Ambience screen instead.
+class _AmbienceToggle extends StatelessWidget {
   final AmbienceService service;
-  final ActionFaceBuilder face;
-  final BorderRadius radius;
-  const _AmbienceButton({
-    required this.service,
-    required this.face,
-    required this.radius,
-  });
+  final VoidCallback? onOpen;
+  const _AmbienceToggle({required this.service, this.onOpen});
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return ValueListenableBuilder<AmbienceState>(
       valueListenable: service.state,
-      builder: (context, s, _) => Semantics(
-        button: true,
-        label: 'Ambience, ${s.playing ? 'playing ${s.summary}' : 'off'}. '
-            'Background sounds.',
-        excludeSemantics: true,
-        child: Material(
-          type: MaterialType.transparency,
+      builder: (context, s, _) {
+        final hasMix = s.mix.isNotEmpty;
+        final on = s.on && hasMix;
+        final fg = on ? c.accentText : c.textSecondary;
+        return Semantics(
+          button: true,
+          toggled: hasMix ? on : null,
+          label: 'Ambience',
+          hint: hasMix ? null : 'Opens the Ambience screen to pick sounds',
+          excludeSemantics: true,
           child: InkWell(
-            onTap: () => showAmbience(context, service),
-            borderRadius: radius,
-            child: face(
-              context,
-              ActionFace(
-                icon: Icons.surround_sound_rounded,
-                caption: 'Ambience',
-                value: s.summary,
-                short: s.playing ? s.sounds.first.name : 'Ambience',
-                active: s.playing,
+            onTap: hasMix ? () => service.setOn(!s.on) : onOpen,
+            onLongPress: onOpen,
+            customBorder: const StadiumBorder(),
+            // A 44px tap target around a 32px pill.
+            child: SizedBox(
+              height: Dim.tapMin,
+              child: Center(
+                child: Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: Sp.x3),
+                  decoration: BoxDecoration(
+                    color: on ? c.accentWash : c.glassSurface,
+                    borderRadius: R.pill,
+                    border: Border.all(color: on ? c.accent : c.border),
+                    boxShadow: c.shadowUi,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                          on
+                              ? Icons.surround_sound_rounded
+                              : Icons.surround_sound_outlined,
+                          size: 16,
+                          color: fg),
+                      const SizedBox(width: Sp.x1),
+                      Text(on ? 'On' : 'Off',
+                          style: AppType.caption.copyWith(
+                              color: fg, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

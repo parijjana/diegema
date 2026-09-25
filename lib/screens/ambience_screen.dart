@@ -5,41 +5,12 @@ import '../core/utils/duration_format.dart';
 import '../services/ambience_service.dart';
 import '../theme/app_theme.dart';
 
-/// Opens the ambience mixer: a bottom sheet on phones, a dialog on wide
-/// windows (matching Up next).
-Future<void> showAmbience(BuildContext context, AmbienceService service) {
-  final wide = MediaQuery.sizeOf(context).width >= Dim.wideBreakpoint;
-  final sheet = AmbienceSheet(service: service);
-  if (wide) {
-    return showDialog<void>(
-      context: context,
-      builder: (context) => Dialog(
-        clipBehavior: Clip.antiAlias,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 760),
-          child: sheet,
-        ),
-      ),
-    );
-  }
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (context) => ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
-      ),
-      child: sheet,
-    ),
-  );
-}
-
-/// The background-sound mixer: its own on/off, volume and sleep timer,
-/// whether it follows the book, the user's saved mixes, and the sounds.
-class AmbienceSheet extends StatelessWidget {
+/// The Ambience screen: the background-sound channel's own on/off, volume
+/// and sleep timer, whether it follows the book, the user's saved mixes,
+/// and the sounds. Now Playing carries only a small on/off pill for it.
+class AmbienceScreen extends StatelessWidget {
   final AmbienceService service;
-  const AmbienceSheet({super.key, required this.service});
+  const AmbienceScreen({super.key, required this.service});
 
   static const _sleepOptions = [15, 30, 45, 60, 90];
 
@@ -56,86 +27,90 @@ class AmbienceSheet extends StatelessWidget {
                 : s.mix.isEmpty
                     ? 'Pick a sound below'
                     : 'Off';
-        return ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(Sp.x5, 0, Sp.x5, Sp.x8),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Semantics(
-                        header: true,
-                        child: Text('Ambience',
-                            style: AppType.serif(AppType.titleMd)
-                                .copyWith(color: c.text)),
-                      ),
-                      const SizedBox(height: Sp.x1),
-                      Text(status,
-                          style:
-                              AppType.caption.copyWith(color: c.textSecondary)),
-                    ],
+        return LayoutBuilder(builder: (context, constraints) {
+          final gutter = constraints.maxWidth >= Dim.wideBreakpoint
+              ? Sp.gutterDesktop
+              : Sp.gutterPhone;
+          return ListView(
+            padding: EdgeInsets.fromLTRB(gutter, Sp.x5, gutter, Sp.x8),
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Semantics(
+                          header: true,
+                          child: Text('Ambience',
+                              style: AppType.serif(AppType.titleLg)
+                                  .copyWith(color: c.text)),
+                        ),
+                        const SizedBox(height: Sp.x1),
+                        Text(status,
+                            style: AppType.caption
+                                .copyWith(color: c.textSecondary)),
+                      ],
+                    ),
                   ),
-                ),
-                Switch(
-                  value: s.on,
-                  onChanged: s.mix.isEmpty ? null : service.setOn,
-                ),
-              ],
-            ),
-            const SizedBox(height: Sp.x4),
-            _LabelledSwitch(
-              label: 'Play with the book',
-              description: s.followBook
-                  ? 'Starts and stops with the audiobook.'
-                  : 'Plays on its own, with or without a book.',
-              value: s.followBook,
-              onChanged: service.setFollowBook,
-            ),
-            const SizedBox(height: Sp.x3),
-            Text('Volume', style: AppType.label.copyWith(color: c.text)),
-            Semantics(
-              label: 'Ambience volume',
-              child: Slider(value: s.master, onChanged: service.setMaster),
-            ),
-            Text(
-              'Always kept quieter than the narration.',
-              style: AppType.caption.copyWith(color: c.textSecondary),
-            ),
-            const SizedBox(height: Sp.x5),
-            _SleepRow(
-              remaining: s.sleepRemaining,
-              options: _sleepOptions,
-              onSet: (m) => service.setSleepTimer(Duration(minutes: m)),
-              onCancel: service.cancelSleepTimer,
-            ),
-            const SizedBox(height: Sp.x5),
-            _MixesRow(service: service, state: s),
-            for (final group in AmbienceGroup.values) ...[
+                  Switch(
+                    value: s.on,
+                    onChanged: s.mix.isEmpty ? null : service.setOn,
+                  ),
+                ],
+              ),
+              const SizedBox(height: Sp.x4),
+              _LabelledSwitch(
+                label: 'Play with the book',
+                description: s.followBook
+                    ? 'Starts and stops with the audiobook.'
+                    : 'Plays on its own, with or without a book.',
+                value: s.followBook,
+                onChanged: service.setFollowBook,
+              ),
+              const SizedBox(height: Sp.x3),
+              Text('Volume', style: AppType.label.copyWith(color: c.text)),
+              Semantics(
+                label: 'Ambience volume',
+                child: Slider(value: s.master, onChanged: service.setMaster),
+              ),
+              Text(
+                'Always kept quieter than the narration.',
+                style: AppType.caption.copyWith(color: c.textSecondary),
+              ),
               const SizedBox(height: Sp.x5),
-              Text(group.label,
-                  style: AppType.caption.copyWith(
-                      color: c.textSecondary, fontWeight: FontWeight.w700)),
-              const SizedBox(height: Sp.x2),
-              for (final sound in AmbienceSound.all)
-                if (sound.group == group)
-                  _SoundRow(
-                    sound: sound,
-                    level: s.mix[sound.id],
-                    onToggle: () => service.toggleSound(sound.id),
-                    onLevel: (v) => service.setLevel(sound.id, v),
-                  ),
+              _SleepRow(
+                remaining: s.sleepRemaining,
+                options: _sleepOptions,
+                onSet: (m) => service.setSleepTimer(Duration(minutes: m)),
+                onCancel: service.cancelSleepTimer,
+              ),
+              const SizedBox(height: Sp.x5),
+              _MixesRow(service: service, state: s),
+              for (final group in AmbienceGroup.values) ...[
+                const SizedBox(height: Sp.x5),
+                Text(group.label,
+                    style: AppType.caption.copyWith(
+                        color: c.textSecondary, fontWeight: FontWeight.w700)),
+                const SizedBox(height: Sp.x2),
+                for (final sound in AmbienceSound.all)
+                  if (sound.group == group)
+                    _SoundRow(
+                      sound: sound,
+                      level: s.mix[sound.id],
+                      onToggle: () => service.toggleSound(sound.id),
+                      onLevel: (v) => service.setLevel(sound.id, v),
+                    ),
+              ],
+              const SizedBox(height: Sp.x5),
+              Text(
+                'Recordings by Joseph Sardin, BigSoundBank.com (CC0). '
+                'The noises are generated by Diegema.',
+                style: AppType.caption.copyWith(color: c.textMuted),
+              ),
             ],
-            const SizedBox(height: Sp.x5),
-            Text(
-              'Recordings by Joseph Sardin, BigSoundBank.com (CC0). '
-              'The noises are generated by Diegema.',
-              style: AppType.caption.copyWith(color: c.textMuted),
-            ),
-          ],
-        );
+          );
+        });
       },
     );
   }

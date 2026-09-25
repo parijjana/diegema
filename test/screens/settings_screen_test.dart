@@ -273,7 +273,8 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('the player offers Ambience, whose mixer builds a mix',
+  testWidgets(
+      'Ambience is its own screen; Now Playing has only a small on/off pill',
       (tester) async {
     final store = <String, Object>{};
     final ambience = AmbienceService(
@@ -289,13 +290,16 @@ void main() {
     await audio.loadBook(book);
     await pumpFrames(tester);
 
-    // A fourth action beside Up next, Speed and Sleep.
-    final action = find.bySemanticsLabel(RegExp(r'^Ambience, off'));
-    expect(action, findsOneWidget);
-    await tester.tap(action);
-    await pumpFrames(tester);
+    // No ambience action in the Up next / Speed / Sleep row any more.
+    expect(find.bySemanticsLabel(RegExp(r'^Ambience, ')), findsNothing);
+    final pill = find.bySemanticsLabel('Ambience');
+    expect(pill, findsOneWidget);
 
+    // With nothing chosen yet, the pill opens the Ambience screen.
+    await tester.tap(pill);
+    await pumpFrames(tester);
     expect(find.text('Play with the book'), findsOneWidget);
+
     final rain = find.bySemanticsLabel('Rain');
     await tester.scrollUntilVisible(rain, 150,
         scrollable: find.byType(Scrollable).last);
@@ -304,8 +308,20 @@ void main() {
     await pumpFrames(tester);
     expect(ambience.state.value.mix.keys, ['rain']);
     expect(ambience.state.value.on, isTrue);
-    // The master volume, plus a level slider for the sound just added.
-    expect(find.byType(Slider), findsNWidgets(2));
+    // The sound just added gets its own level slider (the master volume
+    // slider may have scrolled out of the lazy list by now).
+    expect(find.byType(Slider), findsWidgets);
+
+    // Back on the player, the pill now just switches the mix off and on.
+    await goTo(tester, 'Now playing');
+    await tester.tap(find.bySemanticsLabel('Ambience'));
+    await pumpFrames(tester);
+    expect(ambience.state.value.on, isFalse);
+    expect(find.text('Play with the book'), findsNothing,
+        reason: 'a quick toggle, not a trip to the screen');
+    await tester.tap(find.bySemanticsLabel('Ambience'));
+    await pumpFrames(tester);
+    expect(ambience.state.value.on, isTrue);
 
     // Inside the body, not addTearDown: its futures belong to this test's
     // fake-async zone and would never complete from outside it.

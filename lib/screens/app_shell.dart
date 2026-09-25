@@ -14,6 +14,8 @@ import '../widgets/mini_player_bar.dart';
 import 'discover_screen.dart';
 import 'library_screen.dart';
 import 'now_playing_screen.dart';
+import '../services/ambience_service.dart';
+import 'ambience_screen.dart';
 import 'settings_screen.dart';
 
 /// The navigation shell, replacing the old header-tab shell
@@ -194,19 +196,34 @@ class _AppShellState extends State<AppShell> {
   void _go(int index) => setState(() => _index = index);
 
   /// Order is load-bearing: the demo deep link addresses screens by index
-  /// (`?screen=`), so Settings is appended rather than slotted in — 0/1/2
-  /// keep meaning what every existing demo URL says they mean.
-  static const List<_Destination> _destinations = [
-    _Destination(
-        'Now playing', Icons.headphones_outlined, Icons.headphones_rounded),
-    _Destination('Library', Icons.book_outlined, Icons.book_rounded),
-    _Destination('Discover', Icons.explore_outlined, Icons.explore_rounded),
-    _Destination('Settings', Icons.settings_outlined, Icons.settings_rounded),
-  ];
+  /// (`?screen=`), so 0/1/2 keep meaning what every existing demo URL says
+  /// they mean. Ambience (where the build has it; not the web demo) and
+  /// Settings follow.
+  static const _nowPlaying = _Destination(_Tab.nowPlaying, 'Now playing',
+      Icons.headphones_outlined, Icons.headphones_rounded);
+  static const _library = _Destination(
+      _Tab.library, 'Library', Icons.book_outlined, Icons.book_rounded);
+  static const _discover = _Destination(
+      _Tab.discover, 'Discover', Icons.explore_outlined, Icons.explore_rounded);
+  static const _ambience = _Destination(_Tab.ambience, 'Ambience',
+      Icons.surround_sound_outlined, Icons.surround_sound_rounded);
+  static const _settings = _Destination(_Tab.settings, 'Settings',
+      Icons.settings_outlined, Icons.settings_rounded);
+
+  List<_Destination> _destinationsFor(BuildContext context) => [
+        _nowPlaying,
+        _library,
+        _discover,
+        if (AmbienceScope.maybeOf(context) != null) _ambience,
+        _settings,
+      ];
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final destinations = _destinationsFor(context);
+    final index = _index.clamp(0, destinations.length - 1);
+    void goTo(_Tab tab) => _go(destinations.indexWhere((d) => d.tab == tab));
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -214,11 +231,11 @@ class _AppShellState extends State<AppShell> {
         bottom: false,
         child: Column(
           children: [
-            Expanded(child: _screenFor(_index)),
+            Expanded(child: _screenFor(destinations[index].tab, goTo)),
             // The mini player never appears on Now Playing: that screen
             // *is* the player, and a second copy of the same controls
             // is exactly the redundancy this redesign removes.
-            if (_index != 0)
+            if (index != 0)
               MiniPlayerBar(
                 audioService: _audioService,
                 onOpenPlayer: () => _go(0),
@@ -227,28 +244,28 @@ class _AppShellState extends State<AppShell> {
         ),
       ),
       bottomNavigationBar: _BottomNav(
-        index: _index,
-        destinations: _destinations,
+        index: index,
+        destinations: destinations,
         onSelect: _go,
       ),
     );
   }
 
-  Widget _screenFor(int index) {
+  Widget _screenFor(_Tab tab, void Function(_Tab) goTo) {
     // No theme toggle anywhere in here any more. It used to sit in each
     // screen's heading and in the top tab bar — the same control up to
     // three times over — and then, after that dedup, on Now Playing only,
     // explicitly as an interim placement. Settings is the final home, so
     // the interim is gone.
-    switch (index) {
-      case 1:
+    switch (tab) {
+      case _Tab.library:
         return LibraryScreen(
           db: widget.db,
           audioService: _audioService,
           onGoToDiscover: () => _go(2),
           scanLibrary: widget.libraryScanner,
         );
-      case 2:
+      case _Tab.discover:
         return DiscoverScreen(
           db: widget.db,
           openBookId: kDemoMode ? widget.deepLink.book : null,
@@ -257,24 +274,30 @@ class _AppShellState extends State<AppShell> {
           artworkService: _artworkService,
           downloader: _downloader,
         );
-      case 3:
+      case _Tab.ambience:
+        return AmbienceScreen(service: AmbienceScope.maybeOf(context)!);
+      case _Tab.settings:
         return const SettingsScreen();
-      default:
+      case _Tab.nowPlaying:
         return NowPlayingScreen(
           db: widget.db,
           audioService: _audioService,
           preferences: widget.preferences,
           onGoToDiscover: () => _go(2),
+          onOpenAmbience: () => goTo(_Tab.ambience),
         );
     }
   }
 }
 
+enum _Tab { nowPlaying, library, discover, ambience, settings }
+
 class _Destination {
+  final _Tab tab;
   final String label;
   final IconData icon;
   final IconData selectedIcon;
-  const _Destination(this.label, this.icon, this.selectedIcon);
+  const _Destination(this.tab, this.label, this.icon, this.selectedIcon);
 }
 
 class _BottomNav extends StatelessWidget {

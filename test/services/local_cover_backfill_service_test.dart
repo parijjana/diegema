@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -99,6 +100,45 @@ void main() {
     final updated = await db.getAudiobook('local_1');
     expect(updated!.coverArtUrlOrPath, isNotNull);
     expect(File(updated.coverArtUrlOrPath!).readAsBytesSync(), equals(jpeg));
+  });
+
+  test('replaces a placeholder title and author from embedded tags, '
+      'even when the book was already attempted', () async {
+    final filePath = await writeFixture(
+      'odyssey.m4b',
+      buildM4bWithMetadata(
+          album: 'The Odyssey for Boys and Girls',
+          artist: 'Alfred John Church',
+          coverBytes: syntheticJpegBytes()),
+    );
+    await saveLocalBook(
+      id: 'local_tags',
+      title: 'Odyssey',
+      author: 'Local Files',
+      origin: 'local',
+      filePaths: [filePath],
+    );
+
+    final service = LocalCoverBackfillService(
+      db: db,
+      // Attempted a minute ago: only the online step is rationed.
+      store: BackfillAttemptStore(overrides: {
+        'local_cover_backfill.attempted.v1': jsonEncode({
+          'local_tags': DateTime.now()
+              .subtract(const Duration(minutes: 1))
+              .toIso8601String(),
+        }),
+      }),
+      lookupService: CoverLookupService(
+        client: MockClient((_) async => http.Response('', 500)),
+      ),
+    );
+    await service.run();
+
+    final updated = await db.getAudiobook('local_tags');
+    expect(updated!.title, 'The Odyssey for Boys and Girls');
+    expect(updated.author, 'Alfred John Church');
+    expect(updated.coverArtUrlOrPath, isNotNull);
   });
 
   test('falls back to online lookup when no embedded/folder art exists',

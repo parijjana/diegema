@@ -16,8 +16,9 @@ const _placeholderAuthors = {'Local Audiobook', 'Local Files'};
 /// embedded-metadata (step 1), folder-image (step 2), and online-lookup
 /// (step 3) pipeline `local_audiobook_import_io.dart` runs at import time.
 ///
-/// Never throws. Books already attempted within [retryAfter] are skipped
-/// (tracked via [BackfillAttemptStore]); the loop runs strictly
+/// Never throws. The offline steps (embedded tags and art, folder image)
+/// run every launch; the online lookup runs at most once per [retryAfter]
+/// per book (tracked via [BackfillAttemptStore]). The loop runs strictly
 /// sequentially, so at most one online lookup is ever in flight.
 class LocalCoverBackfillService {
   final AppDatabase db;
@@ -45,18 +46,24 @@ class LocalCoverBackfillService {
       final candidates = books.where((book) {
         if (book.origin != BookIdentity.originLocal) return false;
         final cover = book.coverArtUrlOrPath;
-        if (cover != null && cover.isNotEmpty) return false;
-        final lastAttempt = attempts[book.id];
-        if (lastAttempt != null &&
-            nowValue.difference(lastAttempt) < retryAfter) {
-          return false;
-        }
-        return true;
+        final hasCover = cover != null && cover.isNotEmpty;
+        return !hasCover || _placeholderAuthors.contains(book.author);
       });
 
-      for (final book in candidates) {
-        attempts[book.id] = nowValue;
-        final found = await _findCover(book);
+      for (var book in candidates) {
+        // Books imported before tags were read carry the filename as the
+        // title and a placeholder author; fix those first so the online
+        // lookup below searches with the real title.
+        book = await _applyEmbeddedTags(book);
+        final cover = book.coverArtUrlOrPath;
+        if (cover != null && cover.isNotEmpty) continue;
+        // The offline steps are cheap and run every launch; only the
+        // online lookup is rationed to once per [retryAfter].
+        final lastAttempt = attempts[book.id];
+        final mayGoOnline = lastAttempt == null ||
+            nowValue.difference(lastAttempt) >= retryAfter;
+        if (mayGoOnline) attempts[book.id] = nowValue;
+        final found = await _findCover(book, online: mayGoOnline);
         if (found != null) {
           await db.setCoverUrl(book.id, found);
         }
@@ -68,13 +75,40 @@ class LocalCoverBackfillService {
     }
   }
 
-  Future<String?> _findCover(UnifiedAudiobook book) async {
-    final localPaths = book.chapters
-        .map((c) => c.audioPathOrUrl)
-        .where((path) =>
-            !path.startsWith('http://') && !path.startsWith('https://'))
-        .toSet()
-        .toList();
+  Future<UnifiedAudiobook> _applyEmbeddedTags(UnifiedAudiobook book) async {
+    if (!_placeholderAuthors.contains(book.author)) return book;
+    final metadata = await readEmbeddedMetadataForFiles(_localPaths(book));
+    final title = metadata?.title?.trim() ?? '';
+    final author = metadata?.author?.trim() ?? '';
+    if (title.isEmpty && author.isEmpty) return book;
+    final updated = UnifiedAudiobook(
+      id: book.id,
+      title: title.isNotEmpty ? title : book.title,
+      author: author.isNotEmpty ? author : book.author,
+      description: (metadata?.description?.trim().isNotEmpty ?? false)
+          ? metadata!.description!.trim()
+          : book.description,
+      coverArtUrlOrPath: book.coverArtUrlOrPath,
+      source: book.source,
+      origin: book.origin,
+      narrators: book.narrators,
+      chapters: book.chapters,
+      isDownloaded: book.isDownloaded,
+    );
+    await db.saveAudiobook(updated);
+    return updated;
+  }
+
+  List<String> _localPaths(UnifiedAudiobook book) => book.chapters
+      .map((c) => c.audioPathOrUrl)
+      .where((path) =>
+          !path.startsWith('http://') && !path.startsWith('https://'))
+      .toSet()
+      .toList();
+
+  Future<String?> _findCover(UnifiedAudiobook book,
+      {required bool online}) async {
+    final localPaths = _localPaths(book);
 
     if (localPaths.isNotEmpty) {
       final metadata = await readEmbeddedMetadataForFiles(localPaths);
@@ -88,6 +122,7 @@ class LocalCoverBackfillService {
       if (folderCover != null) return folderCover;
     }
 
+    if (!online) return null;
     final knownAuthor =
         _placeholderAuthors.contains(book.author) ? null : book.author;
     return _lookupService.lookupCoverUrl(

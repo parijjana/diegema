@@ -123,6 +123,41 @@ class _AppShellState extends State<AppShell> {
     _audioService = widget.audioService ?? AudioPlaybackService(db: widget.db);
     if (kDemoMode && widget.deepLink.play != null) {
       _startDeepLinkedPlayback(widget.deepLink.play!);
+    } else if (!kDemoMode) {
+      _maybeRestoreLastPlayed();
+    }
+  }
+
+  /// Cold-start restore (Task 3 of the background-playback work): if the
+  /// user left off mid-book, Now Playing should open straight into the
+  /// full player, paused at the saved position, rather than its idle
+  /// "Continue listening" list — the list is still what shows once nothing
+  /// is eligible, exactly as before.
+  ///
+  /// `getContinueListening(limit: 1)` — rather than `getMostRecentProgress`
+  /// plus hand-rolled checks — is what actually reuses
+  /// [AppDatabase.getContinueListening]'s eligibility rules (minimum
+  /// position, not hidden-from-continue, not effectively finished) instead
+  /// of re-deriving them here and risking drift. Its ordering is the same
+  /// most-recently-updated-first as `getMostRecentProgress`, so the top
+  /// result *is* "the book the user was last playing that is still
+  /// eligible to resume".
+  ///
+  /// `loadBook(..., autoPlay: false)` restores the saved chapter and
+  /// position but never starts audio — a cold start must never play sound
+  /// the user did not ask for. Runs once per app launch (`initState`, not
+  /// per tab visit), and never under `kDemoMode`: the web demo seeds its
+  /// own progress and landing screen deliberately (see `demo_seed.dart`),
+  /// and this would silently open its Now Playing screen already
+  /// mid-player instead of showing the seeded idle state.
+  Future<void> _maybeRestoreLastPlayed() async {
+    try {
+      final candidates = await widget.db.getContinueListening(limit: 1);
+      if (candidates.isEmpty) return;
+      if (!mounted) return;
+      await _audioService.loadBook(candidates.first, autoPlay: false);
+    } catch (e) {
+      debugPrint('AppShell: restoring last-played book failed: $e');
     }
   }
 

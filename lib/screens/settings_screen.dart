@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -8,6 +6,7 @@ import '../core/app_settings.dart';
 import '../core/playback_constants.dart';
 import '../core/player_controls_style.dart';
 import '../theme/app_theme.dart';
+import '../widgets/card_stack.dart';
 
 /// The settings panel — Phase 1 of `settings_panel_plan.md`.
 ///
@@ -46,6 +45,7 @@ class SettingsScreen extends StatelessWidget {
             '${settings.accent.name} (${settings.accent.family.label.toLowerCase()})'
           ),
           ('Shadows', settings.shadows.label),
+          ('Card stacks', settings.cardStacks ? 'On' : 'Off'),
         ],
         preview: _ColoursPreview(
             background: settings.background, accent: settings.accent),
@@ -94,6 +94,15 @@ class SettingsScreen extends StatelessWidget {
                 _Choice(style, style.label),
             ],
             onChanged: settings.setShadows,
+          ),
+          const SizedBox(height: Sp.x5),
+          _ThreeWayToggle<bool>(
+            label: 'Card stacks',
+            description: 'Settings, Library and Discover as a stack of '
+                'cards you flick through, instead of lists.',
+            value: settings.cardStacks,
+            options: const [_Choice(false, 'Off'), _Choice(true, 'On')],
+            onChanged: settings.setCardStacks,
           ),
         ],
       ),
@@ -217,9 +226,9 @@ class SettingsScreen extends StatelessWidget {
         ],
       ),
     ];
-    // The last card sits at the front of the stack with its face showing, so
-    // the most visited group goes last.
-    return _SettingsDeck(groups: groups.reversed.toList());
+    return settings.cardStacks
+        ? _SettingsDeck(groups: groups)
+        : _SettingsList(groups: groups);
   }
 }
 
@@ -259,69 +268,87 @@ class _SettingsGroup {
   String get heroTag => 'settings-card-$title';
 }
 
-/// Settings as a rolodex: the groups are physical cards stacked vertically,
-/// each one covering the card behind it so only its title row shows. The
-/// front card shows its face (the current values). Tap any title to pull that
-/// card out full screen with its controls; it grows out of the stack and
-/// shrinks back into it.
+/// Settings as a rolodex of cards (see [CardStack]), Theme & colours at the
+/// front. Tap a card to open it full screen with its controls.
 class _SettingsDeck extends StatelessWidget {
   final List<_SettingsGroup> groups;
   const _SettingsDeck({required this.groups});
 
-  void _openCard(BuildContext context, _SettingsGroup group) {
-    Navigator.of(context).push(PageRouteBuilder<void>(
-      transitionDuration: const Duration(milliseconds: 380),
-      reverseTransitionDuration: const Duration(milliseconds: 320),
-      pageBuilder: (context, animation, _) => _OpenedCard(group: group),
-      transitionsBuilder: (context, animation, _, child) =>
-          FadeTransition(opacity: animation, child: child),
-    ));
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final scaler = MediaQuery.textScalerOf(context);
-    // The visible strip of each card: its padding plus the title row, which
-    // grows with the text size so the title is never cut off.
-    final titleRow =
-        math.max(40.0, scaler.scale(AppType.titleMd.fontSize! * 1.4));
-    final peek = Sp.x5 + titleRow + Sp.x4;
     return LayoutBuilder(builder: (context, constraints) {
       final wide = constraints.maxWidth >= Dim.wideBreakpoint;
       final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
-      return ListView(
-        padding: EdgeInsets.fromLTRB(gutter, Sp.x5, gutter, Sp.x8),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Semantics(
-                    header: true,
-                    child: Text('Settings',
-                        style: AppType.serif(AppType.titleLg)
-                            .copyWith(color: c.text)),
+          _SettingsHeading(
+            gutter: gutter,
+            hint: 'Tap a card to open it.',
+          ),
+          Expanded(
+            child: CardStack(
+              padding: EdgeInsets.fromLTRB(gutter, Sp.x2, gutter, Sp.x5),
+              cards: [
+                for (final g in groups)
+                  StackCard(
+                    title: g.title,
+                    leading: CardIconBadge(g.icon),
+                    heroTag: g.heroTag,
+                    semanticLabel: '${g.title} settings. '
+                        '${g.summary.map((e) => '${e.$1}: ${e.$2}').join(', ')}',
+                    face: (context) => ExcludeSemantics(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final (label, value) in g.summary)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: Sp.x3),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(label,
+                                      style: AppType.caption
+                                          .copyWith(color: c.textSecondary)),
+                                  Text(value,
+                                      style: AppType.label.copyWith(
+                                          color: c.text,
+                                          fontWeight: FontWeight.w700)),
+                                ],
+                              ),
+                            ),
+                          if (g.preview != null) ...[
+                            const SizedBox(height: Sp.x2),
+                            g.preview!,
+                          ],
+                        ],
+                      ),
+                    ),
+                    onOpen: () => openStackCard(
+                      context,
+                      title: g.title,
+                      leading: CardIconBadge(g.icon),
+                      heroTag: g.heroTag,
+                      body: (context) {
+                        final settings = SettingsScope.of(context);
+                        final wide = MediaQuery.sizeOf(context).width >=
+                            Dim.wideBreakpoint;
+                        final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
+                        return Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 640),
+                            child: ListView(
+                              padding: EdgeInsets.fromLTRB(
+                                  gutter, Sp.x5, gutter, Sp.x8),
+                              children: g.controls(context, settings),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                  const SizedBox(height: Sp.x1),
-                  Text('Tap a card to open it.',
-                      style: AppType.caption.copyWith(color: c.textSecondary)),
-                  const SizedBox(height: Sp.x5),
-                  _Rolodex(
-                    peek: peek,
-                    // Cards behind the front one are only ever seen as their
-                    // title strip, so each is just tall enough to stay a card.
-                    frontHeight: math.max(
-                        peek * 2.2,
-                        math.min(
-                            constraints.maxHeight * 0.55, scaler.scale(320))),
-                    groups: groups,
-                    onOpen: (g) => _openCard(context, g),
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
         ],
@@ -330,268 +357,83 @@ class _SettingsDeck extends StatelessWidget {
   }
 }
 
-/// Lays the cards out top to bottom, each [peek] below the last and painted
-/// over it, with the ones further back a touch narrower so the stack reads as
-/// depth rather than a list.
-class _Rolodex extends StatelessWidget {
-  final double peek;
-  final double frontHeight;
+/// Settings as a plain scrolling list: each group's heading, then its
+/// controls.
+class _SettingsList extends StatelessWidget {
   final List<_SettingsGroup> groups;
-  final ValueChanged<_SettingsGroup> onOpen;
-  const _Rolodex({
-    required this.peek,
-    required this.frontHeight,
-    required this.groups,
-    required this.onOpen,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final n = groups.length;
-    final behindHeight = peek + Sp.x8;
-    return SizedBox(
-      height: peek * (n - 1) + frontHeight,
-      child: Stack(
-        children: [
-          for (var i = 0; i < n; i++)
-            Positioned(
-              top: peek * i,
-              left: (n - 1 - i) * 6.0,
-              right: (n - 1 - i) * 6.0,
-              height: i == n - 1 ? frontHeight : behindHeight,
-              child: _DeckCard(
-                group: groups[i],
-                front: i == n - 1,
-                onOpen: () => onOpen(groups[i]),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The card surface, shared by the deck card and the opened card so the
-/// Hero flight between them is one continuous object.
-class _CardSurface extends StatelessWidget {
-  final Widget child;
-  const _CardSurface({required this.child});
-  static const radius = R.xl;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return DecoratedBox(
-      // Same radius on the shadow and the fill, and the fill is opaque.
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: c.shadowUi.isEmpty ? c.shadow2 : c.shadowUi,
-      ),
-      child: Material(
-        color: c.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: radius,
-          side: BorderSide(color: c.border),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: child,
-      ),
-    );
-  }
-}
-
-class _CardTitle extends StatelessWidget {
-  final _SettingsGroup group;
-  final Widget? trailing;
-  final int maxLines;
-  const _CardTitle({required this.group, this.trailing, this.maxLines = 2});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: c.accentWash,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(group.icon, size: Dim.iconSm, color: c.accentText),
-        ),
-        const SizedBox(width: Sp.x3),
-        Expanded(
-          child: Semantics(
-            header: true,
-            child: Text(group.title,
-                maxLines: maxLines,
-                overflow: TextOverflow.ellipsis,
-                style: AppType.serif(AppType.titleMd).copyWith(color: c.text)),
-          ),
-        ),
-        if (trailing != null) trailing!,
-      ],
-    );
-  }
-}
-
-class _DeckCard extends StatelessWidget {
-  final _SettingsGroup group;
-  final VoidCallback onOpen;
-
-  /// Only the front card shows its face; the ones behind are covered below
-  /// their title row, so drawing their faces would be wasted work.
-  final bool front;
-  const _DeckCard(
-      {required this.group, required this.onOpen, required this.front});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final summary = group.summary.map((e) => '${e.$1}: ${e.$2}').join(', ');
-    return Semantics(
-      button: true,
-      label: '${group.title} settings. $summary',
-      excludeSemantics: true,
-      child: Hero(
-        tag: group.heroTag,
-        child: _CardSurface(
-          child: InkWell(
-            onTap: onOpen,
-            child: Padding(
-              padding: const EdgeInsets.all(Sp.x5),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _CardTitle(group: group, maxLines: 1),
-                  if (front) ...[
-                    const SizedBox(height: Sp.x4),
-                    Divider(color: c.border, height: 1),
-                    const SizedBox(height: Sp.x4),
-                    // The face has a fixed height, so at large text sizes it
-                    // clips rather than overflowing.
-                    Expanded(
-                      child: ClipRect(
-                        child: SingleChildScrollView(
-                          physics: const NeverScrollableScrollPhysics(),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              for (final (label, value) in group.summary)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: Sp.x3),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(label,
-                                          style: AppType.caption.copyWith(
-                                              color: c.textSecondary)),
-                                      Text(value,
-                                          style: AppType.label.copyWith(
-                                              color: c.text,
-                                              fontWeight: FontWeight.w700)),
-                                    ],
-                                  ),
-                                ),
-                              if (group.preview != null) ...[
-                                const SizedBox(height: Sp.x2),
-                                group.preview!,
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: Sp.x3),
-                    Row(
-                      children: [
-                        Text('Tap to open',
-                            style:
-                                AppType.caption.copyWith(color: c.accentText)),
-                        const Spacer(),
-                        Icon(Icons.open_in_full_rounded,
-                            size: 18, color: c.accentText),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A card opened out of the deck, full screen, with its controls.
-class _OpenedCard extends StatelessWidget {
-  final _SettingsGroup group;
-  const _OpenedCard({required this.group});
+  const _SettingsList({required this.groups});
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final settings = SettingsScope.of(context);
-    return Scaffold(
-      backgroundColor: c.bg,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(Sp.x2),
-          child: Hero(
-            tag: group.heroTag,
-            // In flight, show only the surface and title: laying the
-            // controls out at every intermediate size would be busy and
-            // expensive.
-            flightShuttleBuilder: (context, animation, direction, from, to) =>
-                _CardSurface(
-              child: Padding(
-                padding: const EdgeInsets.all(Sp.x5),
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: _CardTitle(group: group),
-                ),
-              ),
-            ),
-            child: _CardSurface(
-              child: LayoutBuilder(builder: (context, constraints) {
-                final wide = constraints.maxWidth >= Dim.wideBreakpoint;
-                final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(gutter, Sp.x4, Sp.x2, Sp.x2),
-                      child: _CardTitle(
-                        group: group,
-                        trailing: IconButton(
-                          tooltip: 'Close',
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ),
-                    ),
-                    Divider(color: c.border, height: 1),
-                    Expanded(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 640),
-                          child: ListView(
-                            padding: EdgeInsets.fromLTRB(
-                                gutter, Sp.x5, gutter, Sp.x8),
-                            children: group.controls(context, settings),
+    return LayoutBuilder(builder: (context, constraints) {
+      final wide = constraints.maxWidth >= Dim.wideBreakpoint;
+      final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, Sp.x10),
+            children: [
+              _SettingsHeading(gutter: gutter),
+              for (final g in groups)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(gutter, Sp.x4, gutter, Sp.x4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        Icon(g.icon, size: Dim.iconSm, color: c.accentText),
+                        const SizedBox(width: Sp.x2),
+                        Expanded(
+                          child: Semantics(
+                            header: true,
+                            child: Text(g.title,
+                                style: AppType.serif(AppType.titleMd)
+                                    .copyWith(color: c.text)),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                );
-              }),
-            ),
+                      ]),
+                      const SizedBox(height: Sp.x4),
+                      ...g.controls(context, settings),
+                      const SizedBox(height: Sp.x4),
+                      Divider(color: c.border, height: 1),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ),
+      );
+    });
+  }
+}
+
+class _SettingsHeading extends StatelessWidget {
+  final double gutter;
+  final String? hint;
+  const _SettingsHeading({required this.gutter, this.hint});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(gutter, Sp.x5, gutter, Sp.x2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text('Settings',
+                style: AppType.serif(AppType.titleLg).copyWith(color: c.text)),
+          ),
+          if (hint != null) ...[
+            const SizedBox(height: Sp.x1),
+            Text(hint!,
+                style: AppType.caption.copyWith(color: c.textSecondary)),
+          ],
+        ],
       ),
     );
   }

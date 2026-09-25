@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../core/app_settings.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
 import '../services/local_library_scanner.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
+import '../widgets/card_stack.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/library_book_detail_overlay.dart';
 import '../widgets/local_audiobook_importer.dart';
@@ -276,7 +278,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           ];
 
-          if (wide) {
+          if ((SettingsScope.maybeOf(context)?.cardStacks ?? false)) {
+            body = _LibraryStack(
+              inProgress: _inProgress,
+              books: _books,
+              progressById: _progressById,
+              padding: EdgeInsets.fromLTRB(gutter, Sp.x2, gutter,
+                  wide ? Sp.x10 : _LibraryFab.reservedHeight),
+              onOpen: (book) => _openDetail(context, book, wide: wide),
+            );
+          } else if (wide) {
             body = ListView(
               padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Sp.x10),
               children: rows,
@@ -703,6 +714,123 @@ class _BookRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The library as a rolodex (Settings > Card stacks): books in progress at
+/// the front, then everything else. The front card shows the cover, author
+/// and progress; tapping any card opens the same detail overlay a row does.
+class _LibraryStack extends StatelessWidget {
+  final List<UnifiedAudiobook> inProgress;
+  final List<UnifiedAudiobook> books;
+  final Map<String, double?> progressById;
+  final EdgeInsets padding;
+  final ValueChanged<UnifiedAudiobook> onOpen;
+
+  const _LibraryStack({
+    required this.inProgress,
+    required this.books,
+    required this.progressById,
+    required this.padding,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final started = {for (final b in inProgress) b.id};
+    final ordered = [
+      ...inProgress,
+      ...books.where((b) => !started.contains(b.id)),
+    ];
+    String? percent(UnifiedAudiobook b) {
+      final p = progressById[b.id];
+      return started.contains(b.id) && p != null
+          ? '${(p * 100).round()}%'
+          : null;
+    }
+
+    return CardStack(
+      padding: padding,
+      cards: [
+        for (final book in ordered)
+          StackCard(
+            title: book.title,
+            leading: AppBookCover(
+              bookId: book.id,
+              title: book.title,
+              coverUrl: book.coverArtUrlOrPath,
+              width: 40,
+              height: 40,
+            ),
+            trailing: percent(book) == null
+                ? null
+                : Text(percent(book)!,
+                    style: AppType.label.copyWith(
+                        color: c.accentText, fontWeight: FontWeight.w700)),
+            semanticLabel: [
+              book.title,
+              'by ${book.author}',
+              if (percent(book) != null) '${percent(book)} listened',
+              'View details',
+            ].join('. '),
+            onOpen: () => onOpen(book),
+            face: (context) {
+              final chapters = book.chapters.length;
+              final p =
+                  started.contains(book.id) ? progressById[book.id] : null;
+              return ExcludeSemantics(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppBookCover(
+                      bookId: book.id,
+                      title: book.title,
+                      coverUrl: book.coverArtUrlOrPath,
+                      width: 96,
+                      height: 96,
+                    ),
+                    const SizedBox(width: Sp.x4),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(book.author,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppType.body.copyWith(
+                                  color: c.text, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: Sp.x1),
+                          Text(
+                            chapters == 0
+                                ? (book.source ?? 'Local')
+                                : '$chapters ${chapters == 1 ? 'chapter' : 'chapters'} '
+                                    '· ${book.source ?? 'Local'}',
+                            style: AppType.caption
+                                .copyWith(color: c.textSecondary),
+                          ),
+                          if (p != null) ...[
+                            const SizedBox(height: Sp.x3),
+                            ClipRRect(
+                              borderRadius: R.pill,
+                              child: LinearProgressIndicator(
+                                value: p,
+                                minHeight: 6,
+                                color: c.accentFill,
+                                backgroundColor: c.surfaceSunken,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
     );
   }
 }

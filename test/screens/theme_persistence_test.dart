@@ -81,9 +81,6 @@ void main() {
       matching: find.text('Settings'),
     ));
     await pumpFrames(tester);
-    await tester
-        .tap(find.bySemanticsLabel(RegExp('^Theme & colours settings')));
-    await pumpFrames(tester);
   }
 
   Future<void> choose(WidgetTester tester, String option) async {

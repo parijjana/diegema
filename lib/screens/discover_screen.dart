@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../widgets/card_stack.dart';
+import '../core/app_settings.dart';
 
 import '../database/app_database.dart';
 import '../domain/models/librivox_book.dart';
@@ -314,6 +316,27 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   bottomInset: bottomInset,
                   onSelect: (b) => _select(context, b, wide: wide),
                 );
+        } else if ((SettingsScope.maybeOf(context)?.cardStacks ?? false)) {
+          childReservesInset = true;
+          browse = _ShelfStack(
+            shelves: [
+              for (final cat in _categories)
+                if ((_shelves[cat.query] ?? const []).isNotEmpty)
+                  (
+                    cat.query.isEmpty
+                        ? 'Featured classics'
+                        : 'Top ${cat.name.toLowerCase()}',
+                    _shelves[cat.query]!,
+                  ),
+            ],
+            selected: _selected,
+            padding: EdgeInsets.fromLTRB(
+                wide ? Sp.gutterDesktop : Sp.gutterPhone,
+                Sp.x2,
+                wide ? Sp.gutterDesktop : Sp.gutterPhone,
+                bottomInset),
+            onSelect: (context, b) => _select(context, b, wide: wide),
+          );
         } else {
           childReservesInset = true;
           browse = ListView(
@@ -550,6 +573,77 @@ class _SearchResults extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// The shelves as a rolodex (Settings > Card stacks): each shelf is a card
+/// titled with its heading. The front card carries its books in a sideways
+/// row; tapping a card opens the whole shelf full screen.
+class _ShelfStack extends StatelessWidget {
+  final List<(String, List<LibriVoxBook>)> shelves;
+  final LibriVoxBook? selected;
+  final EdgeInsets padding;
+  final void Function(BuildContext context, LibriVoxBook book) onSelect;
+
+  const _ShelfStack({
+    required this.shelves,
+    required this.selected,
+    required this.padding,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final rowHeight =
+        LibriVoxBookItem.coverHeight + Sp.x2 + (26 * 2 + 18) * textScale;
+    return CardStack(
+      padding: padding,
+      cards: [
+        for (final (title, books) in shelves)
+          StackCard(
+            title: title,
+            leading: const CardIconBadge(Icons.auto_stories_rounded),
+            heroTag: 'discover-shelf-$title',
+            semanticLabel: '$title, ${books.length} books. Open the shelf',
+            face: (context) => SizedBox(
+              height: rowHeight,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: books.length,
+                separatorBuilder: (_, __) => const SizedBox(width: Sp.x3),
+                itemBuilder: (context, i) => LibriVoxBookItem(
+                  book: books[i],
+                  isSelected: selected?.id == books[i].id,
+                  onTap: () => onSelect(context, books[i]),
+                ),
+              ),
+            ),
+            onOpen: () => openStackCard(
+              context,
+              title: title,
+              leading: const CardIconBadge(Icons.auto_stories_rounded),
+              heroTag: 'discover-shelf-$title',
+              body: (context) => SingleChildScrollView(
+                padding: const EdgeInsets.all(Sp.x5),
+                child: Wrap(
+                  spacing: Sp.x3,
+                  runSpacing: Sp.x5,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    for (final book in books)
+                      LibriVoxBookItem(
+                        book: book,
+                        isSelected: selected?.id == book.id,
+                        onTap: () => onSelect(context, book),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

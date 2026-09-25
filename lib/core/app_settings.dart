@@ -35,6 +35,7 @@ class AppSettings extends ChangeNotifier {
   AccentPalette _accent = AccentPalette.fallback;
   BackgroundPair _background = BackgroundPair.fallback;
   ShadowStyle _shadows = ShadowStyle.off;
+  bool _cardStacks = false;
 
   AppSettings({
     required UiPreferences preferences,
@@ -65,6 +66,10 @@ class AppSettings extends ChangeNotifier {
   /// Drop shadows under cards, tiles and buttons (Settings > Colours).
   ShadowStyle get shadows => _shadows;
 
+  /// Settings, Library and Discover as rolodex card stacks instead of lists
+  /// (Settings > Theme & colours). Off by default: fun, not practical.
+  bool get cardStacks => _cardStacks;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
@@ -76,6 +81,7 @@ class AppSettings extends ChangeNotifier {
         BackgroundPair.byId(await _preferences.getBackgroundId());
     final storedShadows =
         ShadowStyle.fromName(await _preferences.getShadowsName());
+    final storedCardStacks = await _preferences.getCardStacks();
 
     if (storedTheme == _themeMode &&
         storedSkip == _skipSeconds &&
@@ -83,7 +89,8 @@ class AppSettings extends ChangeNotifier {
         storedTransport == _transportStyle &&
         storedAccent == _accent &&
         storedBackground == _background &&
-        storedShadows == _shadows) {
+        storedShadows == _shadows &&
+        storedCardStacks == _cardStacks) {
       return;
     }
     _themeMode = storedTheme;
@@ -93,6 +100,7 @@ class AppSettings extends ChangeNotifier {
     _accent = storedAccent;
     _background = storedBackground;
     _shadows = storedShadows;
+    _cardStacks = storedCardStacks;
     notifyListeners();
   }
 
@@ -145,6 +153,13 @@ class AppSettings extends ChangeNotifier {
     _shadows = shadows;
     notifyListeners();
     await _preferences.setShadowsName(shadows.name);
+  }
+
+  Future<void> setCardStacks(bool on) async {
+    if (on == _cardStacks) return;
+    _cardStacks = on;
+    notifyListeners();
+    await _preferences.setCardStacks(on);
   }
 }
 

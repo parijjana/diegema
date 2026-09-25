@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:diegema/widgets/card_stack.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:diegema/app.dart';
@@ -50,6 +51,8 @@ void main() {
     Map<String, Object> store, {
     AmbienceService? ambience,
   }) async {
+    // These tests walk the card flow; list mode has its own test below.
+    store.putIfAbsent('appearance.card_stacks', () => 'on');
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
@@ -70,6 +73,8 @@ void main() {
 
   /// Opens [title]'s card from the stack.
   Future<void> openCard(WidgetTester tester, String title) async {
+    // Only with Card stacks on; the default list shows every group inline.
+    if (find.byType(CardStack).evaluate().isEmpty) return;
     // Cards overlap, so tap the title: the one strip of each that shows.
     await tester.tap(find.text(title));
     await pumpFrames(tester);
@@ -424,6 +429,36 @@ void main() {
         findsOneWidget);
     await reveal(tester, find.text('Volunteer for LibriVox'));
     expect(find.text('Volunteer for LibriVox'), findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  testWidgets(
+      'Card stacks off shows a plain list; on turns three screens '
+      'into stacks', (tester) async {
+    final store = <String, Object>{'appearance.card_stacks': 'off'};
+    final db = await pumpApp(tester, store);
+    await seedBook(db, id: 'z', title: 'Persuasion');
+
+    await goTo(tester, 'Settings');
+    expect(find.byType(CardStack), findsNothing);
+    final on = find.text('On');
+    await reveal(tester, on);
+    await tester.ensureVisible(on);
+    await pumpFrames(tester);
+    await tester.tap(on);
+    await pumpFrames(tester);
+    expect(store['appearance.card_stacks'], 'on');
+    expect(find.byType(CardStack), findsOneWidget);
+
+    await openCard(tester, 'Playback');
+    expect(find.text('30 seconds'), findsOneWidget);
+    await closeCard(tester);
+
+    // Discover's shelves need the catalogue, which this harness doesn't
+    // serve; the library is local.
+    await goTo(tester, 'Library');
+    expect(find.byType(CardStack), findsOneWidget);
 
     await unmount(tester);
   });

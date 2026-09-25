@@ -66,7 +66,16 @@ class GlassCard extends StatelessWidget {
 
     // The optional drop shadow (Settings > Colours > Shadows) sits outside
     // the clip, or the blur's ClipRRect would cut it off.
-    final shadows = context.colors.shadowUi;
+    // The card is translucent, so the shadow is an outer-only halo with no
+    // offset: painting under it would muddy the glass, and outer blur with
+    // an offset leaves a hard band.
+    final shadows = [
+      for (final s in context.colors.shadowUi)
+        BoxShadow(
+            color: s.color,
+            blurRadius: s.blurRadius,
+            blurStyle: BlurStyle.outer),
+    ];
     Widget withShadow(Widget card) => shadows.isEmpty
         ? card
         : DecoratedBox(

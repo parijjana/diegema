@@ -176,7 +176,7 @@ class PlayerTransport extends StatelessWidget {
             child: bar
                 ? Container(
                     decoration: BoxDecoration(
-                      color: c.surface.withValues(alpha: 0.72),
+                      color: c.glassSurface,
                       borderRadius: R.lg,
                       border: Border.all(color: c.border),
                       boxShadow: c.shadowUi,
@@ -321,9 +321,7 @@ class _TransportButton extends StatelessWidget {
                     shape:
                         radius == null ? BoxShape.circle : BoxShape.rectangle,
                     borderRadius: radius,
-                    color: radius == null
-                        ? c.surfaceSunken
-                        : c.surface.withValues(alpha: 0.72),
+                    color: radius == null ? c.surfaceSunken : c.glassSurface,
                     border: Border.all(color: c.border),
                     boxShadow: c.shadowUi,
                   )

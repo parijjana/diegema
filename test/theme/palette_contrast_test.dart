@@ -80,7 +80,6 @@ void main() {
           expect(
               s.color.withValues(alpha: 1).computeLuminance(), lessThan(0.05),
               reason: 'a dark colour, not the accent');
-          expect(s.blurStyle, BlurStyle.outer);
         }
         expect(c.shadow2, c.shadowUi, reason: 'elevation tokens follow');
       }

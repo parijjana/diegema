@@ -143,9 +143,8 @@ class AppColors extends ThemeExtension<AppColors> {
 
   /// The optional drop shadow for cards, tiles and buttons (Settings >
   /// Colours > Shadows). Empty when shadows are off, which is the default,
-  /// so a widget can always pass it to `boxShadow`. Painted with
-  /// [BlurStyle.outer], so it never darkens a translucent element from
-  /// underneath.
+  /// so a widget can always pass it to `boxShadow`. Pair it with an opaque
+  /// fill ([glassSurface]).
   final List<BoxShadow> shadowUi;
 
   const AppColors({
@@ -306,6 +305,14 @@ class AppColors extends ThemeExtension<AppColors> {
 
   /// The drop shadow for [style]: [darkInk] (the text colour) in light
   /// mode, a faded [accent] glow in dark mode.
+  ///
+  /// Tight on purpose: the extent (offset + blur) stays under the 24px
+  /// gap above the bottom nav and small enough that neighbouring buttons
+  /// 8px apart keep separate halos. Normal blur style, because
+  /// [BlurStyle.outer] combined with an offset leaves a hard, unpainted
+  /// band along the offset edge; elements that take a shadow are drawn
+  /// opaque instead (see [glassSurface]). Dark mode's glow is centred
+  /// (no drop), since light-coloured glows read as light, not depth.
   static List<BoxShadow> shadowsFor(
       Brightness brightness, ShadowStyle style, Color accent, Color darkInk) {
     if (style == ShadowStyle.off) return const [];
@@ -313,26 +320,30 @@ class AppColors extends ThemeExtension<AppColors> {
     final strong = style == ShadowStyle.strong;
     final colour = dark ? accent : darkInk;
     final alpha = switch ((dark, strong)) {
-      (false, false) => 0.16,
-      (false, true) => 0.28,
-      (true, false) => 0.30,
-      (true, true) => 0.50,
+      (false, false) => 0.14,
+      (false, true) => 0.22,
+      (true, false) => 0.22,
+      (true, true) => 0.34,
     };
     return [
       BoxShadow(
         color: colour.withValues(alpha: alpha),
-        blurRadius: strong ? 20 : 12,
-        offset: Offset(0, strong ? 8 : 4),
-        blurStyle: BlurStyle.outer,
+        blurRadius: strong ? 14 : 8,
+        offset: dark ? Offset.zero : Offset(0, strong ? 4 : 2),
       ),
       BoxShadow(
-        color: colour.withValues(alpha: alpha * 0.6),
-        blurRadius: strong ? 4 : 2,
-        offset: Offset(0, strong ? 2 : 1),
-        blurStyle: BlurStyle.outer,
+        color: colour.withValues(alpha: alpha * 0.5),
+        blurRadius: strong ? 3 : 2,
+        offset: dark ? Offset.zero : const Offset(0, 1),
       ),
     ];
   }
+
+  /// The fill for the translucent "glass" controls over the Now Playing
+  /// backdrop. Opaque while shadows are on, because a shadow painted
+  /// beneath a translucent control shows through and muddies it.
+  Color get glassSurface =>
+      shadowUi.isEmpty ? surface.withValues(alpha: 0.72) : surface;
 
   /// The tinted background behind accent text (selected rows, chips).
   static Color accentWashFor(

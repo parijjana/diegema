@@ -294,6 +294,16 @@ class _BottomNav extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: c.border)),
+        // The optional drop shadow, cast upward: the bar sits at the
+        // bottom edge, so a downward one would fall off the screen.
+        boxShadow: [
+          for (final s in c.shadowUi)
+            BoxShadow(
+              color: s.color,
+              blurRadius: s.blurRadius,
+              offset: Offset(0, -s.offset.dy - s.blurRadius / 4),
+            ),
+        ],
       ),
       child: NavigationBar(
         selectedIndex: index,

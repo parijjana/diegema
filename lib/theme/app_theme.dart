@@ -264,8 +264,6 @@ abstract final class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: c.surface,
-        elevation: c.shadowUi.isEmpty ? 0 : c.shadowUi.first.blurRadius / 3,
-        shadowColor: c.shadowUi.isEmpty ? null : c.shadowUi.first.color,
         surfaceTintColor: Colors.transparent,
         indicatorColor: c.accentWash,
         indicatorShape: const RoundedRectangleBorder(borderRadius: R.pill),

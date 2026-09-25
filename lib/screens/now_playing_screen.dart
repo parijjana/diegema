@@ -1189,7 +1189,7 @@ class _ActionRow extends StatelessWidget {
             final width = (constraints.maxWidth - 2 - 2) / 3;
             return Container(
               decoration: BoxDecoration(
-                color: c.surface.withValues(alpha: 0.72),
+                color: c.glassSurface,
                 borderRadius: R.lg,
                 border: Border.all(color: c.border),
                 boxShadow: c.shadowUi,
@@ -1270,7 +1270,7 @@ class _TileFace extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
       decoration: BoxDecoration(
-        color: face.active ? c.accentWash : c.surface.withValues(alpha: 0.72),
+        color: face.active ? c.accentWash : c.glassSurface,
         borderRadius: R.md,
         border: Border.all(color: face.active ? c.accent : c.border),
         boxShadow: c.shadowUi,
@@ -1321,9 +1321,7 @@ class _RoundFace extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: face.active
-                  ? c.accentWash
-                  : c.surface.withValues(alpha: 0.72),
+              color: face.active ? c.accentWash : c.glassSurface,
               border: Border.all(color: face.active ? c.accent : c.border),
               boxShadow: c.shadowUi,
             ),

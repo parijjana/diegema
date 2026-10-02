@@ -302,7 +302,9 @@ class AudioPlaybackService {
   Future<void> skipForward({int seconds = kSkipSeconds}) async {
     final newPos = positionNotifier.value + Duration(seconds: seconds);
     final maxDur = durationNotifier.value;
-    await seek(newPos > maxDur ? maxDur : newPos);
+    // Zero means not known yet (a stream still loading): don't clamp to it,
+    // or skipping forward jumps back to the start.
+    await seek(maxDur > Duration.zero && newPos > maxDur ? maxDur : newPos);
   }
 
   Future<void> skipBackward({int seconds = kSkipSeconds}) async {

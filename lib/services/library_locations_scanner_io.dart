@@ -91,7 +91,10 @@ Future<List<_Candidate>> _findBooks(Directory root) async {
     if (audio.isNotEmpty) {
       final allM4b =
           audio.every((path) => p.extension(path).toLowerCase() == '.m4b');
-      if (allM4b && audio.length > 1) {
+      // Several .m4b files are separate books (Emma.m4b, Persuasion.m4b)
+      // unless their names share a start, as one book split into parts
+      // does ("Title - 01 - Opening Credits.m4b", "Title - 02 - …").
+      if (allM4b && audio.length > 1 && _sharedStem(audio).length < 4) {
         for (final path in audio) {
           found.add(_Candidate(
               BookIdentity.localIdForPath(path), path, dir.path, [path]));
@@ -117,8 +120,49 @@ Future<List<_Candidate>> _findBooks(Directory root) async {
   return found;
 }
 
+/// The start every file name in [paths] shares, extension excluded.
+String _sharedStem(List<String> paths) {
+  final names = paths.map(p.basenameWithoutExtension).toList();
+  var stem = names.first;
+  for (final name in names.skip(1)) {
+    var i = 0;
+    while (i < stem.length && i < name.length && stem[i] == name[i]) {
+      i++;
+    }
+    stem = stem.substring(0, i);
+  }
+  return stem;
+}
+
 Future<UnifiedAudiobook> _buildBook(_Candidate c) async {
-  final chapters = await chaptersForFiles(c.id, c.files);
+  var chapters = await chaptersForFiles(c.id, c.files);
+  // A whole-file chapter is titled with its file name; drop the start the
+  // files share ("Title [id] - 04 - Chapter 1" reads "04 - Chapter 1").
+  if (c.files.length > 1) {
+    final stem = _sharedStem(c.files);
+    // Cut back to a separator so a shared "Chapter 1" stays whole.
+    final cut = stem.lastIndexOf(RegExp(r'[\s_\-.]'));
+    if (cut > 0) {
+      final prefix = stem.substring(0, cut + 1);
+      chapters = [
+        for (final ch in chapters)
+          ch.title == p.basenameWithoutExtension(ch.audioPathOrUrl) &&
+                  ch.title.length > prefix.length
+              ? AudiobookChapter(
+                  id: ch.id,
+                  title: ch.title
+                      .substring(prefix.length)
+                      .replaceFirst(RegExp(r'^[\s_\-.]+'), ''),
+                  audioPathOrUrl: ch.audioPathOrUrl,
+                  durationSeconds: ch.durationSeconds,
+                  isStream: ch.isStream,
+                  startMs: ch.startMs,
+                  endMs: ch.endMs,
+                )
+              : ch,
+      ];
+    }
+  }
   final metadata = await readEmbeddedMetadataForFiles(c.files);
   String? coverPath;
   if (metadata?.hasCover == true) {

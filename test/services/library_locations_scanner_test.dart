@@ -65,10 +65,28 @@ void main() {
     write('Shelf/Emma.m4b');
     write('Shelf/Persuasion.m4b');
 
-    expect(await scanLibraryLocations(db, store: store, only: location.path),
-        2);
+    expect(
+        await scanLibraryLocations(db, store: store, only: location.path), 2);
     final titles = (await db.getAllAudiobooks()).map((b) => b.title).toSet();
     expect(titles, {'Emma', 'Persuasion'});
+  });
+
+  test('numbered .m4b parts of one book stay one book, titles trimmed',
+      () async {
+    for (final part in [
+      '01 - Opening Credits',
+      '02 - Dedication',
+      '04 - Chapter 1'
+    ]) {
+      write('Desolation [152]/Desolation [152] - $part.m4b');
+    }
+
+    expect(
+        await scanLibraryLocations(db, store: store, only: location.path), 1);
+    final book = (await db.getAllAudiobooks()).single;
+    expect(book.title, 'Desolation [152]');
+    expect(book.chapters.map((c) => c.title),
+        ['01 - Opening Credits', '02 - Dedication', '04 - Chapter 1']);
   });
 
   test('nothing in the location is created, changed or removed', () async {
@@ -121,8 +139,7 @@ void main() {
     expect(await db.getAllAudiobooks(), hasLength(1));
   });
 
-  test('the store keeps each location once and forgets removed ones',
-      () async {
+  test('the store keeps each location once and forgets removed ones', () async {
     expect(await store.add('/a'), isTrue);
     expect(await store.add('/a'), isFalse);
     await store.add('/b');

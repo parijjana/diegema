@@ -591,8 +591,10 @@ class _DownloadFooter extends StatelessWidget {
               ),
               const SizedBox(width: Sp.x3),
               Expanded(
-                child: SizedBox(
-                  height: Dim.tapComfy,
+                // A minimum, not a fixed height: the two-line label is
+                // taller than 56 at large text scales.
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: Dim.tapComfy),
                   child: Semantics(
                     button: true,
                     label: subtitle == null ? title : '$title, $subtitle',
@@ -601,6 +603,7 @@ class _DownloadFooter extends StatelessWidget {
                       onPressed: onDownload,
                       style: FilledButton.styleFrom(
                         shape: const RoundedRectangleBorder(borderRadius: R.md),
+                        minimumSize: const Size(0, Dim.tapComfy),
                         disabledBackgroundColor: c.accentFill,
                         disabledForegroundColor: c.textOnAccent,
                       ),

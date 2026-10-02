@@ -7,6 +7,7 @@ import '../core/network/user_agent.dart';
 import '../core/utils/book_identity.dart';
 import '../domain/models/librivox_book.dart';
 import '../domain/models/audiobook.dart';
+import 'chapters_unavailable.dart';
 
 class LibriVoxStreamAndDownloader {
   final http.Client _client;
@@ -33,31 +34,37 @@ class LibriVoxStreamAndDownloader {
 
     if (book.urlRss.isNotEmpty) {
       try {
-        final response =
-            await _client.get(Uri.parse(book.urlRss), headers: _headers);
-        if (response.statusCode == 200) {
-          final rss = RssFeed.parse(response.body);
-          int index = 0;
-          for (final item in rss.items) {
-            final streamUrl = item.enclosure?.url;
-            if (streamUrl == null) continue;
-
-            final durationSecs = item.itunes?.duration?.inSeconds ?? 0;
-            final trackTitle = item.title ?? 'Section ${index + 1}';
-
-            chapters.add(
-              AudiobookChapter(
-                id: '${canonicalId}_stream_$index',
-                title: trackTitle,
-                audioPathOrUrl: streamUrl,
-                durationSeconds: durationSecs,
-                isStream: true,
-              ),
-            );
-            index++;
-          }
+        final response = await _client
+            .get(Uri.parse(book.urlRss), headers: _headers)
+            .timeout(const Duration(seconds: 20));
+        if (response.statusCode != 200) {
+          throw ChaptersUnavailable('HTTP ${response.statusCode}');
         }
-      } catch (_) {}
+        final rss = RssFeed.parse(response.body);
+        int index = 0;
+        for (final item in rss.items) {
+          final streamUrl = item.enclosure?.url;
+          if (streamUrl == null) continue;
+
+          final durationSecs = item.itunes?.duration?.inSeconds ?? 0;
+          final trackTitle = item.title ?? 'Section ${index + 1}';
+
+          chapters.add(
+            AudiobookChapter(
+              id: '${canonicalId}_stream_$index',
+              title: trackTitle,
+              audioPathOrUrl: streamUrl,
+              durationSeconds: durationSecs,
+              isStream: true,
+            ),
+          );
+          index++;
+        }
+      } on ChaptersUnavailable {
+        rethrow;
+      } catch (e) {
+        throw ChaptersUnavailable('$e');
+      }
     }
 
     return UnifiedAudiobook(

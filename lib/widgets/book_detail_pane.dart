@@ -55,6 +55,9 @@ class BookDetailPane extends StatefulWidget {
 class _BookDetailPaneState extends State<BookDetailPane> {
   String? _coverArtUrl;
   UnifiedAudiobook? _streamableBook;
+
+  /// The chapter list couldn't be fetched (offline, timeout, feed error).
+  bool _chaptersFailed = false;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
   bool _isDownloaded = false;
@@ -82,15 +85,20 @@ class _BookDetailPaneState extends State<BookDetailPane> {
 
   Future<void> _loadEnrichmentData() async {
     final coverFuture = widget.artworkService.resolveCoverArtUrl(widget.book);
-    final streamFuture = widget.downloader.parseStreamableBook(widget.book);
+    final chaptersFuture = _loadChapters();
+    final cover = await coverFuture;
+    if (mounted) setState(() => _coverArtUrl = cover);
+    await chaptersFuture;
+  }
 
-    final results = await Future.wait([coverFuture, streamFuture]);
-
-    if (mounted) {
-      setState(() {
-        _coverArtUrl = results[0] as String?;
-        _streamableBook = results[1] as UnifiedAudiobook?;
-      });
+  Future<void> _loadChapters() async {
+    if (mounted) setState(() => _chaptersFailed = false);
+    try {
+      final book = await widget.downloader.parseStreamableBook(widget.book);
+      if (mounted) setState(() => _streamableBook = book);
+    } on ChaptersUnavailable catch (e) {
+      debugPrint('BookDetailPane: chapters unavailable: $e');
+      if (mounted) setState(() => _chaptersFailed = true);
     }
   }
 
@@ -408,7 +416,9 @@ class _BookDetailPaneState extends State<BookDetailPane> {
               ?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        if (_streamableBook != null && _streamableBook!.chapters.isEmpty)
+        if (_chaptersFailed && _streamableBook == null)
+          EmptyChaptersNote(onRetry: _loadChapters)
+        else if (_streamableBook != null && _streamableBook!.chapters.isEmpty)
           const EmptyChaptersNote(),
         if (_streamableBook != null)
           ..._streamableBook!.chapters.asMap().entries.map((entry) {
@@ -477,8 +487,13 @@ class _BookDetailPaneState extends State<BookDetailPane> {
 /// "Chapters (0)" heading, and points at the fix (download the book,
 /// which pulls chapters from the ZIP rather than the RSS feed this pane
 /// streams from).
+///
+/// With [onRetry] it is the failure version instead: the chapter list
+/// couldn't be fetched at all (offline, timed out), with a way to try again.
 class EmptyChaptersNote extends StatelessWidget {
-  const EmptyChaptersNote({super.key});
+  final VoidCallback? onRetry;
+
+  const EmptyChaptersNote({super.key, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -498,12 +513,17 @@ class EmptyChaptersNote extends StatelessWidget {
           const SizedBox(width: Sp.x3),
           Expanded(
             child: Text(
-              "The chapter list isn't available yet. Download the book to "
-              'get every chapter.',
+              onRetry != null
+                  ? "Couldn't load the chapters. Check your connection and "
+                      'try again.'
+                  : "The chapter list isn't available yet. Download the book "
+                      'to get every chapter.',
               style:
                   AppType.body.copyWith(color: c.textSecondary, height: 1.45),
             ),
           ),
+          if (onRetry != null)
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );

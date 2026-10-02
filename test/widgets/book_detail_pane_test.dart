@@ -20,6 +20,7 @@ import '../support/test_harness.dart';
 void main() {
   late AppDatabase db;
   late FakePlaybackService audio;
+  var rssStatus = 200;
 
   final book = LibriVoxBook(
     id: '1205',
@@ -45,7 +46,7 @@ void main() {
   Widget wrap({required String rssBody, int? zipBytes}) {
     final httpClient = MockClient((request) async {
       if (request.url.toString().contains('/rss/')) {
-        return http.Response(rssBody, 200);
+        return http.Response(rssStatus == 200 ? rssBody : '', rssStatus);
       }
       // Cover art probe — a 404 is fine, the pane falls back to its
       // placeholder either way.
@@ -77,6 +78,7 @@ void main() {
   }
 
   setUp(() {
+    rssStatus = 200;
     db = AppDatabase(NativeDatabase.memory());
     audio = FakePlaybackService();
   });
@@ -136,5 +138,23 @@ void main() {
 
     expect(find.text('Chapters (1)'), findsOneWidget);
     expect(find.byType(EmptyChaptersNote), findsNothing);
+  });
+
+  testWidgets('phone: a failed chapter fetch says so and Retry loads them',
+      (tester) async {
+    await setSurface(tester, const Size(390, 844));
+    rssStatus = 503;
+    await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
+    await pumpFrames(tester);
+
+    expect(find.textContaining("Couldn't load the chapters"), findsOneWidget);
+    expect(find.textContaining("isn't available yet"), findsNothing);
+
+    rssStatus = 200;
+    await tester.tap(find.text('Retry'));
+    await pumpFrames(tester);
+
+    expect(find.textContaining("Couldn't load the chapters"), findsNothing);
+    expect(find.text('Chapters (1)'), findsOneWidget);
   });
 }

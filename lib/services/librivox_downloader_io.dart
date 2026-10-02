@@ -36,7 +36,8 @@ class LibriVoxStreamAndDownloader {
       try {
         final response = await _client
             .get(Uri.parse(book.urlRss), headers: _headers)
-            .timeout(const Duration(seconds: 20));
+            // LibriVox's feeds routinely take 12-17 s to answer.
+            .timeout(const Duration(seconds: 45));
         if (response.statusCode != 200) {
           throw ChaptersUnavailable('HTTP ${response.statusCode}');
         }

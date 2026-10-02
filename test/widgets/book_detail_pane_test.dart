@@ -1,3 +1,5 @@
+import 'package:diegema/core/utils/book_identity.dart';
+import 'package:diegema/domain/models/audiobook.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -156,5 +158,39 @@ void main() {
 
     expect(find.textContaining("Couldn't load the chapters"), findsNothing);
     expect(find.text('Chapters (1)'), findsOneWidget);
+  });
+
+  testWidgets(
+      'phone: a downloaded book shows its own chapters when the feed fails',
+      (tester) async {
+    await setSurface(tester, const Size(390, 844));
+    rssStatus = 503;
+    await db.saveAudiobook(UnifiedAudiobook(
+      id: 'frankenstein_1205_librivox',
+      title: 'Frankenstein',
+      author: 'Mary Shelley',
+      description: '',
+      source: 'Downloaded',
+      origin: BookIdentity.originLibrivox,
+      isDownloaded: true,
+      chapters: [
+        AudiobookChapter(
+            id: 'c0',
+            title: 'Letter 1',
+            audioPathOrUrl: '/books/01.mp3',
+            durationSeconds: 60),
+        AudiobookChapter(
+            id: 'c1',
+            title: 'Letter 2',
+            audioPathOrUrl: '/books/02.mp3',
+            durationSeconds: 60),
+      ],
+    ));
+    await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
+    await pumpFrames(tester);
+
+    expect(find.textContaining("Couldn't load the chapters"), findsNothing);
+    expect(find.text('Chapters (2)'), findsOneWidget);
+    rssStatus = 200;
   });
 }

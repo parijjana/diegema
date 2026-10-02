@@ -97,12 +97,37 @@ class _BookDetailPaneState extends State<BookDetailPane> {
 
   Future<void> _loadChapters() async {
     if (mounted) setState(() => _chaptersFailed = false);
+    // A downloaded copy plays from disk, so it needs no feed at all; show
+    // it straight away and let the feed only fill in what it adds.
+    final saved = await _savedCopy();
+    if (saved != null && mounted) {
+      setState(() {
+        _isDownloaded = true;
+        _streamableBook = saved;
+      });
+    }
     try {
       final book = await widget.downloader.parseStreamableBook(widget.book);
-      if (mounted) setState(() => _streamableBook = book);
+      if (mounted && saved == null) setState(() => _streamableBook = book);
     } on ChaptersUnavailable catch (e) {
       debugPrint('BookDetailPane: chapters unavailable: $e');
-      if (mounted) setState(() => _chaptersFailed = true);
+      if (mounted && saved == null) setState(() => _chaptersFailed = true);
+    }
+  }
+
+  /// The downloaded row for this book, if it has one with chapters.
+  Future<UnifiedAudiobook?> _savedCopy() async {
+    try {
+      final id = BookIdentity.archiveIdentifierFor(
+        librivoxApiId: widget.book.id,
+        urlIarchive: widget.book.urlIarchive,
+      );
+      final book = await widget.db.getAudiobook(id);
+      return book != null && book.isDownloaded && book.chapters.isNotEmpty
+          ? book
+          : null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -150,6 +175,13 @@ class _BookDetailPaneState extends State<BookDetailPane> {
         urlIarchive: widget.book.urlIarchive,
       );
 
+      // The feed's section titles and durations, when it lists exactly the
+      // files the ZIP held (LibriVox numbers both the same way); otherwise
+      // the file names.
+      final feed = _streamableBook?.chapters;
+      final fromFeed = feed != null &&
+          !(_streamableBook?.isDownloaded ?? false) &&
+          feed.length == extractedFiles.length;
       final List<AudiobookChapter> chapters = [];
       for (int i = 0; i < extractedFiles.length; i++) {
         final filePath = extractedFiles[i];
@@ -157,9 +189,9 @@ class _BookDetailPaneState extends State<BookDetailPane> {
         chapters.add(
           AudiobookChapter(
             id: '${canonicalId}_local_$i',
-            title: filename.replaceAll('.mp3', ''),
+            title: fromFeed ? feed[i].title : filename.replaceAll('.mp3', ''),
             audioPathOrUrl: filePath,
-            durationSeconds: 0,
+            durationSeconds: fromFeed ? feed[i].durationSeconds : 0,
             isStream: false,
           ),
         );

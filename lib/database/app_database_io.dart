@@ -285,7 +285,10 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // --- Audiobook CRUD ---
-  Future<void> saveAudiobook(domain.UnifiedAudiobook book) async {
+  Future<void> saveAudiobook(domain.UnifiedAudiobook book) =>
+      transaction(() => _saveAudiobook(book));
+
+  Future<void> _saveAudiobook(domain.UnifiedAudiobook book) async {
     await into(audiobooks).insertOnConflictUpdate(
       AudiobooksCompanion.insert(
         id: book.id,
@@ -298,6 +301,17 @@ class AppDatabase extends _$AppDatabase {
         isDownloaded: Value(book.isDownloaded),
       ),
     );
+
+    // Drop chapters the new copy no longer has, or streaming then
+    // downloading a book (`<id>_stream_N` vs `<id>_local_N`) leaves both
+    // sets under one book. A save with no chapters keeps the old ones: that
+    // is a metadata-only save or a failed fetch, not a book with none.
+    if (book.chapters.isNotEmpty) {
+      final keep = book.chapters.map((c) => c.id).toList();
+      await (delete(chapters)
+            ..where((c) => c.audiobookId.equals(book.id) & c.id.isNotIn(keep)))
+          .go();
+    }
 
     // Save chapters
     for (int i = 0; i < book.chapters.length; i++) {

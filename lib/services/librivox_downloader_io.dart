@@ -91,9 +91,16 @@ class LibriVoxStreamAndDownloader {
     required String saveDirectoryPath,
     void Function(double progress)? onProgress,
   }) async {
+    // Title for people browsing the folder, archive.org id so two editions
+    // with the same title never share (and overwrite, or on removal delete)
+    // one folder.
     final sanitizeName =
         book.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
-    final bookDir = Directory(p.join(saveDirectoryPath, sanitizeName));
+    final identifier = BookIdentity.archiveIdentifierFor(
+            librivoxApiId: book.id, urlIarchive: book.urlIarchive)
+        .replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    final bookDir =
+        Directory(p.join(saveDirectoryPath, '$sanitizeName [$identifier]'));
     await bookDir.create(recursive: true);
 
     final zipFile = File(p.join(bookDir.path, 'package.zip'));

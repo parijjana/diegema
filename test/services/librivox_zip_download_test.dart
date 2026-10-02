@@ -81,7 +81,7 @@ void main() {
     expect(paths.map(p.basename), ['01.mp3', '02.mp3']);
     expect(File(paths.first).lengthSync(), 3000);
     expect(filesUnder(downloads)..sort(),
-        ['Emma/01.mp3', 'Emma/02.mp3', 'Emma/notes.txt']);
+        ['Emma [1]/01.mp3', 'Emma [1]/02.mp3', 'Emma [1]/notes.txt']);
     expect(progress.last, 1.0);
   });
 
@@ -95,7 +95,7 @@ void main() {
     await LibriVoxStreamAndDownloader(client: _serve(body))
         .downloadAndExtractZip(_book(), saveDirectoryPath: downloads);
 
-    expect(filesUnder(root.path), ['downloads/Emma/01.mp3']);
+    expect(filesUnder(root.path), ['downloads/Emma [1]/01.mp3']);
   });
 
   test('a dropped connection leaves no partial zip behind', () async {
@@ -130,6 +130,31 @@ void main() {
         downloader.downloadAndExtractZip(_book(), saveDirectoryPath: downloads),
         throwsA(isA<FormatException>()));
     expect(filesUnder(downloads), isEmpty);
+  });
+
+  test('two books with the same title download to separate folders',
+      () async {
+    final body = _zip({'01.mp3': [1]});
+    final downloader = LibriVoxStreamAndDownloader(client: _serve(body));
+    final other = LibriVoxBook(
+      id: '2',
+      title: 'Emma',
+      description: '',
+      totalTimeSecs: 0,
+      authors: const [],
+      urlRss: '',
+      urlZipFile: 'https://archive.org/download/emma2/emma2.zip',
+      urlIarchive: 'https://archive.org/details/emma_2_librivox',
+      language: 'English',
+      narrators: const [],
+    );
+
+    final a = await downloader.downloadAndExtractZip(_book(),
+        saveDirectoryPath: downloads);
+    final b = await downloader.downloadAndExtractZip(other,
+        saveDirectoryPath: downloads);
+
+    expect(p.dirname(a.single), isNot(p.dirname(b.single)));
   });
 
   test('a non-200 response throws', () async {

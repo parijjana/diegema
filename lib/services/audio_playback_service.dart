@@ -106,6 +106,14 @@ class AudioPlaybackService {
       }
     });
 
+    // Errors after a chapter has loaded (a stream dropping, a file deleted
+    // mid-play) arrive only here, never through playerStateStream.
+    _player.playbackEventStream.listen((_) {}, onError: (Object e, _) {
+      if (_loading) return; // the load's own catch reports it
+      debugPrint('AudioPlaybackService: playback error: $e');
+      stateNotifier.value = PlaybackState.error;
+    });
+
     _player.positionStream.listen((pos) {
       positionNotifier.value = pos;
     });
@@ -369,6 +377,13 @@ class AudioPlaybackService {
   Future<void> skipBackward({int seconds = kSkipSeconds}) async {
     final newPos = positionNotifier.value - Duration(seconds: seconds);
     await seek(newPos < Duration.zero ? Duration.zero : newPos);
+  }
+
+  /// Loads the current chapter again from where it stopped, after a
+  /// playback error.
+  Future<void> retryCurrentChapter() async {
+    if (_currentBook == null) return;
+    await _playCurrentChapter(seekToPosition: positionNotifier.value);
   }
 
   Future<void> nextChapter() async {

@@ -14,6 +14,25 @@ import 'package:diegema/services/librivox_downloader.dart';
 
 class _SeekRecorder extends AudioPlayer {
   Duration? lastSeek;
+  int loads = 0;
+  // ignore: close_sinks
+  final events = StreamController<PlaybackEvent>.broadcast();
+  @override
+  Stream<PlaybackEvent> get playbackEventStream => events.stream;
+  @override
+  Future<Duration?> setUrl(String url,
+      {Map<String, String>? headers,
+      Duration? initialPosition,
+      bool preload = true,
+      dynamic tag}) async {
+    loads++;
+    return const Duration(minutes: 10);
+  }
+
+  @override
+  Future<void> setSpeed(double speed) async {}
+  @override
+  Future<void> play() async {}
   @override
   Stream<PlayerState> get playerStateStream => const Stream.empty();
   @override
@@ -122,5 +141,38 @@ void main() {
               200)));
       expect((await d.parseStreamableBook(book)).chapters, isEmpty);
     });
+  });
+
+  test(
+      'an error mid-playback shows as an error; Retry reloads from the '
+      'same place', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    final player = _SeekRecorder();
+    final service = AudioPlaybackService(player: player, db: db);
+    await service.loadBook(UnifiedAudiobook(
+      id: 'odyssey',
+      title: 'Odyssey',
+      author: 'Homer',
+      description: '',
+      chapters: [
+        AudiobookChapter(
+            id: 'c0',
+            title: 'c0',
+            audioPathOrUrl: 'https://example.org/0.mp3',
+            durationSeconds: 600,
+            isStream: true),
+      ],
+    ));
+    expect(player.loads, 1);
+
+    service.positionNotifier.value = const Duration(seconds: 200);
+    player.events.addError(Exception('stream dropped'));
+    await Future<void>.delayed(Duration.zero);
+    expect(service.stateNotifier.value, PlaybackState.error);
+
+    await service.retryCurrentChapter();
+    expect(player.loads, 2);
+    expect(player.lastSeek, const Duration(seconds: 200));
+    await db.close();
   });
 }

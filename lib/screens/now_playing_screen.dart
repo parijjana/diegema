@@ -979,37 +979,34 @@ class _ActiveView extends StatelessWidget {
                       final showError = state == PlaybackState.error;
                       final showHeaderAction = !wide && headerAction != null;
                       final ambience = AmbienceScope.maybeOf(context);
-                      if (!showError && !showHeaderAction && ambience == null) {
-                        return const SizedBox.shrink();
-                      }
-                      return Padding(
-                        padding:
-                            const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (showError) ...[
-                              Icon(Icons.error_outline_rounded,
-                                  color: c.danger),
-                              const SizedBox(width: Sp.x2),
-                              Text('Playback failed',
-                                  style:
-                                      AppType.label.copyWith(color: c.danger)),
-                            ],
-                            if (showError &&
-                                (showHeaderAction || ambience != null))
-                              const SizedBox(width: Sp.x3),
-                            // The quick ambience switch: small and up here,
-                            // out of the thumb zone and away from the book's
-                            // own controls. The full mixer is its own screen.
-                            if (ambience != null)
-                              _AmbienceToggle(
-                                  service: ambience, onOpen: onOpenAmbience),
-                            if (ambience != null && showHeaderAction)
-                              const SizedBox(width: Sp.x2),
-                            if (showHeaderAction) headerAction!,
-                          ],
-                        ),
+                      final header = !showHeaderAction && ambience == null
+                          ? null
+                          : Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                  Sp.x4, Sp.x2, Sp.x4, 0),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  // The quick ambience switch: small and up here,
+                                  // out of the thumb zone and away from the book's
+                                  // own controls. The full mixer is its own screen.
+                                  if (ambience != null)
+                                    _AmbienceToggle(
+                                        service: ambience,
+                                        onOpen: onOpenAmbience),
+                                  if (ambience != null && showHeaderAction)
+                                    const SizedBox(width: Sp.x2),
+                                  if (showHeaderAction) headerAction!,
+                                ],
+                              ),
+                            );
+                      if (!showError) return header ?? const SizedBox.shrink();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (header != null) header,
+                          _PlaybackErrorNote(service: audioService),
+                        ],
                       );
                     },
                   ),
@@ -1464,6 +1461,43 @@ class _BarFace extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: AppType.caption
                   .copyWith(color: c.text, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+/// The chapter couldn't load or stopped with an error: says so, and offers
+/// to try it again from the same place or move on.
+class _PlaybackErrorNote extends StatelessWidget {
+  final AudioPlaybackService service;
+  const _PlaybackErrorNote({required this.service});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final book = service.currentBookNotifier.value;
+    final hasNext = book != null &&
+        service.chapterIndexNotifier.value < book.chapters.length - 1;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: Sp.x2,
+        children: [
+          Icon(Icons.error_outline_rounded, color: c.danger),
+          Text("Couldn't play this chapter",
+              style: AppType.label.copyWith(color: c.danger)),
+          TextButton(
+            onPressed: service.retryCurrentChapter,
+            child: const Text('Retry'),
+          ),
+          if (hasNext)
+            TextButton(
+              onPressed: service.nextChapter,
+              child: const Text('Next chapter'),
+            ),
         ],
       ),
     );

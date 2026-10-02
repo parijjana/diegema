@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+. Same rule as backup_rules.xml: the library database and
+     preferences go to the cloud backup and to a device-to-device transfer;
+     downloads and covers don't. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="root" path="app_flutter/diegema.sqlite" />
+        <include domain="sharedpref" path="FlutterSharedPreferences.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="root" path="app_flutter/diegema.sqlite" />
+        <include domain="sharedpref" path="FlutterSharedPreferences.xml" />
+    </device-transfer>
+</data-extraction-rules>

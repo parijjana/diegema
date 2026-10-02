@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -68,57 +69,69 @@ Future<void> _scanDownloads(
   }
   for (final entity in entities) {
     if (entity is! Directory) continue;
-
-    final folderName = p.basename(entity.path);
-    final mp3Files = entity
-        .listSync()
-        .whereType<File>()
-        .where((f) => f.path.toLowerCase().endsWith('.mp3'))
-        .toList()
-      ..sort((a, b) => a.path.compareTo(b.path));
-
-    if (mp3Files.isEmpty) continue;
-
-    // Deterministic sha256-of-path id — NOT hashCode (see
-    // core/utils/book_identity.dart).
-    final bookId = BookIdentity.localIdForPath(entity.path);
-    final existing = await db.getAudiobook(bookId);
-
-    // Another book already owns this folder: drop a duplicate an earlier
-    // scan made, unless the user has since listened to or bookmarked it.
-    if (owners.containsKey(p.normalize(entity.path))) {
-      if (existing != null &&
-          await db.getProgress(bookId) == null &&
-          (await db.getBookmarks(bookId)).isEmpty) {
-        await db.deleteAudiobook(bookId);
-      }
-      continue;
+    try {
+      await _registerDownloadFolder(db, entity, owners);
+    } catch (e) {
+      // One unreadable folder must not cost the rest of the scan.
+      debugPrint('Downloads scan: skipped ${entity.path}: $e');
     }
-    if (existing != null) continue;
-
-    final chapters = mp3Files.asMap().entries.map((e) {
-      final idx = e.key;
-      final file = e.value;
-      final name = p.basename(file.path).replaceAll('.mp3', '');
-      return AudiobookChapter(
-        id: '${bookId}_ch_$idx',
-        title: name,
-        audioPathOrUrl: file.path,
-        durationSeconds: 0,
-        isStream: false,
-      );
-    }).toList();
-
-    final book = UnifiedAudiobook(
-      id: bookId,
-      title: folderName.replaceAll('_', ' '),
-      author: 'Downloaded Audiobook',
-      description: 'Downloaded to local storage.',
-      source: 'Local Storage',
-      origin: BookIdentity.originLocal,
-      chapters: chapters,
-      isDownloaded: true,
-    );
-    await db.saveAudiobook(book);
   }
+}
+
+Future<void> _registerDownloadFolder(
+  AppDatabase db,
+  Directory entity,
+  Map<String, String> owners,
+) async {
+  final folderName = p.basename(entity.path);
+  final mp3Files = entity
+      .listSync()
+      .whereType<File>()
+      .where((f) => f.path.toLowerCase().endsWith('.mp3'))
+      .toList()
+    ..sort((a, b) => a.path.compareTo(b.path));
+
+  if (mp3Files.isEmpty) return;
+
+  // Deterministic sha256-of-path id — NOT hashCode (see
+  // core/utils/book_identity.dart).
+  final bookId = BookIdentity.localIdForPath(entity.path);
+  final existing = await db.getAudiobook(bookId);
+
+  // Another book already owns this folder: drop a duplicate an earlier
+  // scan made, unless the user has since listened to or bookmarked it.
+  if (owners.containsKey(p.normalize(entity.path))) {
+    if (existing != null &&
+        await db.getProgress(bookId) == null &&
+        (await db.getBookmarks(bookId)).isEmpty) {
+      await db.deleteAudiobook(bookId);
+    }
+    return;
+  }
+  if (existing != null) return;
+
+  final chapters = mp3Files.asMap().entries.map((e) {
+    final idx = e.key;
+    final file = e.value;
+    final name = p.basename(file.path).replaceAll('.mp3', '');
+    return AudiobookChapter(
+      id: '${bookId}_ch_$idx',
+      title: name,
+      audioPathOrUrl: file.path,
+      durationSeconds: 0,
+      isStream: false,
+    );
+  }).toList();
+
+  final book = UnifiedAudiobook(
+    id: bookId,
+    title: folderName.replaceAll('_', ' '),
+    author: 'Downloaded Audiobook',
+    description: 'Downloaded to local storage.',
+    source: 'Local Storage',
+    origin: BookIdentity.originLocal,
+    chapters: chapters,
+    isDownloaded: true,
+  );
+  await db.saveAudiobook(book);
 }

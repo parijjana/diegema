@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:path/path.dart' as p;
 import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
@@ -42,14 +43,41 @@ Future<int> scanLibraryLocations(
   final locations = only != null ? [only] : await store.read();
   var added = 0;
   for (final location in locations) {
+    // Unreachable (unplugged drive, access not granted this run): leave its
+    // books alone, they come back with the folder.
+    if (!await Directory(location).exists()) continue;
+    await _forgetVanishedBooks(db, location);
     for (final candidate in await _findBooks(Directory(location))) {
       if (removed.contains(candidate.id)) continue;
-      if (await db.getAudiobook(candidate.id) != null) continue;
-      await db.saveAudiobook(await _buildBook(candidate));
-      added++;
+      try {
+        if (await db.getAudiobook(candidate.id) != null) continue;
+        await db.saveAudiobook(await _buildBook(candidate));
+        added++;
+      } catch (e) {
+        // One unreadable book must not cost the rest of the scan.
+        debugPrint('Library folder: skipped ${candidate.keyPath}: $e');
+      }
     }
   }
   return added;
+}
+
+/// Forgets books from [location] with a file that no longer exists (moved,
+/// renamed or deleted outside Diegema), keeping their progress the way
+/// removing a folder does. If the folder still holds the book, the scan
+/// that follows adds it back as it is now, under the same id.
+Future<void> _forgetVanishedBooks(AppDatabase db, String location) async {
+  for (final id in await booksInLocation(db, location)) {
+    final book = await db.getAudiobook(id);
+    if (book == null) continue;
+    final files = {for (final ch in book.chapters) ch.audioPathOrUrl};
+    for (final file in files) {
+      if (!await File(file).exists()) {
+        await db.deleteAudiobook(id);
+        break;
+      }
+    }
+  }
 }
 
 /// Ids of the books that were read from [location], for forgetting them

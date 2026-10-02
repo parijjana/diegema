@@ -67,7 +67,8 @@ Future<void> main() async {
   AmbienceService? ambience;
   if (!kIsWeb) {
     nativeDb = demoDb ?? AppDatabase();
-    audioService = AudioPlaybackService(db: nativeDb);
+    audioService =
+        AudioPlaybackService(db: nativeDb, preferences: const UiPreferences());
     ambience = AmbienceService(book: audioService);
     try {
       await initDiegemaAudioService(audioService, ambience: ambience);

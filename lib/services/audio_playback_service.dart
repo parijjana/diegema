@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import '../core/playback_constants.dart';
+import '../core/ui_preferences.dart';
 import '../domain/models/audiobook.dart';
 import '../database/app_database.dart';
 import 'local_file_playback.dart';
@@ -19,6 +20,7 @@ enum PlaybackState {
 class AudioPlaybackService {
   final AudioPlayer _player;
   final AppDatabase? _db;
+  final UiPreferences? _preferences;
   bool _isInitialized = false;
 
   UnifiedAudiobook? _currentBook;
@@ -48,9 +50,13 @@ class AudioPlaybackService {
   /// so the ambience channel can stop with the book.
   final ValueNotifier<int> sleepTimerFired = ValueNotifier(0);
 
-  AudioPlaybackService({AudioPlayer? player, AppDatabase? db})
+  /// [preferences] remembers each book's speed and supplies the global
+  /// default; without it speed is not persisted (tests, demo).
+  AudioPlaybackService(
+      {AudioPlayer? player, AppDatabase? db, UiPreferences? preferences})
       : _player = player ?? AudioPlayer(),
-        _db = db {
+        _db = db,
+        _preferences = preferences {
     _listenToPlayerStreams();
     _startProgressAutoSave();
   }
@@ -142,6 +148,16 @@ class AudioPlaybackService {
       } catch (e) {
         debugPrint('AudioPlaybackService: Error storing book in DB: $e');
       }
+    }
+
+    // A book's own speed wins; otherwise the global default.
+    final prefs = _preferences;
+    if (prefs != null) {
+      try {
+        _playbackSpeed =
+            await prefs.getBookSpeed(book.id) ?? await prefs.getDefaultSpeed();
+        speedNotifier.value = _playbackSpeed;
+      } catch (_) {}
     }
 
     // Attempt to restore progress from database if not explicitly supplied
@@ -335,6 +351,8 @@ class AudioPlaybackService {
   Future<void> setSpeed(double speed) async {
     _playbackSpeed = speed;
     speedNotifier.value = speed;
+    final book = _currentBook;
+    if (book != null) await _preferences?.setBookSpeed(book.id, speed);
     await _player.setSpeed(speed);
   }
 

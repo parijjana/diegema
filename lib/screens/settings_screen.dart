@@ -145,6 +145,17 @@ class SettingsScreen extends StatelessWidget {
                   ],
                   onChanged: settings.setSkipSeconds,
                 ),
+                _ChoiceGroup<double>(
+                  label: 'Default speed',
+                  description: 'The speed a book starts at until you change '
+                      'it for that book.',
+                  value: settings.defaultSpeed,
+                  options: [
+                    for (final speed in kPlaybackSpeedOptions)
+                      _Choice(speed, '${speed}x'),
+                  ],
+                  onChanged: settings.setDefaultSpeed,
+                ),
               ],
             ),
             if (db != null && !kIsWeb)

@@ -166,4 +166,43 @@ void main() {
         downloader.downloadAndExtractZip(_book(), saveDirectoryPath: downloads),
         throwsA(isA<HttpException>()));
   });
+
+  group('extractAudioFromZip (the download manager\'s half)', () {
+    test('extracts only mp3s, in order, and leaves the zip to the caller',
+        () async {
+      final zip = File(p.join(root.path, 'book.zip'))
+        ..writeAsBytesSync(_zip({
+          '02.mp3': [2],
+          '01.mp3': [1],
+          'cover.jpg': [9],
+          '../escape.mp3': [6],
+        }));
+      final files = await extractAudioFromZip(
+          zip, Directory(p.join(downloads, bookFolderName('Emma', 'emma_x'))));
+
+      expect(files.map(p.basename), ['01.mp3', '02.mp3']);
+      expect(filesUnder(downloads)..sort(), [
+        p.join('Emma [emma_x]', '01.mp3'),
+        p.join('Emma [emma_x]', '02.mp3'),
+      ]..sort());
+      expect(zip.existsSync(), isTrue);
+      expect(File(p.join(root.path, 'escape.mp3')).existsSync(), isFalse);
+    });
+
+    test('a zip with no audio fails and writes nothing', () async {
+      final zip = File(p.join(root.path, 'book.zip'))
+        ..writeAsBytesSync(_zip({
+          'notes.txt': [1]
+        }));
+      await expectLater(
+          extractAudioFromZip(zip, Directory(p.join(downloads, 'x'))),
+          throwsA(isA<FormatException>()));
+      expect(filesUnder(downloads), isEmpty);
+    });
+
+    test('folder names keep the title readable and the id safe', () {
+      expect(bookFolderName('A/B: "C"', 'id with space'),
+          'A_B_ _C_ [id_with_space]');
+    });
+  });
 }

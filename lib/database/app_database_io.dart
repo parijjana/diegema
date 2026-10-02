@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../core/utils/book_identity.dart';
 import '../domain/models/audiobook.dart' as domain;
+import '../core/utils/chapter_title.dart';
 
 part 'app_database_io.g.dart';
 
@@ -400,7 +401,9 @@ class AppDatabase extends _$AppDatabase {
         .map(
           (c) => domain.AudiobookChapter(
             id: c.id,
-            title: c.title,
+            // Older downloads stored file names as titles; every screen
+            // (Now Playing, mini player, lock screen) gets the readable one.
+            title: prettifyChapterTitle(c.title, index: c.chapterIndex),
             audioPathOrUrl: c.audioPathOrUrl,
             durationSeconds: c.durationSeconds,
             isStream: c.isStream,
@@ -811,9 +814,14 @@ class AppDatabase extends _$AppDatabase {
     final newRoot = p.normalize(to);
     if (oldRoot == newRoot) return 0;
 
-    String? moved(String? path) => path != null && p.isWithin(oldRoot, path)
-        ? p.join(newRoot, p.relative(path, from: oldRoot))
-        : null;
+    // `from` itself counts: moving one book folder passes that folder.
+    String? moved(String? path) => path == null
+        ? null
+        : p.equals(oldRoot, path)
+            ? newRoot
+            : p.isWithin(oldRoot, path)
+                ? p.join(newRoot, p.relative(path, from: oldRoot))
+                : null;
 
     var touched = 0;
     await transaction(() async {

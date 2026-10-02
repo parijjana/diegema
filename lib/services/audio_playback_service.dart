@@ -20,6 +20,9 @@ enum PlaybackState {
 class AudioPlaybackService {
   final AudioPlayer _player;
   final AppDatabase? _db;
+
+  /// The library database, for screens that change a book in place.
+  AppDatabase? get database => _db;
   final UiPreferences? _preferences;
   bool _isInitialized = false;
 

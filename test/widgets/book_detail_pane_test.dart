@@ -1,3 +1,5 @@
+import 'package:diegema/core/utils/book_identity.dart';
+import 'package:diegema/domain/models/audiobook.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,7 @@ import 'package:diegema/services/artwork_enrichment_service.dart';
 import 'package:diegema/services/librivox_downloader.dart';
 import 'package:diegema/services/librivox_service.dart';
 import 'package:diegema/widgets/book_detail_pane.dart';
+import 'package:diegema/widgets/book_detail_parts.dart';
 
 import '../support/fake_playback_service.dart';
 import '../support/test_harness.dart';
@@ -43,7 +46,7 @@ void main() {
   const rssWithNoChapters = '''<?xml version="1.0"?>
 <rss version="2.0"><channel><title>Frankenstein</title></channel></rss>''';
 
-  Widget wrap({required String rssBody, int? zipBytes}) {
+  Widget wrap({required String rssBody, int? zipBytes, bool wide = false}) {
     final httpClient = MockClient((request) async {
       if (request.url.toString().contains('/rss/')) {
         return http.Response(rssStatus == 200 ? rssBody : '', rssStatus);
@@ -72,6 +75,7 @@ void main() {
           audioService: audio,
           db: db,
           libriVoxService: librivoxService,
+          wide: wide,
         ),
       ),
     );
@@ -88,16 +92,17 @@ void main() {
     await db.close();
   });
 
-  testWidgets('phone: sticky footer shows Close and Download with the ZIP size',
+  testWidgets('phone: sticky footer is one Download action with the ZIP size',
       (tester) async {
     await setSurface(tester, const Size(390, 844));
     await tester.pumpWidget(
         wrap(rssBody: rssWithOneChapter, zipBytes: 10 * 1024 * 1024));
     await pumpFrames(tester);
 
-    expect(find.bySemanticsLabel('Close'), findsOneWidget);
-    expect(find.text('Download audiobook'), findsOneWidget);
-    expect(find.text('ZIP · 10 MB'), findsOneWidget);
+    expect(find.text('Download · ZIP 10 MB'), findsOneWidget);
+    expect(find.byType(DetailStickyFooter), findsOneWidget);
+    // One primary action: a single filled button on the whole pane.
+    expect(find.byType(FilledButton), findsOneWidget);
 
     // The old inline "Download Full Audiobook (ZIP)" button is gone from
     // the scrolling content on phone — the footer is the only download
@@ -111,8 +116,8 @@ void main() {
     await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
     await pumpFrames(tester);
 
-    expect(find.text('Download audiobook'), findsOneWidget);
-    expect(find.textContaining('ZIP ·'), findsNothing);
+    expect(find.text('Download'), findsOneWidget);
+    expect(find.textContaining('ZIP'), findsNothing);
   });
 
   testWidgets(
@@ -122,7 +127,7 @@ void main() {
     await tester.pumpWidget(wrap(rssBody: rssWithNoChapters));
     await pumpFrames(tester);
 
-    expect(find.text('Chapters (0)'), findsOneWidget);
+    expect(find.text('Chapters'), findsOneWidget);
     expect(
       find.text("The chapter list isn't available yet. Download the book to "
           'get every chapter.'),
@@ -136,7 +141,8 @@ void main() {
     await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
     await pumpFrames(tester);
 
-    expect(find.text('Chapters (1)'), findsOneWidget);
+    expect(find.text('Chapters'), findsOneWidget);
+    expect(find.byType(ChapterListRow), findsOneWidget);
     expect(find.byType(EmptyChaptersNote), findsNothing);
   });
 
@@ -155,6 +161,64 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.textContaining("Couldn't load the chapters"), findsNothing);
-    expect(find.text('Chapters (1)'), findsOneWidget);
+    expect(find.text('Chapters'), findsOneWidget);
+    expect(find.byType(ChapterListRow), findsOneWidget);
   });
+
+  testWidgets(
+      'phone: a downloaded book shows its own chapters when the feed fails',
+      (tester) async {
+    await setSurface(tester, const Size(390, 844));
+    rssStatus = 503;
+    await db.saveAudiobook(UnifiedAudiobook(
+      id: 'frankenstein_1205_librivox',
+      title: 'Frankenstein',
+      author: 'Mary Shelley',
+      description: '',
+      source: 'Downloaded',
+      origin: BookIdentity.originLibrivox,
+      isDownloaded: true,
+      chapters: [
+        AudiobookChapter(
+            id: 'c0',
+            title: 'Letter 1',
+            audioPathOrUrl: '/books/01.mp3',
+            durationSeconds: 60),
+        AudiobookChapter(
+            id: 'c1',
+            title: 'Letter 2',
+            audioPathOrUrl: '/books/02.mp3',
+            durationSeconds: 60),
+      ],
+    ));
+    await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
+    await pumpFrames(tester);
+
+    expect(find.textContaining("Couldn't load the chapters"), findsNothing);
+    expect(find.byType(ChapterListRow), findsNWidgets(2));
+    rssStatus = 200;
+  });
+
+  for (final wide in [false, true]) {
+    testWidgets('no overflow at 2.0x text, ${wide ? 'wide' : 'phone'}',
+        (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await setSurface(
+          tester, wide ? const Size(1280, 800) : const Size(390, 844));
+      await tester.pumpWidget(Center(
+        child: SizedBox(
+          width: wide ? 880 : 390,
+          height: wide ? 680 : 844,
+          child: wrap(
+              rssBody: rssWithOneChapter,
+              zipBytes: 98 * 1024 * 1024,
+              wide: wide),
+        ),
+      ));
+      await pumpFrames(tester);
+      expect(find.text('Download · ZIP 98 MB'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

@@ -11,6 +11,7 @@ import 'database/app_database.dart';
 import 'screens/app_shell.dart';
 import 'screens/library_screen.dart' show LibraryScanner;
 import 'services/app_paths.dart';
+import 'services/downloads_location.dart';
 import 'services/artwork_enrichment_service.dart';
 import 'services/demo_artwork_service.dart';
 import 'services/demo_downloader.dart';
@@ -77,10 +78,14 @@ Future<void> main() async {
     // Before anything scans or plays from a library folder: on macOS/iOS
     // the sandbox forgets picked folders between launches.
     await openLibraryLocations();
+    await openDownloadsFolder();
     nativeDb = demoDb ?? AppDatabase();
     // Before playback restores the last book: iOS moves the app's folder
     // on every update, and the database stores absolute paths into it.
     await rebaseAppPathsIfMoved(nativeDb);
+    // Same reason: downloads made before the user-visible folder existed
+    // move there once, and their stored paths with them.
+    await moveDownloadsToVisibleFolder(nativeDb);
     audioService =
         AudioPlaybackService(db: nativeDb, preferences: const UiPreferences());
     ambience = AmbienceService(book: audioService);

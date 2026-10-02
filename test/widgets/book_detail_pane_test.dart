@@ -11,6 +11,7 @@ import 'package:diegema/services/artwork_enrichment_service.dart';
 import 'package:diegema/services/librivox_downloader.dart';
 import 'package:diegema/services/librivox_service.dart';
 import 'package:diegema/widgets/book_detail_pane.dart';
+import 'package:diegema/widgets/book_detail_parts.dart';
 
 import '../support/fake_playback_service.dart';
 import '../support/test_harness.dart';
@@ -90,16 +91,17 @@ void main() {
     await db.close();
   });
 
-  testWidgets('phone: sticky footer shows Close and Download with the ZIP size',
+  testWidgets('phone: sticky footer is one Download action with the ZIP size',
       (tester) async {
     await setSurface(tester, const Size(390, 844));
     await tester.pumpWidget(
         wrap(rssBody: rssWithOneChapter, zipBytes: 10 * 1024 * 1024));
     await pumpFrames(tester);
 
-    expect(find.bySemanticsLabel('Close'), findsOneWidget);
-    expect(find.text('Download audiobook'), findsOneWidget);
-    expect(find.text('ZIP · 10 MB'), findsOneWidget);
+    expect(find.text('Download · ZIP 10 MB'), findsOneWidget);
+    expect(find.byType(DetailStickyFooter), findsOneWidget);
+    // One primary action: a single filled button on the whole pane.
+    expect(find.byType(FilledButton), findsOneWidget);
 
     // The old inline "Download Full Audiobook (ZIP)" button is gone from
     // the scrolling content on phone — the footer is the only download
@@ -113,8 +115,8 @@ void main() {
     await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
     await pumpFrames(tester);
 
-    expect(find.text('Download audiobook'), findsOneWidget);
-    expect(find.textContaining('ZIP ·'), findsNothing);
+    expect(find.text('Download'), findsOneWidget);
+    expect(find.textContaining('ZIP'), findsNothing);
   });
 
   testWidgets(
@@ -124,7 +126,7 @@ void main() {
     await tester.pumpWidget(wrap(rssBody: rssWithNoChapters));
     await pumpFrames(tester);
 
-    expect(find.text('Chapters (0)'), findsOneWidget);
+    expect(find.text('Chapters'), findsOneWidget);
     expect(
       find.text("The chapter list isn't available yet. Download the book to "
           'get every chapter.'),
@@ -138,7 +140,8 @@ void main() {
     await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
     await pumpFrames(tester);
 
-    expect(find.text('Chapters (1)'), findsOneWidget);
+    expect(find.text('Chapters'), findsOneWidget);
+    expect(find.byType(ChapterListRow), findsOneWidget);
     expect(find.byType(EmptyChaptersNote), findsNothing);
   });
 
@@ -157,7 +160,8 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.textContaining("Couldn't load the chapters"), findsNothing);
-    expect(find.text('Chapters (1)'), findsOneWidget);
+    expect(find.text('Chapters'), findsOneWidget);
+    expect(find.byType(ChapterListRow), findsOneWidget);
   });
 
   testWidgets(
@@ -190,7 +194,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.textContaining("Couldn't load the chapters"), findsNothing);
-    expect(find.text('Chapters (2)'), findsOneWidget);
+    expect(find.byType(ChapterListRow), findsNWidgets(2));
     rssStatus = 200;
   });
 }

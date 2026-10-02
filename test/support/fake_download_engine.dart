@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:diegema/services/download_manager.dart';
 
@@ -64,6 +65,9 @@ class FakeDownloadEngine implements DownloadEngine {
 
   @override
   Future<String> zipPath(String id) async => '$zipRoot/$id.zip';
+
+  @override
+  Future<bool> hasZip(String id) async => File('$zipRoot/$id.zip').exists();
 
   @override
   Future<void> forget(String id) async {

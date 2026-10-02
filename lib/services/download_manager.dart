@@ -320,6 +320,9 @@ abstract class DownloadEngine {
   /// Where task [id]'s ZIP lands: app-private, never the shared folder.
   Future<String> zipPath(String id);
 
+  /// Whether task [id]'s finished ZIP is still there to extract.
+  Future<bool> hasZip(String id);
+
   /// Drops task [id]'s record and its ZIP, partial or whole.
   Future<void> forget(String id);
 
@@ -526,6 +529,13 @@ class DownloadManager extends ChangeNotifier {
     _jobs.putIfAbsent(id, () => update.job);
     switch (update.status) {
       case EngineStatus.complete:
+        if (_finished.contains(id)) {
+          // A replay of a completion already saved: the plugin's tracking
+          // writes the record back, so drop it again or the next launch
+          // finds a "complete" task with no ZIP.
+          unawaited(engine.forget(id));
+          return;
+        }
         unawaited(_finish(_jobs[id]!));
       case EngineStatus.notFound when update.job.fallbackUrl != null:
         // No pre-built ZIP for this item: the form LibriVox itself links.
@@ -593,6 +603,20 @@ class DownloadManager extends ChangeNotifier {
     _downloads[id] =
         BookDownload(id: id, title: job.title, phase: DownloadPhase.extracting);
     notifyListeners();
+    if (!await engine.hasZip(id)) {
+      // Saved on an earlier run (its record outlived it): nothing to do.
+      // Without a saved copy it is a real failure, shown with Retry.
+      final saved = await db.getAudiobook(id);
+      if (saved != null && saved.isDownloaded) {
+        _finishing.remove(id);
+        _finished.add(id);
+        _downloads[id] =
+            BookDownload(id: id, title: job.title, phase: DownloadPhase.done);
+        notifyListeners();
+        await engine.forget(id);
+        return;
+      }
+    }
     try {
       final root = await location.current();
       if (root == null) throw StateError('No folder to download into');

@@ -390,4 +390,27 @@ void main() {
     expect(back.chapters.single.seconds, 60);
     expect(DownloadJob.decode('not json'), isNull);
   });
+
+  test('a completion already saved on an earlier run is dropped quietly',
+      () async {
+    manager.dispose();
+    final job = DownloadJob.fromLibriVox(emma);
+    await db.saveAudiobook(job.toBook(['/books/01.mp3']));
+    // The record came back (a replayed update re-tracked it); its ZIP is
+    // long gone.
+    engine.persisted['emma_librivox'] =
+        EngineUpdate(job, status: EngineStatus.complete);
+    manager = newManager();
+    await manager.start();
+    await _until(() => engine.persisted.isEmpty);
+
+    expect(engine.persisted, isEmpty);
+    expect(
+        manager.stateFor('emma_librivox')?.phase, isNot(DownloadPhase.failed));
+    // A replay after it was finished this run is dropped too.
+    engine.emit(job, status: EngineStatus.complete);
+    await _settle();
+    expect(
+        manager.stateFor('emma_librivox')?.phase, isNot(DownloadPhase.failed));
+  });
 }

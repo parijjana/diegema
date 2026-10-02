@@ -137,7 +137,16 @@ class BackgroundDownloaderEngine implements DownloadEngine {
       _downloader.enqueue(DownloadTask(
         taskId: job.id,
         url: job.url,
-        headers: const {'User-Agent': kHttpUserAgent},
+        headers: {
+          'User-Agent': kHttpUserAgent,
+          // Android decides whether a task can pause (and so resume after
+          // its 9-minute worker limit) from an Accept-Ranges header on the
+          // response or a 206. archive.org's file servers send neither on a
+          // plain GET, only on the redirect before it, so without this every
+          // pause fails and a long download fails at 9 minutes. Asking for
+          // the whole file as a range gets a 206; `compress` ignores it.
+          if (Platform.isAndroid) 'Range': 'bytes=0-',
+        },
         baseDirectory: BaseDirectory.applicationSupport,
         directory: _zipDir,
         filename: _zipName(job.id),
@@ -182,6 +191,9 @@ class BackgroundDownloaderEngine implements DownloadEngine {
     final dir = await Task.baseDirectoryPath(BaseDirectory.applicationSupport);
     return p.join(dir, _zipDir, _zipName(id));
   }
+
+  @override
+  Future<bool> hasZip(String id) async => File(await zipPath(id)).exists();
 
   @override
   Future<void> forget(String id) async {

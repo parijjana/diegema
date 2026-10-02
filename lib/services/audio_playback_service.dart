@@ -30,6 +30,13 @@ class AudioPlaybackService {
   Timer? _sleepTimerTicker;
   Timer? _progressSaveTimer;
 
+  /// True from the moment a chapter starts loading until the seek to its
+  /// restore position has landed. The player reports "ready, not playing"
+  /// (our paused state) part-way through that, while its position is still
+  /// 0 — or still the previous book's — so progress must not be saved then,
+  /// or a cold start overwrites the saved place with 0.
+  bool _loading = false;
+
   final ValueNotifier<PlaybackState> stateNotifier =
       ValueNotifier(PlaybackState.idle);
   final ValueNotifier<UnifiedAudiobook?> currentBookNotifier =
@@ -101,12 +108,15 @@ class AudioPlaybackService {
   }
 
   Future<void> _persistCurrentProgress() async {
+    if (_loading) return;
     if (_db != null && _currentBook != null) {
       try {
         await _db!.saveProgress(
           audiobookId: _currentBook!.id,
           chapterIndex: _currentChapterIndex,
-          positionSeconds: positionNotifier.value.inSeconds,
+          // The player's own position, not positionNotifier: the notifier
+          // only catches up on the next position tick.
+          positionSeconds: _player.position.inSeconds,
         );
       } catch (e) {
         debugPrint('AudioPlaybackService: Error saving progress: $e');
@@ -173,6 +183,7 @@ class AudioPlaybackService {
 
     final chapter = _currentBook!.chapters[_currentChapterIndex];
     stateNotifier.value = PlaybackState.loading;
+    _loading = true;
 
     try {
       if (chapter.isStream ||
@@ -191,6 +202,7 @@ class AudioPlaybackService {
               : null,
         );
         if (!loaded) {
+          _loading = false;
           stateNotifier.value = PlaybackState.error;
           return;
         }
@@ -201,6 +213,9 @@ class AudioPlaybackService {
       if (seekToPosition != null && seekToPosition > Duration.zero) {
         await _player.seek(seekToPosition);
       }
+      // Cleared here, not in a `finally`: `play()` below only completes
+      // when playback stops.
+      _loading = false;
 
       if (autoPlay) {
         // Only the *start* is allowed to fail benignly. Everything above
@@ -224,6 +239,7 @@ class AudioPlaybackService {
         stateNotifier.value = PlaybackState.paused;
       }
     } catch (e) {
+      _loading = false;
       debugPrint('AudioPlaybackService: Failed to play chapter: $e');
       stateNotifier.value = PlaybackState.error;
     }

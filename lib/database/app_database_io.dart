@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
@@ -154,8 +155,10 @@ class AppDatabase extends _$AppDatabase {
   /// content whose chapter durations were never probed.
   static const double continueListeningMaxProgressFraction = 0.95;
 
+  static const int _schemaVersion = 3;
+
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => _schemaVersion;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -278,10 +281,54 @@ class AppDatabase extends _$AppDatabase {
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
-      final dbFolder = await getApplicationDocumentsDirectory();
-      final file = File(p.join(dbFolder.path, 'diegema.sqlite'));
+      final file = await _databaseFile();
+      await backupBeforeMigration(file);
       return NativeDatabase(file);
     });
+  }
+
+  static Future<File> _databaseFile() async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    return File(p.join(dbFolder.path, 'diegema.sqlite'));
+  }
+
+  /// The schema version stored in [file], read from the SQLite header
+  /// (`user_version`, 4 bytes big-endian at offset 60) without opening it.
+  /// Null when there is no database yet or the file isn't one.
+  static Future<int?> storedSchemaVersion(File file) async {
+    if (!await file.exists()) return null;
+    final raf = await file.open();
+    try {
+      final header = await raf.read(64);
+      if (header.length < 64 ||
+          String.fromCharCodes(header.sublist(0, 15)) != 'SQLite format 3') {
+        return null;
+      }
+      return ByteData.sublistView(header).getUint32(60);
+    } finally {
+      await raf.close();
+    }
+  }
+
+  /// Whether the library on disk was written by a newer Diegema than this
+  /// one. Opening it would let this build "upgrade" a schema it doesn't
+  /// know, so `main` refuses and asks for an update instead.
+  static Future<bool> isLibraryFromNewerVersion() async {
+    try {
+      final stored = await storedSchemaVersion(await _databaseFile());
+      return stored != null && stored > _schemaVersion;
+    } catch (_) {
+      // Can't tell: open as usual rather than lock the user out.
+      return false;
+    }
+  }
+
+  /// Copies [file] to `<file>.v<N>.bak` before this build migrates it from
+  /// schema N, so a migration that goes wrong can be undone by hand.
+  static Future<void> backupBeforeMigration(File file) async {
+    final stored = await storedSchemaVersion(file);
+    if (stored == null || stored == 0 || stored >= _schemaVersion) return;
+    await file.copy('${file.path}.v$stored.bak');
   }
 
   // --- Audiobook CRUD ---

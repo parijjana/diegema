@@ -29,7 +29,14 @@ class SettingsScreen extends StatelessWidget {
   /// which has no local folders) the section is left out.
   final AppDatabase? db;
 
-  const SettingsScreen({super.key, this.db});
+  /// Resolves the version shown in About; tests pass a synchronous fake.
+  final Future<String> Function() versionLoader;
+
+  const SettingsScreen({
+    super.key,
+    this.db,
+    this.versionLoader = loadAppVersion,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +162,13 @@ class SettingsScreen extends StatelessWidget {
             _Section(
               title: 'About',
               children: [
-                const _InfoRow(label: kAppName, value: 'Version $kAppVersion'),
+                FutureBuilder<String>(
+                  future: versionLoader(),
+                  initialData: kFallbackAppVersion,
+                  builder: (context, snap) => _InfoRow(
+                      label: kAppName,
+                      value: 'Version ${snap.data ?? kFallbackAppVersion}'),
+                ),
                 // Credit as LibriVox asks for it ("we much prefer if you
                 // do credit us (with a link to our site)" —
                 // librivox.org/pages/public-domain), their objective in
@@ -207,11 +220,15 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 _LinkRow(
                   label: 'Open source licences',
-                  onTap: () => showLicensePage(
-                    context: context,
-                    applicationName: kAppName,
-                    applicationVersion: kAppVersion,
-                  ),
+                  onTap: () async {
+                    final version = await versionLoader();
+                    if (!context.mounted) return;
+                    showLicensePage(
+                      context: context,
+                      applicationName: kAppName,
+                      applicationVersion: version,
+                    );
+                  },
                 ),
               ],
             ),

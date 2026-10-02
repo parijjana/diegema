@@ -28,6 +28,13 @@ class AppDatabase {
 
   static const int maxPinnedBooks = 5;
   static const int continueListeningMinPositionSeconds = 30;
+
+  /// `PlaybackProgress.positionSeconds` value meaning "the listener marked
+  /// this book finished". A real position is never negative, so the existing
+  /// row carries the flag without a schema change, and [getContinueListening]
+  /// (`positionSeconds > continueListeningMinPositionSeconds`) already
+  /// excludes it.
+  static const int finishedPositionSeconds = -1;
   static const double continueListeningMaxProgressFraction = 0.95;
 
   AppDatabase();
@@ -75,6 +82,20 @@ class AppDatabase {
 
   Future<PlaybackProgressData?> getProgress(String audiobookId) async {
     return _progress[audiobookId];
+  }
+
+  /// See `AppDatabase.markFinished` in `app_database_io.dart`.
+  Future<void> markFinished(String audiobookId,
+      {required int lastChapterIndex}) {
+    return saveProgress(
+      audiobookId: audiobookId,
+      chapterIndex: lastChapterIndex,
+      positionSeconds: finishedPositionSeconds,
+    );
+  }
+
+  Future<void> resetProgress(String audiobookId) async {
+    _progress.remove(audiobookId);
   }
 
   Future<PlaybackProgressData?> getMostRecentProgress() async {

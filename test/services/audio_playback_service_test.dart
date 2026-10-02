@@ -1,5 +1,7 @@
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:diegema/database/app_database.dart';
 import 'package:diegema/domain/models/audiobook.dart';
 import 'package:diegema/services/audio_playback_service.dart';
 
@@ -147,6 +149,73 @@ void main() {
       service.setSleepTimer(const Duration(minutes: 5));
       expect(service.sleepAtChapterEndNotifier.value, isFalse);
       service.cancelSleepTimer();
+    });
+  });
+
+  group('finished and reset progress', () {
+    late AppDatabase db;
+    late AudioPlaybackService service;
+    final book = UnifiedAudiobook(
+      id: 'b',
+      title: 'B',
+      author: 'A',
+      description: '',
+      chapters: [
+        AudiobookChapter(
+            id: '1',
+            title: 'One',
+            audioPathOrUrl: '/x/1.mp3',
+            durationSeconds: 60),
+        AudiobookChapter(
+            id: '2',
+            title: 'Two',
+            audioPathOrUrl: '/x/2.mp3',
+            durationSeconds: 60),
+      ],
+    );
+
+    setUp(() async {
+      db = AppDatabase(NativeDatabase.memory());
+      service = AudioPlaybackService(db: db);
+      await db.saveAudiobook(book);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test('a pause or seek after Mark as finished does not overwrite it',
+        () async {
+      await service.loadBook(book, autoPlay: false);
+      await service.markFinished(book);
+
+      // Both are what the paused player does on its own.
+      await service.seek(const Duration(minutes: 5));
+      await service.pause();
+
+      final row = await db.getProgress('b');
+      expect(row!.positionSeconds, AppDatabase.finishedPositionSeconds);
+      expect(await db.getContinueListening(), isEmpty);
+    });
+
+    test('a finished book reopens from the start', () async {
+      await db.markFinished('b', lastChapterIndex: 1);
+      await service.loadBook(book, autoPlay: false);
+      expect(service.chapterIndexNotifier.value, 0);
+    });
+
+    test('resetting the loaded book cues it at the start and stays reset',
+        () async {
+      await db.saveProgress(
+          audiobookId: 'b', chapterIndex: 1, positionSeconds: 500);
+      await service.loadBook(book, autoPlay: false);
+      expect(service.chapterIndexNotifier.value, 1);
+
+      await service.resetProgress(book);
+      await service.pause();
+
+      expect(service.chapterIndexNotifier.value, 0);
+      expect(await db.getProgress('b'), isNull);
     });
   });
 }

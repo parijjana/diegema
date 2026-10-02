@@ -355,4 +355,35 @@ void main() {
       expect(book!.origin, equals('librivox'));
     });
   });
+
+  group('Mark finished / reset progress', () {
+    test('a finished book leaves continue-listening, and playing revives it',
+        () async {
+      await _seedBook(db, id: 'b1');
+      await db.saveProgress(
+          audiobookId: 'b1', chapterIndex: 0, positionSeconds: 500);
+      expect((await db.getContinueListening()).map((b) => b.id), ['b1']);
+
+      await db.markFinished('b1', lastChapterIndex: 3);
+      expect(await db.getContinueListening(), isEmpty);
+      final row = await db.getProgress('b1');
+      expect(row!.chapterIndex, 3);
+      expect(row.positionSeconds, AppDatabase.finishedPositionSeconds);
+
+      await db.saveProgress(
+          audiobookId: 'b1', chapterIndex: 0, positionSeconds: 100);
+      expect((await db.getContinueListening()).map((b) => b.id), ['b1']);
+    });
+
+    test('reset removes the row but keeps the book', () async {
+      await _seedBook(db, id: 'b1');
+      await db.saveProgress(
+          audiobookId: 'b1', chapterIndex: 2, positionSeconds: 500);
+
+      await db.resetProgress('b1');
+
+      expect(await db.getProgress('b1'), isNull);
+      expect(await db.getAudiobook('b1'), isNotNull);
+    });
+  });
 }

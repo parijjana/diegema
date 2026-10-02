@@ -147,6 +147,13 @@ class AppDatabase extends _$AppDatabase {
   /// opened by accident or sampled for a few seconds.
   static const int continueListeningMinPositionSeconds = 30;
 
+  /// `PlaybackProgress.positionSeconds` value meaning "the listener marked
+  /// this book finished". A real position is never negative, so the existing
+  /// row carries the flag without a schema change, and [getContinueListening]
+  /// (`positionSeconds > continueListeningMinPositionSeconds`) already
+  /// excludes it.
+  static const int finishedPositionSeconds = -1;
+
   /// ...and stops counting once position reaches this fraction of the
   /// book's total known runtime — filters out books that are
   /// effectively finished. See [getContinueListening] for how this is
@@ -386,6 +393,27 @@ class AppDatabase extends _$AppDatabase {
     return (select(playbackProgress)
           ..where((p) => p.audiobookId.equals(audiobookId)))
         .getSingleOrNull();
+  }
+
+  /// Marks [audiobookId] finished: its progress row is kept, pointing at
+  /// the last chapter, with [kFinishedPositionSeconds] as the position — see
+  /// [finishedPositionSeconds] for why this needs no schema change. The next real
+  /// [saveProgress] (i.e. the listener playing it again) replaces the marker.
+  Future<void> markFinished(String audiobookId,
+      {required int lastChapterIndex}) {
+    return saveProgress(
+      audiobookId: audiobookId,
+      chapterIndex: lastChapterIndex,
+      positionSeconds: finishedPositionSeconds,
+    );
+  }
+
+  /// Forgets the saved position for [audiobookId]; the book stays in the
+  /// library and starts from the beginning next time.
+  Future<void> resetProgress(String audiobookId) async {
+    await (delete(playbackProgress)
+          ..where((p) => p.audiobookId.equals(audiobookId)))
+        .go();
   }
 
   Future<PlaybackProgressData?> getMostRecentProgress() async {

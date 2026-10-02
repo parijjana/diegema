@@ -23,11 +23,51 @@ class LibraryBookDetailOverlay extends StatelessWidget {
   final UnifiedAudiobook book;
   final AudioPlaybackService audioService;
 
+  /// Called after "Mark as finished" or "Reset progress" changed the saved
+  /// progress, so the list behind the overlay can refresh.
+  final VoidCallback? onProgressChanged;
+
   const LibraryBookDetailOverlay({
     super.key,
     required this.book,
     required this.audioService,
+    this.onProgressChanged,
   });
+
+  Future<void> _markFinished(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await audioService.markFinished(book);
+    onProgressChanged?.call();
+    messenger.showSnackBar(
+      SnackBar(content: Text('Marked "${book.title}" as finished')),
+    );
+  }
+
+  Future<void> _resetProgress(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset progress?'),
+        content: Text('"${book.title}" will start from the beginning next '
+            'time. The book and your bookmarks stay.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Reset')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await audioService.resetProgress(book);
+    onProgressChanged?.call();
+    messenger.showSnackBar(
+      SnackBar(content: Text('Reset progress for "${book.title}"')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +128,27 @@ class LibraryBookDetailOverlay extends StatelessWidget {
             icon: const Icon(Icons.play_arrow_rounded),
             label: const Text('Play'),
           ),
+        ),
+        const SizedBox(height: Sp.x3),
+        Wrap(
+          spacing: Sp.x2,
+          runSpacing: Sp.x2,
+          children: [
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, Dim.tapMin)),
+              onPressed: () => _markFinished(context),
+              icon: const Icon(Icons.check_circle_outline_rounded),
+              label: const Text('Mark as finished'),
+            ),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, Dim.tapMin)),
+              onPressed: () => _resetProgress(context),
+              icon: const Icon(Icons.restart_alt_rounded),
+              label: const Text('Reset progress'),
+            ),
+          ],
         ),
         const SizedBox(height: Sp.x5),
         if (book.description.trim().isNotEmpty) ...[

@@ -18,6 +18,8 @@ class UiPreferences {
   static const String _pinnedRowVisibleKey = 'now_playing.pinned_row_visible';
   static const String _themeModeKey = 'appearance.theme_mode';
   static const String _skipSecondsKey = 'playback.skip_seconds';
+  static const String _defaultSpeedKey = 'playback.default_speed';
+  static const String _bookSpeedPrefix = 'playback.book_speed.';
   static const String _controlsStyleKey = 'now_playing.controls_style';
   static const String _transportStyleKey = 'now_playing.transport_style';
   static const String _accentKey = 'appearance.accent';
@@ -166,6 +168,55 @@ class UiPreferences {
 
   Future<void> setPlayerControlsStyle(PlayerControlsStyle style) =>
       _setStyle(_controlsStyleKey, style);
+
+  /// The speed a book opens at when it has none of its own. Validated
+  /// against [kPlaybackSpeedOptions] on the way out, like the skip
+  /// interval: a stored value the app no longer offers falls back.
+  Future<double> getDefaultSpeed({double defaultValue = 1.0}) async =>
+      await _getSpeed(_defaultSpeedKey) ?? defaultValue;
+  Future<void> setDefaultSpeed(double value) =>
+      _setSpeed(_defaultSpeedKey, value);
+
+  /// A book's own speed, remembered from the last time the user changed it
+  /// while it played; null when it has never been changed. Keyed by book id
+  /// here rather than stored in the drift schema, which is for library data.
+  Future<double?> getBookSpeed(String bookId) =>
+      _getSpeed('$_bookSpeedPrefix$bookId');
+  Future<void> setBookSpeed(String bookId, double value) =>
+      _setSpeed('$_bookSpeedPrefix$bookId', value);
+
+  Future<double?> _getSpeed(String key) async {
+    final overrides = _overrides;
+    Object? stored;
+    if (overrides != null) {
+      stored = overrides[key];
+    } else {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        stored = prefs.get(key);
+      } catch (e) {
+        debugPrint('UiPreferences: read failed, using default: $e');
+        return null;
+      }
+    }
+    return stored is num && kPlaybackSpeedOptions.contains(stored.toDouble())
+        ? stored.toDouble()
+        : null;
+  }
+
+  Future<void> _setSpeed(String key, double value) async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      overrides[key] = value;
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(key, value);
+    } catch (e) {
+      debugPrint('UiPreferences: write failed: $e');
+    }
+  }
 
   /// The Now Playing transport (play, skip, chapter) style.
   Future<PlayerControlsStyle> getTransportStyle() =>

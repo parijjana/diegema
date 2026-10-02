@@ -329,6 +329,23 @@ void main() {
     await ambience.dispose();
   });
 
+  testWidgets('the default speed is chosen in Settings and persists',
+      (tester) async {
+    final store = <String, Object>{};
+    await pumpApp(tester, store);
+
+    await goTo(tester, 'Settings');
+    await reveal(tester, find.text('1.5x'));
+    await tester.ensureVisible(find.text('1.5x'));
+    await pumpFrames(tester);
+    await tester.tap(find.text('1.5x'));
+    await pumpFrames(tester);
+
+    expect(store['playback.default_speed'], 1.5);
+
+    await unmount(tester);
+  });
+
   testWidgets('a stored skip interval is applied on launch', (tester) async {
     final db =
         await pumpApp(tester, <String, Object>{'playback.skip_seconds': 60});

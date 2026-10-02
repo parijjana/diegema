@@ -81,7 +81,8 @@ Future<void> main() async {
     // Before playback restores the last book: iOS moves the app's folder
     // on every update, and the database stores absolute paths into it.
     await rebaseAppPathsIfMoved(nativeDb);
-    audioService = AudioPlaybackService(db: nativeDb);
+    audioService =
+        AudioPlaybackService(db: nativeDb, preferences: const UiPreferences());
     ambience = AmbienceService(book: audioService);
     try {
       await initDiegemaAudioService(audioService, ambience: ambience);

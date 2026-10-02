@@ -30,6 +30,7 @@ class AppSettings extends ChangeNotifier {
 
   ThemeMode _themeMode;
   int _skipSeconds;
+  double _defaultSpeed = 1.0;
   PlayerControlsStyle _controlsStyle = PlayerControlsStyle.tiles;
   PlayerControlsStyle _transportStyle = PlayerControlsStyle.round;
   AccentPalette _accent = AccentPalette.fallback;
@@ -50,6 +51,10 @@ class AppSettings extends ChangeNotifier {
   /// [kSkipSecondsOptions].
   int get skipSeconds => _skipSeconds;
 
+  /// The speed books open at unless they have their own. Always one of
+  /// [kPlaybackSpeedOptions].
+  double get defaultSpeed => _defaultSpeed;
+
   /// Shape of the phone Now Playing Up next / Speed / Sleep row.
   PlayerControlsStyle get controlsStyle => _controlsStyle;
 
@@ -69,6 +74,7 @@ class AppSettings extends ChangeNotifier {
   Future<void> load() async {
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
     final storedSkip = await _preferences.getSkipSeconds();
+    final storedSpeed = await _preferences.getDefaultSpeed();
     final storedStyle = await _preferences.getPlayerControlsStyle();
     final storedTransport = await _preferences.getTransportStyle();
     final storedAccent = AccentPalette.byId(await _preferences.getAccentId());
@@ -79,6 +85,7 @@ class AppSettings extends ChangeNotifier {
 
     if (storedTheme == _themeMode &&
         storedSkip == _skipSeconds &&
+        storedSpeed == _defaultSpeed &&
         storedStyle == _controlsStyle &&
         storedTransport == _transportStyle &&
         storedAccent == _accent &&
@@ -88,6 +95,7 @@ class AppSettings extends ChangeNotifier {
     }
     _themeMode = storedTheme;
     _skipSeconds = storedSkip;
+    _defaultSpeed = storedSpeed;
     _controlsStyle = storedStyle;
     _transportStyle = storedTransport;
     _accent = storedAccent;
@@ -110,6 +118,15 @@ class AppSettings extends ChangeNotifier {
     _skipSeconds = seconds;
     notifyListeners();
     await _preferences.setSkipSeconds(seconds);
+  }
+
+  Future<void> setDefaultSpeed(double speed) async {
+    if (speed == _defaultSpeed || !kPlaybackSpeedOptions.contains(speed)) {
+      return;
+    }
+    _defaultSpeed = speed;
+    notifyListeners();
+    await _preferences.setDefaultSpeed(speed);
   }
 
   Future<void> setControlsStyle(PlayerControlsStyle style) async {

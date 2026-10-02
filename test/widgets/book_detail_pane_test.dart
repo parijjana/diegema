@@ -46,7 +46,7 @@ void main() {
   const rssWithNoChapters = '''<?xml version="1.0"?>
 <rss version="2.0"><channel><title>Frankenstein</title></channel></rss>''';
 
-  Widget wrap({required String rssBody, int? zipBytes}) {
+  Widget wrap({required String rssBody, int? zipBytes, bool wide = false}) {
     final httpClient = MockClient((request) async {
       if (request.url.toString().contains('/rss/')) {
         return http.Response(rssStatus == 200 ? rssBody : '', rssStatus);
@@ -75,6 +75,7 @@ void main() {
           audioService: audio,
           db: db,
           libriVoxService: librivoxService,
+          wide: wide,
         ),
       ),
     );
@@ -197,4 +198,27 @@ void main() {
     expect(find.byType(ChapterListRow), findsNWidgets(2));
     rssStatus = 200;
   });
+
+  for (final wide in [false, true]) {
+    testWidgets('no overflow at 2.0x text, ${wide ? 'wide' : 'phone'}',
+        (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await setSurface(
+          tester, wide ? const Size(1280, 800) : const Size(390, 844));
+      await tester.pumpWidget(Center(
+        child: SizedBox(
+          width: wide ? 880 : 390,
+          height: wide ? 680 : 844,
+          child: wrap(
+              rssBody: rssWithOneChapter,
+              zipBytes: 98 * 1024 * 1024,
+              wide: wide),
+        ),
+      ));
+      await pumpFrames(tester);
+      expect(find.text('Download · ZIP 98 MB'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

@@ -3,11 +3,13 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:diegema/core/utils/book_identity.dart';
 import 'package:diegema/database/app_database.dart';
 import 'package:diegema/domain/models/audiobook.dart';
 import 'package:diegema/services/book_removal_io.dart';
 import 'package:diegema/services/downloads_location_io.dart';
+import 'package:diegema/services/library_locations_scanner_io.dart';
 import 'package:diegema/services/library_locations_store.dart';
 import 'package:diegema/services/local_library_scanner_io.dart';
 import 'package:diegema/services/removed_books_store.dart';
@@ -167,5 +169,40 @@ void main() {
     expect(File(other).existsSync(), isTrue);
     expect(File(outside).existsSync(), isTrue,
         reason: 'never delete outside a downloads root');
+  });
+
+  test(
+      'a library folder that contains the downloads root does not import '
+      'the downloads again, and an earlier duplicate is dropped', () async {
+    SharedPreferences.setMockInitialValues({});
+    final mp3 = write(p.join(visible, 'Emma [1]', '01.mp3'));
+    await db.saveAudiobook(book('emma_1', [mp3]));
+    // What the scan made before this fix: the same files as a folder book.
+    final dupe = UnifiedAudiobook(
+        id: 'local_dupe',
+        title: 'Emma',
+        author: 'A',
+        description: '',
+        source: kLibraryLocationSource,
+        origin: BookIdentity.originLocal,
+        chapters: [
+          AudiobookChapter(
+              id: 'd0', title: 'c0', audioPathOrUrl: mp3, durationSeconds: 0)
+        ]);
+    await db.saveAudiobook(dupe);
+    write(p.join(music.path, 'Mine', '01.mp3'));
+
+    await scanDownloadedLibrary(db,
+        downloads: location,
+        locations: LibraryLocationsStore(overrides: {
+          'library_locations.v1': [music.path],
+        }));
+
+    final books = await db.getAllAudiobooks();
+    expect(books.map((b) => b.id), isNot(contains('local_dupe')));
+    expect(books.where((b) => b.chapters.first.audioPathOrUrl == mp3),
+        hasLength(1));
+    expect(books.map((b) => b.source), contains(kLibraryLocationSource),
+        reason: 'the folder\'s own books are still read');
   });
 }

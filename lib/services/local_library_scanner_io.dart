@@ -35,7 +35,7 @@ Future<void> scanDownloadedLibrary(
   for (final root in await location.all()) {
     await _scanDownloads(db, root);
   }
-  await scanLibraryLocations(db, store: locations);
+  await scanLibraryLocations(db, store: locations, downloads: location);
 }
 
 Future<void> _scanDownloads(AppDatabase db, String root) async {

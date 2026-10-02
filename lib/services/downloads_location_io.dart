@@ -13,7 +13,8 @@ typedef DirectoryResolver = Future<String?> Function();
 Future<String?> _platformDocumentsRoot() async {
   try {
     return (await getApplicationDocumentsDirectory()).path;
-  } on MissingPluginException {
+  } catch (_) {
+    // No plugin or no binding (plain unit tests): there is no folder.
     return null;
   }
 }

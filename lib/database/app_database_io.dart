@@ -691,4 +691,17 @@ class AppDatabase extends _$AppDatabase {
       await (delete(audiobooks)..where((a) => a.id.equals(id))).go();
     });
   }
+
+  /// Removes a book completely: its row, chapters, saved progress and
+  /// bookmarks. Used by "Remove from library"; [deleteAudiobook] keeps
+  /// progress/bookmarks and stays for its folder-removal callers.
+  Future<void> deleteAudiobookAndUserData(String id) async {
+    await transaction(() async {
+      await (delete(playbackProgress)..where((r) => r.audiobookId.equals(id)))
+          .go();
+      await (delete(bookmarks)..where((b) => b.audiobookId.equals(id))).go();
+      await (delete(chapters)..where((c) => c.audiobookId.equals(id))).go();
+      await (delete(audiobooks)..where((a) => a.id.equals(id))).go();
+    });
+  }
 }

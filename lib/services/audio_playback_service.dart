@@ -250,6 +250,21 @@ class AudioPlaybackService {
     }
   }
 
+  /// Stops playback and clears the loaded book when [bookId] is the one
+  /// currently loaded (a no-op otherwise). Clears the book *before* stopping
+  /// so no progress is written back for a book that is being removed.
+  Future<void> stopIfCurrent(String bookId) async {
+    if (_currentBook?.id != bookId) return;
+    _currentBook = null;
+    _currentChapterIndex = 0;
+    currentBookNotifier.value = null;
+    chapterIndexNotifier.value = 0;
+    await _player.stop();
+    positionNotifier.value = Duration.zero;
+    durationNotifier.value = Duration.zero;
+    stateNotifier.value = PlaybackState.idle;
+  }
+
   Future<void> pause() async {
     await _player.pause();
     await _persistCurrentProgress();

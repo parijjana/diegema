@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
+import 'library_locations_scanner_io.dart';
+import 'library_locations_store.dart';
 
 /// Resolves the directory the app keeps its data in. Returning `null` means
 /// "there is no documents directory here", and the scan is skipped rather
@@ -26,12 +28,23 @@ Future<String?> _platformDocumentsRoot() async {
 }
 
 /// Scans `<documents root>/diegema/downloads` (the directory
-/// `BookDetailPane`'s ZIP downloader writes into) and registers any
-/// not-yet-known book folders in [db].
+/// `BookDetailPane`'s ZIP downloader writes into), then every library
+/// location the user added (read in place — see
+/// `library_locations_scanner_io.dart`), and registers any not-yet-known
+/// books in [db].
 Future<void> scanDownloadedLibrary(
   AppDatabase db, {
   DocumentsRootResolver? documentsRoot,
+  LibraryLocationsStore locations = const LibraryLocationsStore(),
 }) async {
+  await _scanDownloads(db, documentsRoot);
+  await scanLibraryLocations(db, store: locations);
+}
+
+Future<void> _scanDownloads(
+  AppDatabase db,
+  DocumentsRootResolver? documentsRoot,
+) async {
   final rootPath = await (documentsRoot ?? _platformDocumentsRoot)();
   if (rootPath == null) return;
 

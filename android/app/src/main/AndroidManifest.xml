@@ -9,6 +9,12 @@
     <!-- Required from targetSdk 34 on, in addition to the general
          FOREGROUND_SERVICE permission above. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- Library folders: read audiobooks in place from shared storage.
+         Read-only; Diegema never writes there. READ_MEDIA_AUDIO on
+         Android 13+, READ_EXTERNAL_STORAGE below that. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
     <application
         android:label="Diegema"
         android:name="${applicationName}"

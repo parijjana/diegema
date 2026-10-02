@@ -222,22 +222,27 @@ class _LibraryScreenState extends State<LibraryScreen> {
             headline: 'Your library is empty',
             body: 'Import audiobooks you already have, or download something '
                 'free from Discover.',
-            action: Wrap(
-              spacing: Sp.x3,
-              runSpacing: Sp.x3,
-              alignment: WrapAlignment.center,
-              children: [
-                FilledButton.icon(
-                  onPressed: _import,
-                  icon: const Icon(Icons.folder_open_rounded),
-                  label: const Text('Import a book'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: widget.onGoToDiscover,
-                  icon: const Icon(Icons.explore_rounded),
-                  label: const Text('Browse Discover'),
-                ),
-              ],
+            action: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                    style: _pairedButton,
+                    onPressed: _import,
+                    icon: const Icon(Icons.folder_open_rounded),
+                    label: const Text('Import a book'),
+                  ),
+                  const SizedBox(height: Sp.x3),
+                  OutlinedButton.icon(
+                    style: _pairedButton,
+                    onPressed: widget.onGoToDiscover,
+                    icon: const Icon(Icons.explore_rounded),
+                    label: const Text('Browse Discover'),
+                  ),
+                ],
+              ),
             ),
           );
         } else {
@@ -385,6 +390,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 }
 
+/// Gives paired actions the same height and corner radius, so a filled and
+/// an outlined button carry equal weight.
+const ButtonStyle _pairedButton = ButtonStyle(
+  minimumSize: WidgetStatePropertyAll(Size(0, Dim.tapComfy)),
+  shape: WidgetStatePropertyAll(
+    RoundedRectangleBorder(borderRadius: R.md),
+  ),
+);
+
 /// Phone-only floating "Import a book" button, replacing the header icon.
 /// Sits above the mini player without any explicit coordination with it:
 /// `AppShell` renders the mini player as a sibling *below* this screen's
@@ -464,9 +478,11 @@ class _RoomForMorePrompt extends StatelessWidget {
             button: true,
             label: 'Browse Discover',
             excludeSemantics: true,
-            child: TextButton(
+            child: OutlinedButton.icon(
+              style: _pairedButton,
               onPressed: onBrowseDiscover,
-              child: const Text('Browse Discover'),
+              icon: const Icon(Icons.explore_rounded),
+              label: const Text('Browse Discover'),
             ),
           ),
         ],

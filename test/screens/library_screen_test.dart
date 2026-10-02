@@ -145,8 +145,7 @@ void main() {
     expect(find.byType(LibraryBookDetailOverlay), findsOneWidget);
   });
 
-  testWidgets('cards use the accent for progress and chevrons',
-      (tester) async {
+  testWidgets('cards use the accent for progress and chevrons', (tester) async {
     await setSurface(tester, const Size(390, 844));
     await tester.pumpWidget(wrap(scanLibrary: (db) async {
       await seedBook(db,
@@ -160,16 +159,14 @@ void main() {
     final c = AppTheme.light().extension<AppColors>()!;
     final bar = tester.widget<LinearProgressIndicator>(
         find.byType(LinearProgressIndicator).first);
-    expect(bar.valueColor!.value,
-        c.accentFill);
+    expect(bar.valueColor!.value, c.accentFill);
     expect(bar.minHeight, greaterThanOrEqualTo(8));
-    final chevron = tester.widget<Icon>(
-        find.byIcon(Icons.chevron_right_rounded).first);
+    final chevron =
+        tester.widget<Icon>(find.byIcon(Icons.chevron_right_rounded).first);
     expect(chevron.color, c.accentText);
   });
 
-  testWidgets('an in-progress book is marked in All books too',
-      (tester) async {
+  testWidgets('an in-progress book is marked in All books too', (tester) async {
     await setSurface(tester, const Size(390, 1200));
     await tester.pumpWidget(wrap(scanLibrary: (db) async {
       await seedBook(db,
@@ -185,6 +182,40 @@ void main() {
     // In-progress card + All books marker for the one book; none for the other.
     expect(find.byType(LinearProgressIndicator), findsNWidgets(2));
     expect(find.text('Started Book'), findsNWidgets(2));
+  });
+
+  testWidgets('empty-state actions are a matched pair', (tester) async {
+    await setSurface(tester, const Size(390, 844));
+    await tester.pumpWidget(wrap(scanLibrary: (_) async {}));
+    await pumpFrames(tester);
+
+    final import =
+        tester.getSize(find.widgetWithText(FilledButton, 'Import a book'));
+    final browse =
+        tester.getSize(find.widgetWithText(OutlinedButton, 'Browse Discover'));
+    expect(import.height, browse.height);
+    expect(import.width, browse.width);
+  });
+
+  testWidgets('empty state and cards do not overflow at 2x text',
+      (tester) async {
+    await setSurface(tester, const Size(390, 844));
+    tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(wrap(scanLibrary: (_) async {}));
+    await pumpFrames(tester);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox()); // force a fresh state
+    await tester.pumpWidget(wrap(scanLibrary: (db) async {
+      await seedBook(db,
+          id: 'started',
+          title: 'Started Book',
+          runtimeSeconds: 1000,
+          positionSeconds: 500);
+    }));
+    await pumpFrames(tester);
+    expect(tester.takeException(), isNull);
   });
 
   group('phone one-handed layout', () {
@@ -240,8 +271,8 @@ void main() {
             'have.'),
         findsOneWidget,
       );
-      expect(
-          find.widgetWithText(TextButton, 'Browse Discover'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Browse Discover'),
+          findsOneWidget);
     });
 
     testWidgets('the prompt follows the last card, centred', (tester) async {

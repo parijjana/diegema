@@ -220,9 +220,8 @@ class _BookDetailPaneState extends State<BookDetailPane> {
         state.phase == DownloadPhase.done) {
       final size = formatZipSize(_zipSizeBytes);
       return DetailPrimaryButton(
-        icon: _isDownloaded
-            ? Icons.check_circle_rounded
-            : Icons.download_rounded,
+        icon:
+            _isDownloaded ? Icons.check_circle_rounded : Icons.download_rounded,
         label: _isDownloaded
             ? 'Downloaded'
             : (size == null ? 'Download' : 'Download · ZIP $size'),

@@ -7,8 +7,10 @@ import '../core/app_settings.dart';
 import '../core/playback_constants.dart';
 import '../core/player_controls_style.dart';
 import '../database/app_database.dart';
+import '../services/download_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/library_folders_section.dart';
+import 'downloads_screen.dart';
 
 /// The settings panel — Phase 1 of `settings_panel_plan.md`.
 ///
@@ -42,6 +44,8 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final settings = SettingsScope.of(context);
+    final downloads = DownloadsScope.maybeOf(context);
+    final active = downloads?.all.where((d) => d.isActive).length ?? 0;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -165,6 +169,22 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ],
             ),
+            if (db != null && downloads != null && !kIsWeb)
+              _Section(
+                title: 'Downloads',
+                children: [
+                  const DownloadsWifiToggle(),
+                  const SizedBox(height: Sp.x2),
+                  _LinkRow(
+                    label: active == 0
+                        ? 'Manage downloads'
+                        : 'Manage downloads ($active in progress)',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) =>
+                            DownloadsScreen(db: db!, manager: downloads))),
+                  ),
+                ],
+              ),
             if (db != null && !kIsWeb)
               _Section(
                 title: 'Library folders',

@@ -27,8 +27,10 @@ LibriVoxBook _book(String id, String title) => LibriVoxBook(
       totalTimeSecs: 0,
       authors: [LibriVoxAuthor(id: '1', firstName: 'Jane', lastName: 'Austen')],
       urlRss: '',
-      urlZipFile: 'https://archive.org/compress/${title.toLowerCase()}_librivox',
-      urlIarchive: 'https://archive.org/details/${title.toLowerCase()}_librivox',
+      urlZipFile:
+          'https://archive.org/compress/${title.toLowerCase()}_librivox',
+      urlIarchive:
+          'https://archive.org/details/${title.toLowerCase()}_librivox',
       language: 'English',
       narrators: const ['Reader'],
     );
@@ -136,7 +138,8 @@ void main() {
     expect(saved.origin, BookIdentity.originLibrivox);
     expect(saved.chapters.map((c) => c.title), ['Chapter 1', 'Chapter 2']);
     expect(saved.chapters.map((c) => c.durationSeconds), [60, 120]);
-    expect(saved.chapters.first.audioPathOrUrl,
+    expect(
+        saved.chapters.first.audioPathOrUrl,
         p.join(root.path, 'Audiobooks', 'Diegema', 'Emma [emma_librivox]',
             '01.mp3'));
     expect(
@@ -171,8 +174,7 @@ void main() {
         ['emma_01', 'emma_02']);
   });
 
-  test('a ZIP with no audio fails, saves nothing and can be retried',
-      () async {
+  test('a ZIP with no audio fails, saves nothing and can be retried', () async {
     await manager.download(emma);
     landZip('emma_librivox', {
       'readme.txt': [1]
@@ -219,8 +221,7 @@ void main() {
     expect(manager.stateFor('emma_librivox')!.phase, DownloadPhase.queued);
   });
 
-  test('pause and resume; a resume the engine cannot do starts over',
-      () async {
+  test('pause and resume; a resume the engine cannot do starts over', () async {
     await manager.download(emma);
     final job = engine.enqueued.single;
     engine.emit(job, status: EngineStatus.running);
@@ -237,7 +238,8 @@ void main() {
     expect(engine.enqueued, hasLength(2));
   });
 
-  test('a download that finished while the app was dead is saved once on '
+  test(
+      'a download that finished while the app was dead is saved once on '
       'the next launch', () async {
     await manager.download(emma, feed: [_feed(0)]);
     final job = engine.enqueued.single;
@@ -285,8 +287,8 @@ void main() {
 
     expect(engine.started, isTrue);
     expect(manager.stateFor('emma_librivox')!.progress, 0.4);
-    expect(manager.stateFor('persuasion_librivox')!.phase,
-        DownloadPhase.failed);
+    expect(
+        manager.stateFor('persuasion_librivox')!.phase, DownloadPhase.failed);
   });
 
   test('Wi-Fi only reaches the engine and every new task', () async {
@@ -307,7 +309,8 @@ void main() {
     expect(engine.wifiFlags, [true, false]);
   });
 
-  test('re-download uses the pre-built ZIP, falls back to compress when it '
+  test(
+      're-download uses the pre-built ZIP, falls back to compress when it '
       'is missing, and keeps chapter ids, titles and progress', () async {
     final gone = UnifiedAudiobook(
       id: 'tenn_librivox',

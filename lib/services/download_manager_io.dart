@@ -103,7 +103,8 @@ class BackgroundDownloaderEngine implements DownloadEngine {
     await _downloader
         .configure(globalConfig: (Config.holdingQueue, (1, null, null)));
     _downloader.configureNotification(
-      running: const TaskNotification('Downloading {displayName}', '{progress}'),
+      running:
+          const TaskNotification('Downloading {displayName}', '{progress}'),
       paused: const TaskNotification('{displayName}', 'Paused'),
       complete: const TaskNotification('{displayName}', 'Download finished'),
       error: const TaskNotification(

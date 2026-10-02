@@ -447,8 +447,8 @@ class DownloadManager extends ChangeNotifier {
     _finished.remove(job.id);
     _cancelling.remove(job.id);
     _downloads.remove(job.id); // re-queued at the back
-    _downloads[job.id] = BookDownload(
-        id: job.id, title: job.title, phase: DownloadPhase.queued);
+    _downloads[job.id] =
+        BookDownload(id: job.id, title: job.title, phase: DownloadPhase.queued);
     notifyListeners();
     final ok = await engine.enqueue(job, wifiOnly: _wifiOnly);
     if (!ok) _fail(job.id, "Couldn't start the download.");
@@ -576,8 +576,8 @@ class DownloadManager extends ChangeNotifier {
     final id = job.id;
     if (_finishing.contains(id) || _finished.contains(id)) return;
     _finishing.add(id);
-    _downloads[id] = BookDownload(
-        id: id, title: job.title, phase: DownloadPhase.extracting);
+    _downloads[id] =
+        BookDownload(id: id, title: job.title, phase: DownloadPhase.extracting);
     notifyListeners();
     try {
       final root = await location.current();

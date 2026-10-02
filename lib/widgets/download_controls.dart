@@ -99,7 +99,8 @@ class DownloadActions extends StatelessWidget {
       if (download.phase == DownloadPhase.queued ||
           download.phase == DownloadPhase.downloading ||
           download.phase == DownloadPhase.paused)
-        _action('Cancel', 'Cancel downloading $title', () => manager.cancel(id)),
+        _action(
+            'Cancel', 'Cancel downloading $title', () => manager.cancel(id)),
     ];
     if (buttons.isEmpty) return const SizedBox.shrink();
     return Wrap(

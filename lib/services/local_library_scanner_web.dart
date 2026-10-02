@@ -1,4 +1,5 @@
 import '../database/app_database.dart';
+import 'library_locations_store.dart';
 
 /// Kept signature-compatible with the io implementation so callers — and
 /// the conditional export in `local_library_scanner.dart` — never have to
@@ -11,4 +12,5 @@ typedef DocumentsRootResolver = Future<String?> Function();
 Future<void> scanDownloadedLibrary(
   AppDatabase db, {
   DocumentsRootResolver? documentsRoot,
+  LibraryLocationsStore locations = const LibraryLocationsStore(),
 }) async {}

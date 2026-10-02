@@ -1,15 +1,18 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
+import 'package:permission_handler/permission_handler.dart' show openAppSettings;
 import '../core/utils/book_identity.dart';
 import '../core/utils/mp4_chapters.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import 'cover_lookup_service.dart';
+import 'library_locations_scanner_io.dart';
+import 'library_locations_store.dart';
 import 'local_audiobook_storage_io.dart';
 import 'local_book_metadata_io.dart';
+import 'storage_access_io.dart';
 
 /// Builds this book's chapter list from its constituent files, expanding
 /// any `.m4b`/`.m4a` that carries 2+ embedded chapter markers (see
@@ -70,114 +73,51 @@ Future<List<AudiobookChapter>> chaptersForFiles(
   return chapters;
 }
 
+/// Adds a picked folder as a **library location**: Diegema reads the books
+/// in it where they are — no copying, moving, or writing to that folder —
+/// and rescans it whenever the Library loads (see
+/// `library_locations_scanner_io.dart`). The folder may be one book or a
+/// shelf of book folders.
 Future<void> importFolder(
     BuildContext context, AppDatabase db, VoidCallback onSuccess) async {
+  void say(String message, {SnackBarAction? action}) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message), action: action));
+  }
+
   try {
-    final selectedDirectory = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Select Audiobook Directory',
-    );
-
-    if (selectedDirectory == null) return;
-
-    final folderDir = Directory(selectedDirectory);
-    final folderName = p.basename(selectedDirectory);
-
-    final files = await folderDir
-        .list()
-        .where((entity) => entity is File)
-        .cast<File>()
-        .where((f) {
-      final ext = p.extension(f.path).toLowerCase();
-      return ['.mp3', '.m4a', '.m4b', '.aac', '.flac', '.wav', '.ogg']
-          .contains(ext);
-    }).toList();
-
-    files.sort((a, b) => a.path.compareTo(b.path));
-
-    if (files.isEmpty) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'No audio files (.mp3, .m4a, .m4b, etc.) found in selected folder.')),
-        );
-      }
+    if (!await ensureAudioReadAccess()) {
+      say('Diegema needs permission to read audio files to use a folder.',
+          action: SnackBarAction(
+              label: 'Settings', onPressed: () => openAppSettings()));
       return;
     }
 
-    // Deterministic sha256-of-path id — NOT hashCode. See
-    // core/utils/book_identity.dart for why hashCode must never be a
-    // persisted database key. Computed from the ORIGINAL picked paths
-    // (before the durable copy below) so ids stay stable across imports.
-    final bookId = BookIdentity.localIdForPath(selectedDirectory);
-    final filePaths = files.map((f) => f.path).toList();
-    final chapters = await chaptersForFiles(bookId, filePaths);
-
-    // Embedded tags (title/author/description/cover), read straight off
-    // whichever file in the folder carries them. Filename/foldername stay
-    // the fallback when a file has no tags at all.
-    final metadata = await readEmbeddedMetadataForFiles(filePaths);
-    String? embeddedCoverPath;
-    if (metadata?.hasCover == true) {
-      embeddedCoverPath = await saveCoverBytes(
-          metadata!.coverBytes!, metadata.coverMime, bookId);
-    }
-    // Step 2: no embedded art — look for a cover/folder/front/albumart
-    // image file (or a lone image) sitting in the folder itself. Unlike
-    // the embedded cover (already durable under `diegema/covers/`), this
-    // is a loose file in the picked folder, so it gets copied below too.
-    final folderCoverPath = embeddedCoverPath == null
-        ? await findFolderCoverImage(selectedDirectory)
-        : null;
-
-    // Copy the picked audio files (and the folder cover, if any) into
-    // `diegema/library/<bookId>/` so the book survives Android reclaiming
-    // file_picker's cache — see local_audiobook_storage_io.dart. On
-    // failure this throws and is caught below, leaving no partial state.
-    final copyResult = await copyIntoLibrary(
-      bookId: bookId,
-      audioPaths: filePaths,
-      coverPath: folderCoverPath,
+    final selectedDirectory = await FilePicker.getDirectoryPath(
+      dialogTitle: 'Select a folder of audiobooks',
     );
-    final durableChapters =
-        _rewriteChapterPaths(chapters, copyResult.audioPaths);
-    final coverPath = embeddedCoverPath ?? copyResult.coverPath;
+    if (selectedDirectory == null) return;
 
-    final book = UnifiedAudiobook(
-      id: bookId,
-      title: _nonEmpty(metadata?.title) ?? folderName.replaceAll('_', ' '),
-      author: _nonEmpty(metadata?.author) ?? 'Local Audiobook',
-      description: _nonEmpty(metadata?.description) ??
-          'Imported from folder: $selectedDirectory',
-      coverArtUrlOrPath: coverPath,
-      source: 'Local Folder',
-      origin: BookIdentity.originLocal,
-      chapters: durableChapters,
-      isDownloaded: true,
-    );
+    const store = LibraryLocationsStore();
+    final isNew = await store.add(selectedDirectory);
+    final added =
+        await scanLibraryLocations(db, store: store, only: selectedDirectory);
+    final name = p.basename(selectedDirectory);
 
-    await db.saveAudiobook(book);
-    onSuccess();
-
-    // Step 3: still no cover after embedded metadata + folder image —
-    // try an online lookup, after the save, without blocking the import.
-    if (coverPath == null) {
-      unawaited(_enrichCoverOnline(db, bookId, book.title, book.author));
-    }
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(
-                'Imported "${book.title}" (${durableChapters.length} chapters)!')),
-      );
+    if (added > 0) {
+      onSuccess();
+      say('Added $added ${added == 1 ? 'book' : 'books'} from "$name". '
+          'They stay in that folder; Diegema only reads them.');
+    } else if (!isNew) {
+      say('"$name" is already a library folder, with no new books.');
+    } else {
+      // Nothing readable: don't keep a location that yields no books.
+      await store.remove(selectedDirectory);
+      say('No audio files (.mp3, .m4a, .m4b, etc.) found in "$name".');
     }
   } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Folder import failed: $e')),
-      );
-    }
+    say('Adding the folder failed: $e');
   }
 }
 

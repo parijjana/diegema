@@ -277,7 +277,7 @@ class _AppShellState extends State<AppShell> {
       case _Tab.ambience:
         return AmbienceScreen(service: AmbienceScope.maybeOf(context)!);
       case _Tab.settings:
-        return const SettingsScreen();
+        return SettingsScreen(db: widget.db);
       case _Tab.nowPlaying:
         return NowPlayingScreen(
           db: widget.db,

@@ -9,6 +9,7 @@ import '../core/ui_preferences.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
+import '../services/redownload.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
@@ -1005,7 +1006,12 @@ class _ActiveView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (header != null) header,
-                          _PlaybackErrorNote(service: audioService),
+                          _PlaybackErrorNote(
+                              // Re-checks the files for each chapter.
+                              key: ValueKey(
+                                  '${audioService.currentBookNotifier.value?.id}'
+                                  '/${audioService.chapterIndexNotifier.value}'),
+                              service: audioService),
                         ],
                       );
                     },
@@ -1468,17 +1474,72 @@ class _BarFace extends StatelessWidget {
 }
 
 /// The chapter couldn't load or stopped with an error: says so, and offers
-/// to try it again from the same place or move on.
-class _PlaybackErrorNote extends StatelessWidget {
+/// to try it again from the same place or move on. When the cause is a
+/// downloaded file that can no longer be read, it says that instead and
+/// offers to download the book again (never to stream it: owner, to spare
+/// archive.org).
+class _PlaybackErrorNote extends StatefulWidget {
   final AudioPlaybackService service;
-  const _PlaybackErrorNote({required this.service});
+  const _PlaybackErrorNote({super.key, required this.service});
+
+  @override
+  State<_PlaybackErrorNote> createState() => _PlaybackErrorNoteState();
+}
+
+class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
+  bool _filesUnreadable = false;
+  double? _progress; // non-null while re-downloading
+  String? _failed;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFiles();
+  }
+
+  Future<void> _checkFiles() async {
+    final book = widget.service.currentBookNotifier.value;
+    if (book == null || !canRedownload(book)) return;
+    final ok = await downloadedChapterReadable(
+        book, widget.service.chapterIndexNotifier.value);
+    if (mounted && !ok) setState(() => _filesUnreadable = true);
+  }
+
+  Future<void> _redownload() async {
+    final service = widget.service;
+    final book = service.currentBookNotifier.value;
+    final db = service.database;
+    if (book == null || db == null) return;
+    final chapter = service.chapterIndexNotifier.value;
+    final position = service.positionNotifier.value;
+    setState(() {
+      _progress = 0;
+      _failed = null;
+    });
+    try {
+      final fresh = await redownloadBook(db, book,
+          onProgress: (p) => mounted ? setState(() => _progress = p) : null);
+      await service.loadBook(fresh,
+          initialChapterIndex: chapter, initialPosition: position);
+    } catch (e) {
+      debugPrint('Re-download failed: $e');
+      if (mounted) {
+        setState(() {
+          _progress = null;
+          _failed = "Couldn't download it. Check your connection and try again.";
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final service = widget.service;
     final book = service.currentBookNotifier.value;
     final hasNext = book != null &&
         service.chapterIndexNotifier.value < book.chapters.length - 1;
+    final progress = _progress;
     return Padding(
       padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
       child: Wrap(
@@ -1487,17 +1548,31 @@ class _PlaybackErrorNote extends StatelessWidget {
         spacing: Sp.x2,
         children: [
           Icon(Icons.error_outline_rounded, color: c.danger),
-          Text("Couldn't play this chapter",
+          Text(
+              _failed ??
+                  (_filesUnreadable
+                      ? "This book's downloaded files can't be read"
+                      : "Couldn't play this chapter"),
               style: AppType.label.copyWith(color: c.danger)),
-          TextButton(
-            onPressed: service.retryCurrentChapter,
-            child: const Text('Retry'),
-          ),
-          if (hasNext)
+          if (_filesUnreadable && progress != null)
+            Text('Downloading ${(progress * 100).round()}%',
+                style: AppType.label.copyWith(color: c.text))
+          else if (_filesUnreadable)
             TextButton(
-              onPressed: service.nextChapter,
-              child: const Text('Next chapter'),
+              onPressed: _redownload,
+              child: const Text('Re-download'),
+            )
+          else ...[
+            TextButton(
+              onPressed: service.retryCurrentChapter,
+              child: const Text('Retry'),
             ),
+            if (hasNext)
+              TextButton(
+                onPressed: service.nextChapter,
+                child: const Text('Next chapter'),
+              ),
+          ],
         ],
       ),
     );

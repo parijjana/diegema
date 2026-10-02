@@ -70,6 +70,10 @@ abstract final class Dim {
   /// not `MediaQuery.size`, so a widget behaves correctly inside a narrow
   /// pane on a wide window.
   static const double wideBreakpoint = 760;
+
+  /// Max width of the wide book-detail dialog (Library and Discover): two
+  /// columns, cover/progress/actions beside the about text and chapters.
+  static const double detailDialogMaxWidth = 880;
 }
 
 /// Motion (`design/tokens.md` §6). All animation must respect

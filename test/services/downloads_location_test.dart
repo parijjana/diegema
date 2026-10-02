@@ -80,8 +80,8 @@ void main() {
     write(p.join(folder, '01.mp3'), 30);
     write(p.join(folder, '02.mp3'), 20);
     write(p.join(folder, 'notes.txt'));
-    await db.saveAudiobook(book('emma_1',
-        [p.join(folder, '01.mp3'), p.join(folder, '02.mp3')]));
+    await db.saveAudiobook(
+        book('emma_1', [p.join(folder, '01.mp3'), p.join(folder, '02.mp3')]));
     await db.saveProgress(
         audiobookId: 'emma_1', chapterIndex: 1, positionSeconds: 42);
 
@@ -126,8 +126,8 @@ void main() {
 
     expect(await moveDownloadsToVisibleFolder(db, location: location), 0);
     expect(File(mp3).existsSync(), isTrue);
-    expect((await db.getAudiobook('stuck'))!.chapters.single.audioPathOrUrl,
-        mp3);
+    expect(
+        (await db.getAudiobook('stuck'))!.chapters.single.audioPathOrUrl, mp3);
   });
 
   test('no visible folder on this platform: nothing moves', () async {

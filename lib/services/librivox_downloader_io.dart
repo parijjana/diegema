@@ -84,8 +84,10 @@ class LibriVoxStreamAndDownloader {
   static const Duration _stallTimeout = Duration(seconds: 60);
   static const Duration _connectTimeout = Duration(seconds: 30);
 
-  /// Downloads [book]'s ZIP into `<saveDirectoryPath>/<title>/` and extracts
-  /// it there, returning the extracted `.mp3` paths in name order.
+  /// Downloads [book]'s ZIP to a temp folder and extracts its `.mp3`s into
+  /// `<saveDirectoryPath>/<title> [<id>]/`, returning their paths in name
+  /// order. Nothing else is extracted: Android's shared Audiobooks folder
+  /// accepts only audio, and nothing but the audio is ever used.
   ///
   /// Built for books of hundreds of MB on a phone: the ZIP streams straight
   /// to disk and is extracted one entry at a time, so memory stays flat.
@@ -110,7 +112,8 @@ class LibriVoxStreamAndDownloader {
         Directory(p.join(saveDirectoryPath, '$sanitizeName [$identifier]'));
     await bookDir.create(recursive: true);
 
-    final zipFile = File(p.join(bookDir.path, 'package.zip'));
+    final tempDir = await Directory.systemTemp.createTemp('diegema-zip');
+    final zipFile = File(p.join(tempDir.path, 'package.zip'));
     final written = <File>[];
     try {
       await _downloadTo(zipFile, Uri.parse(book.urlZipFile), onProgress);
@@ -128,7 +131,11 @@ class LibriVoxStreamAndDownloader {
       }
       rethrow;
     } finally {
-      await _deleteQuietly(zipFile);
+      try {
+        await tempDir.delete(recursive: true);
+      } on FileSystemException {
+        // Best effort: the OS clears its temp folder eventually.
+      }
     }
   }
 
@@ -175,6 +182,7 @@ class LibriVoxStreamAndDownloader {
       final mp3s = <String>[];
       for (final entry in archive) {
         if (!entry.isFile || entry.isSymbolicLink) continue;
+        if (!entry.name.toLowerCase().endsWith('.mp3')) continue;
         final target = p.canonicalize(p.join(root, p.normalize(entry.name)));
         if (!p.isWithin(root, target)) continue; // zip-slip
         await Directory(p.dirname(target)).create(recursive: true);
@@ -185,7 +193,7 @@ class LibriVoxStreamAndDownloader {
         } finally {
           await out.close();
         }
-        if (target.toLowerCase().endsWith('.mp3')) mp3s.add(target);
+        mp3s.add(target);
       }
       return mp3s;
     } finally {

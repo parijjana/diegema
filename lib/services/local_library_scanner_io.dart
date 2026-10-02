@@ -1,11 +1,10 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show debugPrint;
-import 'package:flutter/services.dart' show MissingPluginException;
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
+import 'downloads_location_io.dart';
 import 'library_locations_scanner_io.dart';
 import 'library_locations_store.dart';
 
@@ -20,36 +19,27 @@ import 'library_locations_store.dart';
 /// "scan failed" line from `LibraryScreen`.
 typedef DocumentsRootResolver = Future<String?> Function();
 
-Future<String?> _platformDocumentsRoot() async {
-  try {
-    return (await getApplicationDocumentsDirectory()).path;
-  } on MissingPluginException {
-    return null;
-  }
-}
-
-/// Scans `<documents root>/diegema/downloads` (the directory
-/// `BookDetailPane`'s ZIP downloader writes into), then every library
+/// Scans every downloads root (`DownloadsLocation.all`: the user-visible
+/// folder and the app-private one `BookDetailPane`'s ZIP downloader used to
+/// write into), then every library
 /// location the user added (read in place — see
 /// `library_locations_scanner_io.dart`), and registers any not-yet-known
 /// books in [db].
 Future<void> scanDownloadedLibrary(
   AppDatabase db, {
   DocumentsRootResolver? documentsRoot,
+  DownloadsLocation? downloads,
   LibraryLocationsStore locations = const LibraryLocationsStore(),
 }) async {
-  await _scanDownloads(db, documentsRoot);
+  final location = downloads ?? DownloadsLocation(documentsRoot: documentsRoot);
+  for (final root in await location.all()) {
+    await _scanDownloads(db, root);
+  }
   await scanLibraryLocations(db, store: locations);
 }
 
-Future<void> _scanDownloads(
-  AppDatabase db,
-  DocumentsRootResolver? documentsRoot,
-) async {
-  final rootPath = await (documentsRoot ?? _platformDocumentsRoot)();
-  if (rootPath == null) return;
-
-  final downloadsDir = Directory(p.join(rootPath, 'diegema', 'downloads'));
+Future<void> _scanDownloads(AppDatabase db, String root) async {
+  final downloadsDir = Directory(root);
 
   if (!await downloadsDir.exists()) return;
 

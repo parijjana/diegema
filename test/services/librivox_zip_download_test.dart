@@ -67,7 +67,7 @@ void main() {
           .toList()
       : [];
 
-  test('extracts the mp3s in name order and removes the zip', () async {
+  test('extracts only the mp3s, in name order, and leaves no zip', () async {
     final body = _zip({
       '02.mp3': List.filled(3000, 2),
       '01.mp3': List.filled(3000, 1),
@@ -81,7 +81,7 @@ void main() {
     expect(paths.map(p.basename), ['01.mp3', '02.mp3']);
     expect(File(paths.first).lengthSync(), 3000);
     expect(filesUnder(downloads)..sort(),
-        ['Emma [1]/01.mp3', 'Emma [1]/02.mp3', 'Emma [1]/notes.txt']);
+        ['Emma [1]/01.mp3', 'Emma [1]/02.mp3']);
     expect(progress.last, 1.0);
   });
 

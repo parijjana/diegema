@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../core/demo_mode.dart';
 import '../core/utils/book_identity.dart';
@@ -7,6 +6,7 @@ import '../database/app_database.dart';
 import '../domain/models/librivox_book.dart';
 import '../domain/models/audiobook.dart';
 import '../services/artwork_enrichment_service.dart';
+import '../services/downloads_location.dart';
 import '../services/librivox_downloader.dart';
 import '../services/librivox_service.dart';
 import '../services/audio_playback_service.dart';
@@ -37,6 +37,9 @@ class BookDetailPane extends StatefulWidget {
   /// the phone layout.
   final bool wide;
 
+  /// Where a download is saved (see `downloads_location_io.dart`).
+  final DownloadsLocation downloadsLocation;
+
   const BookDetailPane({
     super.key,
     required this.book,
@@ -46,6 +49,7 @@ class BookDetailPane extends StatefulWidget {
     required this.db,
     this.libriVoxService,
     this.wide = false,
+    this.downloadsLocation = const DownloadsLocation(),
   });
 
   @override
@@ -122,8 +126,10 @@ class _BookDetailPaneState extends State<BookDetailPane> {
     });
 
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final savePath = p.join(appDir.path, 'diegema', 'downloads');
+      final savePath = await widget.downloadsLocation.current();
+      if (savePath == null) {
+        throw StateError('No folder to download into');
+      }
 
       final extractedFiles = await widget.downloader.downloadAndExtractZip(
         widget.book,

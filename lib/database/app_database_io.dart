@@ -811,9 +811,14 @@ class AppDatabase extends _$AppDatabase {
     final newRoot = p.normalize(to);
     if (oldRoot == newRoot) return 0;
 
-    String? moved(String? path) => path != null && p.isWithin(oldRoot, path)
-        ? p.join(newRoot, p.relative(path, from: oldRoot))
-        : null;
+    // `from` itself counts: moving one book folder passes that folder.
+    String? moved(String? path) => path == null
+        ? null
+        : p.equals(oldRoot, path)
+            ? newRoot
+            : p.isWithin(oldRoot, path)
+                ? p.join(newRoot, p.relative(path, from: oldRoot))
+                : null;
 
     var touched = 0;
     await transaction(() async {

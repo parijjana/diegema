@@ -97,7 +97,8 @@ DownloadsLocation _location(DownloadsLocation? given,
         {String? documentsPath}) =>
     given ??
     DownloadsLocation(
-        documentsRoot: documentsPath == null ? null : () async => documentsPath);
+        documentsRoot:
+            documentsPath == null ? null : () async => documentsPath);
 
 Future<int?> _sizeOf(String path) async {
   try {

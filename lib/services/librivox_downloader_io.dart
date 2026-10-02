@@ -140,8 +140,8 @@ class LibriVoxStreamAndDownloader {
     }
   }
 
-  Future<void> _downloadTo(File target, Uri url,
-      void Function(double progress)? onProgress) async {
+  Future<void> _downloadTo(
+      File target, Uri url, void Function(double progress)? onProgress) async {
     final request = http.Request('GET', url)..headers.addAll(_headers);
     final response = await _client.send(request).timeout(_connectTimeout);
     if (response.statusCode != 200) {

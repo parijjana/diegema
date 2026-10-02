@@ -59,8 +59,8 @@ class FolderAccess {
   /// and bookmarked read-write. Null when cancelled.
   Future<({String path, String bookmark})?> pickDownloadsFolder() async {
     try {
-      final result = await channel
-          .invokeMapMethod<String, Object?>('pickDownloadsFolder');
+      final result =
+          await channel.invokeMapMethod<String, Object?>('pickDownloadsFolder');
       final path = result?['path'];
       final bookmark = result?['bookmark'];
       if (path is! String || bookmark is! String) return null;

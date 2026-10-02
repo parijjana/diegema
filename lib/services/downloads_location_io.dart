@@ -99,12 +99,14 @@ class DownloadsLocation {
     return docs == null ? null : p.join(docs, 'diegema', 'downloads');
   }
 
-  Future<String?> userVisibleRoot() =>
-      (visibleRoot ?? _platformVisibleRoot)();
+  Future<String?> userVisibleRoot() => (visibleRoot ?? _platformVisibleRoot)();
 
   /// macOS before a folder is chosen: [chooseFolder] must ask first.
   bool get needsFolderChoice =>
-      visibleRoot == null && !_underTest && Platform.isMacOS && _macRoot == null;
+      visibleRoot == null &&
+      !_underTest &&
+      Platform.isMacOS &&
+      _macRoot == null;
 
   /// Asks where downloads go (macOS) and remembers it. Returns the new
   /// root, or null when the user cancelled (that download stays private,

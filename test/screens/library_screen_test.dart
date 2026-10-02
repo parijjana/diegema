@@ -164,10 +164,16 @@ void main() {
     await pumpFrames(tester);
   }
 
+  Future<void> openActionsMenu(WidgetTester tester) async {
+    await tester.tap(find.byTooltip('More actions'));
+    await pumpFrames(tester);
+  }
+
   testWidgets('Mark as finished takes the book out of In progress',
       (tester) async {
     await openStartedBook(tester);
 
+    await openActionsMenu(tester);
     await tester.tap(find.text('Mark as finished'));
     await pumpFrames(tester);
 
@@ -180,14 +186,16 @@ void main() {
       (tester) async {
     await openStartedBook(tester);
 
-    await tester.tap(find.text('Reset progress'));
+    await openActionsMenu(tester);
+    await tester.tap(find.text('Reset progress…'));
     await pumpFrames(tester);
     expect(find.text('Reset progress?'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await pumpFrames(tester);
     expect(await db.getProgress('started'), isNotNull);
 
-    await tester.tap(find.text('Reset progress'));
+    await openActionsMenu(tester);
+    await tester.tap(find.text('Reset progress…'));
     await pumpFrames(tester);
     await tester.tap(find.text('Reset'));
     await pumpFrames(tester);

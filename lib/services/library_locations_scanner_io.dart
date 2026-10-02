@@ -124,8 +124,7 @@ class _Candidate {
   const _Candidate(this.id, this.keyPath, this.folder, this.files);
 }
 
-Future<List<_Candidate>> _findBooks(
-    Directory root, List<String> skip) async {
+Future<List<_Candidate>> _findBooks(Directory root, List<String> skip) async {
   final found = <_Candidate>[];
 
   Future<void> visit(Directory dir, int depth) async {

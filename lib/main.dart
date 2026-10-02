@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'app.dart';
 import 'core/demo_deeplink.dart';
+import 'core/error_handling.dart';
 import 'core/demo_mode.dart';
 import 'core/host_page_demo_notice.dart';
 import 'core/ui_preferences.dart';
@@ -24,6 +25,11 @@ import 'services/librivox_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installErrorHandlers();
+  if (!kIsWeb && await AppDatabase.isLibraryFromNewerVersion()) {
+    runApp(const NewerLibraryApp());
+    return;
+  }
   // The "this is a preview" notice now lives in the host HTML page
   // (`web/index.html`), outside the Flutter app entirely — see Task 1 of
   // the UI redesign and `core/host_page_demo_notice.dart`. It ships

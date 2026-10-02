@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -5,7 +6,9 @@ import '../core/app_info.dart';
 import '../core/app_settings.dart';
 import '../core/playback_constants.dart';
 import '../core/player_controls_style.dart';
+import '../database/app_database.dart';
 import '../theme/app_theme.dart';
+import '../widgets/library_folders_section.dart';
 
 /// The settings panel — Phase 1 of `settings_panel_plan.md`.
 ///
@@ -22,7 +25,11 @@ import '../theme/app_theme.dart';
 /// large text scales are a supported case, and a row of side-by-side chips
 /// is exactly the shape that overflowed at 1.3× and 2× on 08-12.
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  /// Needed for the Library folders section; without it (or on the web,
+  /// which has no local folders) the section is left out.
+  final AppDatabase? db;
+
+  const SettingsScreen({super.key, this.db});
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +147,11 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ],
             ),
+            if (db != null && !kIsWeb)
+              _Section(
+                title: 'Library folders',
+                children: [LibraryFoldersSection(db: db!)],
+              ),
             _Section(
               title: 'About',
               children: [

@@ -166,7 +166,7 @@ void main() {
       // Wired to the same `LocalAudiobookImporter.showOptionsModal` the
       // header icon used to call — its options sheet appearing is enough
       // to show the button drives the real action, not a no-op.
-      expect(find.text('Import Audiobook Folder'), findsOneWidget);
+      expect(find.text('Add a library folder'), findsOneWidget);
     });
 
     testWidgets('pull-to-refresh re-runs the scan', (tester) async {

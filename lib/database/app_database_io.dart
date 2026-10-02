@@ -704,4 +704,77 @@ class AppDatabase extends _$AppDatabase {
       await (delete(audiobooks)..where((a) => a.id.equals(id))).go();
     });
   }
+
+  /// Rewrites every stored path under [from] to sit under [to] instead, for
+  /// when the app's own documents folder moves. iOS does that on an app
+  /// update or reinstall (a new container UUID), and the database holds
+  /// absolute paths to downloads, copied imports and saved covers.
+  ///
+  /// Books found by scanning the downloads folder are keyed by a hash of
+  /// that folder's absolute path ([BookIdentity.localIdForPath]); left alone
+  /// they would come back from the next scan as duplicates under a new id,
+  /// so they are re-keyed too, carrying their progress and bookmarks. Other
+  /// ids are never derived again and stay as they are.
+  ///
+  /// Returns how many books had a path rewritten.
+  Future<int> rebaseAppPaths(String from, String to) async {
+    final oldRoot = p.normalize(from);
+    final newRoot = p.normalize(to);
+    if (oldRoot == newRoot) return 0;
+
+    String? moved(String? path) => path != null && p.isWithin(oldRoot, path)
+        ? p.join(newRoot, p.relative(path, from: oldRoot))
+        : null;
+
+    var touched = 0;
+    await transaction(() async {
+      for (final book in await select(audiobooks).get()) {
+        final chapterRows = await (select(chapters)
+              ..where((c) => c.audiobookId.equals(book.id))
+              ..orderBy([(c) => OrderingTerm(expression: c.chapterIndex)]))
+            .get();
+        var changed = false;
+        for (final ch in chapterRows) {
+          final next = moved(ch.audioPathOrUrl);
+          if (next == null) continue;
+          changed = true;
+          await (update(chapters)..where((c) => c.id.equals(ch.id)))
+              .write(ChaptersCompanion(audioPathOrUrl: Value(next)));
+        }
+        final cover = moved(book.coverUrl);
+        final userCover = moved(book.userCoverPath);
+        if (cover != null || userCover != null) {
+          changed = true;
+          await (update(audiobooks)..where((a) => a.id.equals(book.id)))
+              .write(AudiobooksCompanion(
+            coverUrl: cover == null ? const Value.absent() : Value(cover),
+            userCoverPath:
+                userCover == null ? const Value.absent() : Value(userCover),
+          ));
+        }
+        if (!changed) continue;
+        touched++;
+
+        if (chapterRows.isEmpty) continue;
+        final oldFolder = p.dirname(chapterRows.first.audioPathOrUrl);
+        final newFolder = moved(oldFolder);
+        if (newFolder == null ||
+            book.id != BookIdentity.localIdForPath(oldFolder)) {
+          continue;
+        }
+        final oldId = book.id;
+        final newId = BookIdentity.localIdForPath(newFolder);
+        await (update(audiobooks)..where((a) => a.id.equals(oldId)))
+            .write(AudiobooksCompanion(id: Value(newId)));
+        await (update(chapters)..where((c) => c.audiobookId.equals(oldId)))
+            .write(ChaptersCompanion(audiobookId: Value(newId)));
+        await (update(playbackProgress)
+              ..where((r) => r.audiobookId.equals(oldId)))
+            .write(PlaybackProgressCompanion(audiobookId: Value(newId)));
+        await (update(bookmarks)..where((b) => b.audiobookId.equals(oldId)))
+            .write(BookmarksCompanion(audiobookId: Value(newId)));
+      }
+    });
+    return touched;
+  }
 }

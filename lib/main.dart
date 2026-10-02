@@ -9,6 +9,7 @@ import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'screens/app_shell.dart';
 import 'screens/library_screen.dart' show LibraryScanner;
+import 'services/app_paths.dart';
 import 'services/artwork_enrichment_service.dart';
 import 'services/demo_artwork_service.dart';
 import 'services/demo_downloader.dart';
@@ -71,6 +72,9 @@ Future<void> main() async {
     // the sandbox forgets picked folders between launches.
     await openLibraryLocations();
     nativeDb = demoDb ?? AppDatabase();
+    // Before playback restores the last book: iOS moves the app's folder
+    // on every update, and the database stores absolute paths into it.
+    await rebaseAppPathsIfMoved(nativeDb);
     audioService = AudioPlaybackService(db: nativeDb);
     ambience = AmbienceService(book: audioService);
     try {

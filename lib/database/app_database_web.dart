@@ -251,6 +251,10 @@ class AppDatabase {
     _audiobooks.remove(id);
   }
 
+  /// Mirrors `app_database_io.dart`'s `rebaseAppPaths`. Web has no app
+  /// documents folder to move, so there is nothing to rewrite.
+  Future<int> rebaseAppPaths(String from, String to) async => 0;
+
   /// Mirrors `app_database_io.dart`'s `deleteAudiobookAndUserData`.
   Future<void> deleteAudiobookAndUserData(String id) async {
     _audiobooks.remove(id);

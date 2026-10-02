@@ -101,8 +101,8 @@ class _LibraryFoldersSectionState extends State<LibraryFoldersSection> {
                       Text(p.basename(location),
                           style: AppType.label.copyWith(color: c.text)),
                       Text(location,
-                          style: AppType.caption
-                              .copyWith(color: c.textSecondary)),
+                          style:
+                              AppType.caption.copyWith(color: c.textSecondary)),
                     ],
                   ),
                 ),

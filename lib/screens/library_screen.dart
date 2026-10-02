@@ -165,6 +165,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
               child: LibraryBookDetailOverlay(
                 book: book,
                 audioService: widget.audioService,
+                db: widget.db,
+                onRemoved: _load,
               ),
             ),
           ),
@@ -182,6 +184,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
             child: LibraryBookDetailOverlay(
               book: book,
               audioService: widget.audioService,
+              db: widget.db,
+              onRemoved: _load,
             ),
           ),
         ),

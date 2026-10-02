@@ -96,15 +96,26 @@ Future<void> importFolder(
       return;
     }
 
-    final selectedDirectory = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Select a folder of audiobooks',
-    );
+    final access = FolderAccess();
+    final String? selectedDirectory;
+    final String? bookmark;
+    if (access.picksNatively) {
+      final picked = await access.pickFolder();
+      selectedDirectory = picked?.path;
+      bookmark = picked?.bookmark;
+    } else {
+      selectedDirectory = await FilePicker.getDirectoryPath(
+        dialogTitle: 'Select a folder of audiobooks',
+      );
+      // Made now, while the picker's access is live, so the folder still
+      // opens after a relaunch (macOS; null where none is needed).
+      bookmark = selectedDirectory == null
+          ? null
+          : await access.bookmark(selectedDirectory);
+    }
     if (selectedDirectory == null) return;
 
     const store = LibraryLocationsStore();
-    // Made now, while the picker's access is live, so the folder still
-    // opens after a relaunch (macOS/iOS; null elsewhere).
-    final bookmark = await FolderAccess().bookmark(selectedDirectory);
     final isNew = await store.add(selectedDirectory, bookmark: bookmark);
     final added =
         await scanLibraryLocations(db, store: store, only: selectedDirectory);

@@ -28,6 +28,32 @@ class FolderAccess {
                     defaultTargetPlatform == TargetPlatform.iOS)),
         channel = channel ?? _channel;
 
+  /// Whether the folder picker must be [pickFolder] rather than
+  /// file_picker's: on iOS file_picker returns a path without opening the
+  /// folder's security scope, so the folder can't be read or bookmarked.
+  bool get picksNatively =>
+      enabled &&
+      channel == _channel &&
+      defaultTargetPlatform == TargetPlatform.iOS;
+
+  /// Shows the system folder picker and returns the chosen folder, already
+  /// open for this run, with a bookmark when one could be made. Null when
+  /// cancelled. iOS only (see [picksNatively]).
+  Future<({String path, String? bookmark})?> pickFolder() async {
+    try {
+      final result =
+          await channel.invokeMapMethod<String, Object?>('pickFolder');
+      final path = result?['path'];
+      if (path is! String) return null;
+      return (path: path, bookmark: result!['bookmark'] as String?);
+    } on PlatformException catch (e) {
+      debugPrint('FolderAccess.pickFolder failed: ${e.message}');
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   /// A bookmark for [path], base64-encoded, or null when the platform needs
   /// none or the folder can't be bookmarked. Call it right after the picker
   /// returns, while the picker's own access is still live.

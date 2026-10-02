@@ -10,6 +10,7 @@ import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import 'cover_lookup_service.dart';
 import 'library_locations_scanner_io.dart';
+import 'folder_access.dart';
 import 'library_locations_store.dart';
 import 'local_audiobook_storage_io.dart';
 import 'local_book_metadata_io.dart';
@@ -101,7 +102,10 @@ Future<void> importFolder(
     if (selectedDirectory == null) return;
 
     const store = LibraryLocationsStore();
-    final isNew = await store.add(selectedDirectory);
+    // Made now, while the picker's access is live, so the folder still
+    // opens after a relaunch (macOS/iOS; null elsewhere).
+    final bookmark = await FolderAccess().bookmark(selectedDirectory);
+    final isNew = await store.add(selectedDirectory, bookmark: bookmark);
     final added =
         await scanLibraryLocations(db, store: store, only: selectedDirectory);
     final name = p.basename(selectedDirectory);

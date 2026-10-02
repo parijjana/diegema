@@ -16,6 +16,7 @@ import 'services/demo_librivox_service.dart';
 import 'services/ambience_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/diegema_audio_handler.dart';
+import 'services/folder_access.dart';
 import 'services/demo_seed.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
@@ -66,6 +67,9 @@ Future<void> main() async {
   AudioPlaybackService? audioService;
   AmbienceService? ambience;
   if (!kIsWeb) {
+    // Before anything scans or plays from a library folder: on macOS/iOS
+    // the sandbox forgets picked folders between launches.
+    await openLibraryLocations();
     nativeDb = demoDb ?? AppDatabase();
     audioService = AudioPlaybackService(db: nativeDb);
     ambience = AmbienceService(book: audioService);

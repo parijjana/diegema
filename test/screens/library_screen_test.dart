@@ -145,6 +145,48 @@ void main() {
     expect(find.byType(LibraryBookDetailOverlay), findsOneWidget);
   });
 
+  testWidgets('cards use the accent for progress and chevrons',
+      (tester) async {
+    await setSurface(tester, const Size(390, 844));
+    await tester.pumpWidget(wrap(scanLibrary: (db) async {
+      await seedBook(db,
+          id: 'started',
+          title: 'Started Book',
+          runtimeSeconds: 1000,
+          positionSeconds: 500);
+    }));
+    await pumpFrames(tester);
+
+    final c = AppTheme.light().extension<AppColors>()!;
+    final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator).first);
+    expect(bar.valueColor!.value,
+        c.accentFill);
+    expect(bar.minHeight, greaterThanOrEqualTo(8));
+    final chevron = tester.widget<Icon>(
+        find.byIcon(Icons.chevron_right_rounded).first);
+    expect(chevron.color, c.accentText);
+  });
+
+  testWidgets('an in-progress book is marked in All books too',
+      (tester) async {
+    await setSurface(tester, const Size(390, 1200));
+    await tester.pumpWidget(wrap(scanLibrary: (db) async {
+      await seedBook(db,
+          id: 'started',
+          title: 'Started Book',
+          runtimeSeconds: 1000,
+          positionSeconds: 500);
+      await seedBook(db, id: 'untouched', title: 'Untouched Book');
+    }));
+    await pumpFrames(tester);
+
+    expect(find.text('In progress · 50%'), findsOneWidget);
+    // In-progress card + All books marker for the one book; none for the other.
+    expect(find.byType(LinearProgressIndicator), findsNWidgets(2));
+    expect(find.text('Started Book'), findsNWidgets(2));
+  });
+
   group('phone one-handed layout', () {
     testWidgets(
         'the header Import/Refresh icons are gone; a floating button imports',

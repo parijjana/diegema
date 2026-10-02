@@ -270,6 +270,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 padding: const EdgeInsets.only(bottom: Sp.listGap),
                 child: _BookRow(
                   book: book,
+                  inProgress: _inProgress.any((b) => b.id == book.id),
+                  progress: _progressById[book.id],
                   onTap: () => _openDetail(context, book, wide: wide),
                 ),
               ),
@@ -408,19 +410,17 @@ class _LibraryFab extends StatelessWidget {
       child: Material(
         // The fill is in the Ink below, over its shadow (see the cards).
         type: MaterialType.transparency,
-        // 18px — the mockup's own figure; it doesn't line up with an
-        // existing `R.*` step (16 or 24), so it's spelled out here rather
-        // than rounded to the nearest token.
-        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        // Same radius as the cards it floats over.
+        borderRadius: R.md,
         child: InkWell(
           onTap: onPressed,
-          borderRadius: const BorderRadius.all(Radius.circular(18)),
+          borderRadius: R.md,
           child: Ink(
             height: _height,
             padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x5, 0),
             decoration: BoxDecoration(
               color: c.accentFill,
-              borderRadius: const BorderRadius.all(Radius.circular(18)),
+              borderRadius: R.md,
               boxShadow: c.shadow2,
             ),
             child: Row(
@@ -491,6 +491,27 @@ class _SectionHeader extends StatelessWidget {
     return Semantics(
       header: true,
       child: Text(title, style: AppType.titleSm.copyWith(color: c.text)),
+    );
+  }
+}
+
+/// Accent-coloured progress bar shared by both list sections, so the same
+/// book reads identically wherever it appears.
+class _AccentProgressBar extends StatelessWidget {
+  final double value;
+  const _AccentProgressBar({required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ClipRRect(
+      borderRadius: R.pill,
+      child: LinearProgressIndicator(
+        value: value,
+        minHeight: 8,
+        backgroundColor: c.border,
+        valueColor: AlwaysStoppedAnimation(c.accentFill),
+      ),
     );
   }
 }
@@ -579,15 +600,7 @@ class _InProgressRow extends StatelessWidget {
                       ),
                       const SizedBox(height: Sp.x2),
                       if (percentLabel != null) ...[
-                        ClipRRect(
-                          borderRadius: R.pill,
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 6,
-                            backgroundColor: c.border,
-                            valueColor: AlwaysStoppedAnimation(c.accentFill),
-                          ),
-                        ),
+                        _AccentProgressBar(value: progress!),
                         const SizedBox(height: Sp.x1),
                         Text(
                           '$percentLabel listened',
@@ -607,7 +620,7 @@ class _InProgressRow extends StatelessWidget {
                 ),
                 const SizedBox(width: Sp.x2),
                 Icon(Icons.chevron_right_rounded,
-                    size: Dim.iconXl, color: c.textMuted),
+                    size: Dim.iconXl, color: c.accentText),
               ],
             ),
           ),
@@ -626,7 +639,17 @@ class _BookRow extends StatelessWidget {
   /// that lives inside the overlay as an explicit action.
   final VoidCallback onTap;
 
-  const _BookRow({required this.book, required this.onTap});
+  /// True when the book is also listed under "In progress"; the row then
+  /// shows its progress so the two entries read as the same book.
+  final bool inProgress;
+  final double? progress;
+
+  const _BookRow({
+    required this.book,
+    required this.onTap,
+    this.inProgress = false,
+    this.progress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -644,7 +667,9 @@ class _BookRow extends StatelessWidget {
         borderRadius: R.md,
         child: Semantics(
           button: true,
-          label: 'View details for ${book.title}',
+          label: inProgress && progress != null
+              ? 'View details for ${book.title}, ${(progress! * 100).round()}% complete'
+              : 'View details for ${book.title}',
           excludeSemantics: true,
           child: Ink(
             decoration: BoxDecoration(
@@ -684,21 +709,38 @@ class _BookRow extends StatelessWidget {
                         style: AppType.body.copyWith(color: c.textSecondary),
                       ),
                       const SizedBox(height: Sp.x1),
-                      Text(
-                        chapters == 0
-                            ? (book.source ?? 'Local')
-                            : '$chapters ${chapters == 1 ? 'chapter' : 'chapters'} '
-                                '· ${book.source ?? 'Local'}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppType.caption.copyWith(color: c.textMuted),
-                      ),
+                      if (inProgress && progress != null) ...[
+                        _AccentProgressBar(value: progress!),
+                        const SizedBox(height: Sp.x1),
+                        Text(
+                          'In progress · ${(progress! * 100).round()}%',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.caption.copyWith(color: c.accentText),
+                        ),
+                      ] else if (inProgress)
+                        Text(
+                          'In progress',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.caption.copyWith(color: c.accentText),
+                        )
+                      else
+                        Text(
+                          chapters == 0
+                              ? (book.source ?? 'Local')
+                              : '$chapters ${chapters == 1 ? 'chapter' : 'chapters'} '
+                                  '· ${book.source ?? 'Local'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.caption.copyWith(color: c.textMuted),
+                        ),
                     ],
                   ),
                 ),
                 const SizedBox(width: Sp.x2),
                 Icon(Icons.chevron_right_rounded,
-                    size: Dim.iconXl, color: c.textMuted),
+                    size: Dim.iconXl, color: c.accentText),
               ],
             ),
           ),

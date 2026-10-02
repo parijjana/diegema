@@ -100,8 +100,8 @@ class DownloadJob {
   final String origin;
   final List<DownloadChapter> chapters;
 
-  /// A re-download of a book whose files went missing: tries archive.org's
-  /// pre-built ZIP first and [fallbackUrl] when that is not there.
+  /// Tried when [url] is not there (archive.org's pre-built ZIP is missing
+  /// for some items): LibriVox's `compress` link.
   final String? fallbackUrl;
 
   const DownloadJob({
@@ -119,12 +119,26 @@ class DownloadJob {
   });
 
   /// A Discover download. [feed] is the RSS chapter list, when it loaded.
+  ///
+  /// archive.org's pre-built 64kb ZIP first, LibriVox's own link (the
+  /// on-the-fly `compress` endpoint) only when an item has none: the
+  /// pre-built file spares their servers, and it is the one that sends a
+  /// length and accepts ranges — without those there is no percentage, no
+  /// pause, and a download cut off by the OS starts over.
   factory DownloadJob.fromLibriVox(LibriVoxBook book,
       {List<AudiobookChapter>? feed}) {
+    final id = BookIdentity.archiveIdentifierFor(
+        librivoxApiId: book.id, urlIarchive: book.urlIarchive);
+    final prebuilt = book.urlIarchive.isEmpty
+        ? null
+        : 'https://archive.org/download/$id/${id}_64kb_mp3.zip';
+    final hasFallback = prebuilt != null &&
+        book.urlZipFile.isNotEmpty &&
+        book.urlZipFile != prebuilt;
     return DownloadJob(
-      id: BookIdentity.archiveIdentifierFor(
-          librivoxApiId: book.id, urlIarchive: book.urlIarchive),
-      url: book.urlZipFile,
+      id: id,
+      url: prebuilt ?? book.urlZipFile,
+      fallbackUrl: hasFallback ? book.urlZipFile : null,
       title: book.title,
       author: book.authorNames,
       description: book.description,

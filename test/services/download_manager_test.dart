@@ -100,6 +100,11 @@ void main() {
         ['emma_librivox', 'persuasion_librivox']);
     expect(engine.enqueued.first.chapters.map((c) => c.title),
         ['Chapter 1', 'Chapter 2']);
+    // archive.org's pre-built ZIP (a length, ranges), LibriVox's link as
+    // the fallback.
+    expect(engine.enqueued.first.url,
+        'https://archive.org/download/emma_librivox/emma_librivox_64kb_mp3.zip');
+    expect(engine.enqueued.first.fallbackUrl, emma.urlZipFile);
     expect(engine.permissionAsks, 1);
     expect(manager.queuePosition('emma_librivox'), 1);
     expect(manager.queuePosition('persuasion_librivox'), 2);

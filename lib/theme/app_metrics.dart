@@ -50,7 +50,7 @@ abstract final class R {
 /// a control cluster does not fit it **wraps**; it never shrinks (no
 /// `FittedBox(scaleDown)`).
 abstract final class Dim {
-  static const double tapMin = 44;
+  static const double tapMin = 48;
   static const double tapComfy = 56;
   static const double tapPrimary = 76;
 

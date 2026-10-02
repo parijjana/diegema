@@ -1272,7 +1272,7 @@ class _AmbienceToggle extends StatelessWidget {
             onTap: hasMix ? () => service.setOn(!s.on) : onOpen,
             onLongPress: onOpen,
             customBorder: const StadiumBorder(),
-            // A 44px tap target around a 32px pill.
+            // A 48px tap target around a 32px pill.
             child: SizedBox(
               height: Dim.tapMin,
               child: Center(

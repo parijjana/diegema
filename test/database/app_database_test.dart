@@ -79,6 +79,46 @@ void main() {
       expect(all.map((b) => b.title), containsAll(['Book A', 'Book B']));
     });
 
+    test(
+        'updateChapterAudioPath rewrites just that chapter\'s path, '
+        'leaving id, other fields and other chapters untouched', () async {
+      final book = UnifiedAudiobook(
+        id: 'book_migrate',
+        title: 'Migrated Book',
+        author: 'Someone',
+        description: '',
+        chapters: [
+          AudiobookChapter(
+            id: 'ch_01',
+            title: 'One',
+            audioPathOrUrl: '/cache/book.m4b',
+            durationSeconds: 100,
+            startMs: 0,
+            endMs: 5000,
+          ),
+          AudiobookChapter(
+            id: 'ch_02',
+            title: 'Two',
+            audioPathOrUrl: '/cache/book.m4b',
+            durationSeconds: 200,
+            startMs: 5000,
+            endMs: 15000,
+          ),
+        ],
+      );
+      await db.saveAudiobook(book);
+
+      await db.updateChapterAudioPath('ch_01', '/durable/book.m4b');
+
+      final updated = await db.getAudiobook('book_migrate');
+      final ch1 = updated!.chapters.firstWhere((c) => c.id == 'ch_01');
+      final ch2 = updated.chapters.firstWhere((c) => c.id == 'ch_02');
+      expect(ch1.audioPathOrUrl, equals('/durable/book.m4b'));
+      expect(ch1.startMs, equals(0));
+      expect(ch1.endMs, equals(5000));
+      expect(ch2.audioPathOrUrl, equals('/cache/book.m4b'));
+    });
+
     test('saveProgress and getProgress update timestamp and position',
         () async {
       await db.saveProgress(

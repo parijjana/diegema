@@ -76,18 +76,20 @@ class MiniPlayerBar extends StatelessWidget {
                             bookId: book.id,
                             title: book.title,
                             coverUrl: book.coverArtUrlOrPath,
-                            width: 40,
-                            height: 52,
+                            width: Dim.tapMin,
+                            height: Dim.tapMin,
                           ),
                         ),
                         const SizedBox(width: Sp.x3),
-                        Expanded(child: _TitleBlock(book: book, audioService: audioService)),
+                        Expanded(
+                            child: _TitleBlock(
+                                book: book, audioService: audioService)),
                         const SizedBox(width: Sp.x2),
                         if (showSkips)
                           _BarIconButton(
                             label: 'Skip back $skipSeconds seconds',
-                            onPressed: () => audioService.skipBackward(
-                                seconds: skipSeconds),
+                            onPressed: () =>
+                                audioService.skipBackward(seconds: skipSeconds),
                             child: SkipIntervalIcon(
                               direction: SkipDirection.backward,
                               seconds: skipSeconds,
@@ -99,8 +101,8 @@ class MiniPlayerBar extends StatelessWidget {
                         if (showSkips)
                           _BarIconButton(
                             label: 'Skip forward $skipSeconds seconds',
-                            onPressed: () => audioService.skipForward(
-                                seconds: skipSeconds),
+                            onPressed: () =>
+                                audioService.skipForward(seconds: skipSeconds),
                             child: SkipIntervalIcon(
                               direction: SkipDirection.forward,
                               seconds: skipSeconds,
@@ -137,8 +139,8 @@ class _TitleBlock extends StatelessWidget {
           book.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: AppType.bodyLg.copyWith(
-              color: c.text, fontWeight: FontWeight.w600),
+          style: AppType.bodyLg
+              .copyWith(color: c.text, fontWeight: FontWeight.w600),
         ),
         ValueListenableBuilder<PlaybackState>(
           valueListenable: audioService.stateNotifier,

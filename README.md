@@ -12,8 +12,10 @@ A free, open-source, ad-free audiobook player for public domain recordings from
 > change.
 >
 > **"Diegema" is a working title.** Greek *διήγημα*, "a narrative" — the root of
-> *diegesis*. If the LibriVox community is receptive to this project, the
-> intention is to let them choose the real name.
+> *diegesis*.
+
+Diegema is an independent project. It is **not affiliated with or endorsed by
+LibriVox** or the Internet Archive.
 
 ---
 
@@ -103,13 +105,19 @@ rights of every bundled cover.
 
 ---
 
-## Supporting LibriVox
+## Credit and support for LibriVox
 
-Every recording this player uses was produced by a LibriVox volunteer and placed
-in the public domain. If you enjoy them, consider
-[volunteering to read or proof-listen](https://librivox.org/pages/volunteer-for-librivox/).
+The recordings Diegema plays come from [LibriVox](https://librivox.org/), read and
+produced by volunteers. LibriVox recordings are in the public domain. LibriVox
+describes its objective as:
 
-This project is not affiliated with or endorsed by LibriVox.
+> To make all books in the public domain available, narrated by real people and
+> distributed for free, in audio format on the internet.
+
+We strongly support LibriVox and its mission. If you enjoy these recordings,
+consider [volunteering to read or proof-listen](https://librivox.org/pages/volunteer-for-librivox/).
+
+Diegema is not affiliated with or endorsed by LibriVox or the Internet Archive.
 
 ---
 

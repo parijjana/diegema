@@ -62,6 +62,13 @@ class Chapters extends Table {
   IntColumn get durationSeconds => integer().withDefault(const Constant(0))();
   BoolColumn get isStream => boolean().withDefault(const Constant(false))();
 
+  /// Offsets in milliseconds into [audioPathOrUrl] (schema v3), for a
+  /// chapter that is a marker inside a shared M4B file rather than its own
+  /// file. `null` means "the whole file" — see
+  /// `domain/models/audiobook.dart`'s `AudiobookChapter.startMs`/`endMs`.
+  IntColumn get startMs => integer().nullable()();
+  IntColumn get endMs => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -148,7 +155,7 @@ class AppDatabase extends _$AppDatabase {
   static const double continueListeningMaxProgressFraction = 0.95;
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -156,7 +163,13 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
         },
         onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
+          // Each block is also gated on `to` (not just `from`) so that
+          // `SchemaVerifier.migrateAndValidate(db, N)` — which spoofs the
+          // *target* version to validate an intermediate step in isolation
+          // (see test/database/migration_test.dart) — only ever applies the
+          // migrations up to that spoofed target, not every block written
+          // since.
+          if (from < 2 && to >= 2) {
             await m.addColumn(audiobooks, audiobooks.origin);
             await m.addColumn(audiobooks, audiobooks.userCoverPath);
             await m.addColumn(audiobooks, audiobooks.isPinned);
@@ -174,6 +187,14 @@ class AppDatabase extends _$AppDatabase {
             // legacy row, no audiobooks at all, etc).
             await _rekeyLegacyLocalIds();
             await _backfillOrigin();
+          }
+          if (from < 3 && to >= 3) {
+            // M4B chapter markers (schema v3) — see
+            // `core/utils/mp4_chapters.dart`. Existing chapter rows are
+            // untouched: null start/end continues to mean "the whole
+            // file", exactly as it did before this column existed.
+            await m.addColumn(chapters, chapters.startMs);
+            await m.addColumn(chapters, chapters.endMs);
           }
         },
         beforeOpen: (details) async {
@@ -215,7 +236,8 @@ class AppDatabase extends _$AppDatabase {
           .get();
       if (chapterRows.isEmpty) continue;
 
-      final newId = BookIdentity.localIdForPath(chapterRows.first.audioPathOrUrl);
+      final newId =
+          BookIdentity.localIdForPath(chapterRows.first.audioPathOrUrl);
       if (newId == book.id) continue;
 
       final oldId = book.id;
@@ -289,6 +311,8 @@ class AppDatabase extends _$AppDatabase {
           audioPathOrUrl: ch.audioPathOrUrl,
           durationSeconds: Value(ch.durationSeconds),
           isStream: Value(ch.isStream),
+          startMs: Value(ch.startMs),
+          endMs: Value(ch.endMs),
         ),
       );
     }
@@ -312,6 +336,8 @@ class AppDatabase extends _$AppDatabase {
             audioPathOrUrl: c.audioPathOrUrl,
             durationSeconds: c.durationSeconds,
             isStream: c.isStream,
+            startMs: c.startMs,
+            endMs: c.endMs,
           ),
         )
         .toList();
@@ -415,11 +441,10 @@ class AppDatabase extends _$AppDatabase {
     int limit = 5,
   }) async {
     final progressQuery = select(playbackProgress)
-      ..where((p) => p.positionSeconds.isBiggerThanValue(
-          continueListeningMinPositionSeconds))
+      ..where((p) => p.positionSeconds
+          .isBiggerThanValue(continueListeningMinPositionSeconds))
       ..orderBy([
-        (p) =>
-            OrderingTerm(expression: p.updatedAt, mode: OrderingMode.desc)
+        (p) => OrderingTerm(expression: p.updatedAt, mode: OrderingMode.desc)
       ]);
     final progressRows = await progressQuery.get();
 
@@ -433,7 +458,8 @@ class AppDatabase extends _$AppDatabase {
       if (bookRow == null) continue;
       if (bookRow.hiddenFromContinue) continue;
 
-      final totalRuntime = await _totalKnownRuntimeSeconds(progress.audiobookId);
+      final totalRuntime =
+          await _totalKnownRuntimeSeconds(progress.audiobookId);
       if (totalRuntime > 0) {
         final threshold = totalRuntime * continueListeningMaxProgressFraction;
         if (progress.positionSeconds >= threshold) continue;
@@ -562,6 +588,16 @@ class AppDatabase extends _$AppDatabase {
         .write(const AudiobooksCompanion(userCoverPath: Value(null)));
   }
 
+  /// Sets the auto-found cover URL for [audiobookId] — the post-save online
+  /// lookup (step 3 of the local-import cover pipeline, see
+  /// `services/cover_lookup_service.dart`) and the once-per-launch backfill
+  /// both write here, never to [userCoverPath]. [getAudiobook] still
+  /// prefers `userCoverPath` over this whenever both are set.
+  Future<void> setCoverUrl(String audiobookId, String coverUrl) async {
+    await (update(audiobooks)..where((a) => a.id.equals(audiobookId)))
+        .write(AudiobooksCompanion(coverUrl: Value(coverUrl)));
+  }
+
   // --- Bookmarks / audio clips ---
 
   /// Creates a bookmark or clip. A `null` [endPositionSeconds] (the
@@ -630,5 +666,29 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> deleteBookmark(String id) async {
     await (delete(bookmarks)..where((b) => b.id.equals(id))).go();
+  }
+
+  // --- Chapters ---
+
+  /// Rewrites one chapter's [Chapters.audioPathOrUrl] in place, by chapter
+  /// id — used by `local_import_migration_service_io.dart` to point an
+  /// already-imported chapter at its newly-copied, durable file without
+  /// touching the chapter's id, `startMs`/`endMs` offsets, or anything
+  /// else (progress and bookmarks are keyed off the book/chapter index,
+  /// not the path, so neither needs updating here).
+  Future<void> updateChapterAudioPath(
+      String chapterId, String newAudioPathOrUrl) async {
+    await (update(chapters)..where((c) => c.id.equals(chapterId))).write(
+      ChaptersCompanion(audioPathOrUrl: Value(newAudioPathOrUrl)),
+    );
+  }
+
+  /// Removes a book row and its chapters. Progress and bookmarks are left
+  /// alone; callers only delete rows that have none.
+  Future<void> deleteAudiobook(String id) async {
+    await transaction(() async {
+      await (delete(chapters)..where((c) => c.audiobookId.equals(id))).go();
+      await (delete(audiobooks)..where((a) => a.id.equals(id))).go();
+    });
   }
 }

@@ -61,7 +61,8 @@ void main() {
       expect(pinned.length, equals(1));
     });
 
-    test('a 6th pin throws PinLimitExceededException and does not evict '
+    test(
+        'a 6th pin throws PinLimitExceededException and does not evict '
         'any existing pin', () async {
       for (var i = 0; i < 5; i++) {
         await _seedBook(db, id: 'b$i');
@@ -112,7 +113,8 @@ void main() {
   });
 
   group('Hidden-from-continue', () {
-    test('hiding a book removes it from continue-listening but keeps the '
+    test(
+        'hiding a book removes it from continue-listening but keeps the '
         'book and its progress', () async {
       await _seedBook(db, id: 'b1');
       await db.saveProgress(
@@ -151,7 +153,8 @@ void main() {
       );
 
       var book = await db.getAudiobook('b1');
-      expect(book!.coverArtUrlOrPath, equals('https://archive.org/services/img/b1'));
+      expect(book!.coverArtUrlOrPath,
+          equals('https://archive.org/services/img/b1'));
 
       await db.setUserCover('b1', '/local/path/to/cover.jpg');
       book = await db.getAudiobook('b1');
@@ -159,7 +162,8 @@ void main() {
 
       await db.clearUserCover('b1');
       book = await db.getAudiobook('b1');
-      expect(book!.coverArtUrlOrPath, equals('https://archive.org/services/img/b1'));
+      expect(book!.coverArtUrlOrPath,
+          equals('https://archive.org/services/img/b1'));
     });
   });
 
@@ -213,7 +217,8 @@ void main() {
       expect(result.map((b) => b.id), contains('b1'));
     });
 
-    test('unknown runtime (0): the 95% rule is skipped, book stays '
+    test(
+        'unknown runtime (0): the 95% rule is skipped, book stays '
         'eligible for continue-listening', () async {
       // Local content whose durations were never probed — every chapter
       // reports durationSeconds == 0, so totalKnownRuntime == 0.
@@ -287,7 +292,8 @@ void main() {
       expect(clips, isEmpty);
     });
 
-    test('a clip has a non-null endPositionSeconds and a title, and is '
+    test(
+        'a clip has a non-null endPositionSeconds and a title, and is '
         'returned by getClips', () async {
       await _seedBook(db, id: 'b1');
       await db.addBookmark(

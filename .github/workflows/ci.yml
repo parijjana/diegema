@@ -14,6 +14,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned to the SDK the goldens are generated with: newer releases
+          # render the Now Playing fade goldens a few pixels differently.
+          flutter-version: 3.44.5
 
       - name: Install dependencies
         run: flutter pub get

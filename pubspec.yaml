@@ -28,6 +28,8 @@ dependencies:
   # the Now Playing screen is shown). Works on web as well as native, so
   # the DEMO_MODE build keeps the same behaviour.
   shared_preferences: ^2.5.5
+  audio_service: ^0.18.19
+  permission_handler: ^12.0.3
 
 dev_dependencies:
   flutter_test:
@@ -35,6 +37,11 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   drift_dev: ^2.20.0
   build_runner: ^2.4.9
+  # Used directly by test/services/local_book_metadata_test.dart to fake
+  # path_provider's platform channel (same technique as other IO-backed
+  # services' tests).
+  path_provider_platform_interface: ^2.1.2
+  plugin_platform_interface: ^2.1.8
 
 flutter:
   uses-material-design: true
@@ -42,6 +49,9 @@ flutter:
   assets:
     - assets/demo/catalog.json
     - assets/demo/covers/
+    # Background ambience loops, built by tool/ambience/prepare_ambience.py
+    # (CC0 recordings + generated noise; see assets/ambience/CREDITS.md).
+    - assets/ambience/
 
   fonts:
     # Inter 4.0 (SIL Open Font License, assets/fonts/OFL.txt). The type

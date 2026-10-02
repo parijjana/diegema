@@ -34,7 +34,8 @@ void main() {
       }
     });
 
-    test('upgrade from v1 to v2 preserves existing rows and '
+    test(
+        'upgrade from v1 to v2 preserves existing rows and '
         'backfills the new columns', () async {
       // Start a real v1 database and seed it exactly the way the
       // pre-migration app would have: a "legacy" locally-imported book
@@ -93,8 +94,7 @@ void main() {
       // sha256-of-path scheme, and every dependent row (chapters,
       // progress, bookmarks) followed it — nothing is left pointing at
       // the old id.
-      final legacyStillPresent =
-          await migratedDb.getAudiobook('local_123456');
+      final legacyStillPresent = await migratedDb.getAudiobook('local_123456');
       expect(legacyStillPresent, isNull,
           reason: 'legacy hashCode-derived id should have been rewritten');
       expect(bookmarks, isEmpty,
@@ -133,8 +133,7 @@ void main() {
       await migratedDb.close();
     });
 
-    test('upgrade from v1 to v2 does not crash on an empty database',
-        () async {
+    test('upgrade from v1 to v2 does not crash on an empty database', () async {
       final v1Schema = await verifier.schemaAt(1);
       final migratedDb = AppDatabase(v1Schema.newConnection());
       await verifier.migrateAndValidate(migratedDb, 2);
@@ -170,6 +169,54 @@ void main() {
       expect(allBooks.first.id, equals('imported_folder_987654'));
       expect(allBooks.first.origin, equals('local'));
 
+      await migratedDb.close();
+    });
+
+    test(
+        'upgrade from v2 to v3 preserves existing chapters and backfills '
+        'null start/end (M4B chapter markers)', () async {
+      // A v2 database has no start_ms/end_ms columns at all — every
+      // existing chapter row predates M4B chapter-marker support and must
+      // keep meaning "the whole file" after the upgrade.
+      final v2Schema = await verifier.schemaAt(2);
+      final rawDb = v2Schema.rawDatabase;
+      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+      rawDb.execute(
+        "INSERT INTO audiobooks (id, title, author, description, source, "
+        "origin, cover_url, user_cover_path, is_downloaded, is_pinned, "
+        "pin_order, hidden_from_continue, created_at) VALUES "
+        "('local_abcdef', 'A Local Book', 'Local Author', "
+        "'A pre-M4B-support local book', 'Local Folder', 'local', NULL, "
+        "NULL, 1, 0, NULL, 0, $now)",
+      );
+      rawDb.execute(
+        "INSERT INTO chapters (id, audiobook_id, chapter_index, title, "
+        "audio_path_or_url, duration_seconds, is_stream) VALUES "
+        "('local_abcdef_ch_0', 'local_abcdef', 0, 'Chapter One', "
+        "'/Users/test/Audiobooks/A Local Book/Chapter One.mp3', 1800, 0)",
+      );
+
+      final migratedDb = AppDatabase(v2Schema.newConnection());
+      await verifier.migrateAndValidate(migratedDb, 3);
+
+      final book = await migratedDb.getAudiobook('local_abcdef');
+      expect(book, isNotNull);
+      expect(book!.chapters.length, equals(1));
+      expect(book.chapters.first.startMs, isNull);
+      expect(book.chapters.first.endMs, isNull);
+      expect(book.chapters.first.durationSeconds, equals(1800));
+
+      await migratedDb.close();
+    });
+
+    test('upgrade from v2 to v3 does not crash on an empty database', () async {
+      final v2Schema = await verifier.schemaAt(2);
+      final migratedDb = AppDatabase(v2Schema.newConnection());
+      await verifier.migrateAndValidate(migratedDb, 3);
+
+      final allBooks = await migratedDb.getAllAudiobooks();
+      expect(allBooks, isEmpty);
       await migratedDb.close();
     });
   });

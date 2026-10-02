@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/demo_mode.dart';
+import 'local_file_image.dart';
 
 /// Renders a book cover, choosing the right source for the current build:
 ///
@@ -48,6 +49,22 @@ class BookCoverImage extends StatelessWidget {
 
     final url = networkUrl;
     if (url == null || url.isEmpty) return fallbackBuilder(context);
+
+    // A locally imported book's cover (see
+    // `services/local_book_metadata_io.dart` and the folder-image lookup in
+    // `local_audiobook_import_io.dart`) is stored as a plain filesystem
+    // path, not a URL — render it via `Image.file` instead of hitting the
+    // network with a path that isn't one.
+    final isNetwork = url.startsWith('http://') || url.startsWith('https://');
+    if (!isNetwork) {
+      return buildLocalFileImage(
+        url,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => fallbackBuilder(context),
+      );
+    }
 
     return Image.network(
       url,

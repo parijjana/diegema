@@ -5,12 +5,24 @@ class AudiobookChapter {
   final int durationSeconds;
   final bool isStream;
 
+  /// Offsets, in milliseconds, into [audioPathOrUrl] for a chapter that is
+  /// a *marker* inside a single shared file (an M4B's embedded chapter
+  /// table — see `core/utils/mp4_chapters.dart`) rather than its own file.
+  /// `null` means "the whole file", which is every chapter before M4B
+  /// import existed and every non-M4B chapter today. [endMs] is `null`
+  /// only when [startMs] is also `null`, or for the final marker of a file
+  /// whose total duration could not be determined.
+  final int? startMs;
+  final int? endMs;
+
   AudiobookChapter({
     required this.id,
     required this.title,
     required this.audioPathOrUrl,
     required this.durationSeconds,
     this.isStream = false,
+    this.startMs,
+    this.endMs,
   });
 }
 

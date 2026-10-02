@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'playback_constants.dart';
+import 'player_controls_style.dart';
 
 /// Small, non-content UI preferences that must survive a restart but do not
 /// belong in the audiobook schema — the drift schema is for library data,
@@ -17,6 +18,12 @@ class UiPreferences {
   static const String _pinnedRowVisibleKey = 'now_playing.pinned_row_visible';
   static const String _themeModeKey = 'appearance.theme_mode';
   static const String _skipSecondsKey = 'playback.skip_seconds';
+  static const String _controlsStyleKey = 'now_playing.controls_style';
+  static const String _transportStyleKey = 'now_playing.transport_style';
+  static const String _accentKey = 'appearance.accent';
+  static const String _backgroundKey = 'appearance.background';
+  static const String _shadowsKey = 'appearance.shadows';
+  static const String _ambienceKey = 'ambience.v1';
 
   /// In-memory store used by tests. When supplied it replaces
   /// `shared_preferences` entirely, so no platform channel is touched.
@@ -65,7 +72,9 @@ class UiPreferences {
     final overrides = _overrides;
     if (overrides != null) {
       final value = overrides[_themeModeKey];
-      return value is String ? _decodeThemeMode(value, defaultValue) : defaultValue;
+      return value is String
+          ? _decodeThemeMode(value, defaultValue)
+          : defaultValue;
     }
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -150,4 +159,98 @@ class UiPreferences {
         'system' => ThemeMode.system,
         _ => defaultValue,
       };
+
+  /// The Now Playing action-row style.
+  Future<PlayerControlsStyle> getPlayerControlsStyle() =>
+      _getStyle(_controlsStyleKey, PlayerControlsStyle.tiles);
+
+  Future<void> setPlayerControlsStyle(PlayerControlsStyle style) =>
+      _setStyle(_controlsStyleKey, style);
+
+  /// The Now Playing transport (play, skip, chapter) style.
+  Future<PlayerControlsStyle> getTransportStyle() =>
+      _getStyle(_transportStyleKey, PlayerControlsStyle.round);
+
+  Future<void> setTransportStyle(PlayerControlsStyle style) =>
+      _setStyle(_transportStyleKey, style);
+
+  /// Styles are stored by enum name, so an unknown or missing value falls
+  /// back to [fallback].
+  Future<PlayerControlsStyle> _getStyle(
+      String key, PlayerControlsStyle fallback) async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      final value = overrides[key];
+      return PlayerControlsStyle.fromName(value is String ? value : null,
+          fallback: fallback);
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return PlayerControlsStyle.fromName(prefs.getString(key),
+          fallback: fallback);
+    } catch (e) {
+      debugPrint('UiPreferences: read failed, using default: $e');
+      return fallback;
+    }
+  }
+
+  Future<void> _setStyle(String key, PlayerControlsStyle style) async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      overrides[key] = style.name;
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, style.name);
+    } catch (e) {
+      debugPrint('UiPreferences: write failed: $e');
+    }
+  }
+
+  /// The chosen accent palette id; null when never chosen. Unknown ids are
+  /// resolved (to the default) by the palette lookup, not here.
+  Future<String?> getAccentId() => _getString(_accentKey);
+  Future<void> setAccentId(String id) => _setString(_accentKey, id);
+
+  /// The chosen background pair id; null when never chosen.
+  Future<String?> getBackgroundId() => _getString(_backgroundKey);
+  Future<void> setBackgroundId(String id) => _setString(_backgroundKey, id);
+
+  /// The drop-shadow style's enum name; null when never chosen.
+  Future<String?> getShadowsName() => _getString(_shadowsKey);
+  Future<void> setShadowsName(String name) => _setString(_shadowsKey, name);
+
+  /// The ambience mixer's saved settings, as JSON (see `AmbienceState`).
+  Future<String?> getAmbienceJson() => _getString(_ambienceKey);
+  Future<void> setAmbienceJson(String json) => _setString(_ambienceKey, json);
+
+  Future<String?> _getString(String key) async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      final value = overrides[key];
+      return value is String ? value : null;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(key);
+    } catch (e) {
+      debugPrint('UiPreferences: read failed, using default: $e');
+      return null;
+    }
+  }
+
+  Future<void> _setString(String key, String value) async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      overrides[key] = value;
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, value);
+    } catch (e) {
+      debugPrint('UiPreferences: write failed: $e');
+    }
+  }
 }

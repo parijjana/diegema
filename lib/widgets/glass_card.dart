@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class GlassCard extends StatelessWidget {
   final Widget child;
   final String? title;
@@ -62,8 +64,31 @@ class GlassCard extends StatelessWidget {
       child: innerContent,
     );
 
+    // The optional drop shadow (Settings > Colours > Shadows) sits outside
+    // the clip, or the blur's ClipRRect would cut it off.
+    // The card is translucent, so the shadow is an outer-only halo with no
+    // offset: painting under it would muddy the glass, and outer blur with
+    // an offset leaves a hard band.
+    final shadows = [
+      for (final s in context.colors.shadowUi)
+        BoxShadow(
+            color: s.color,
+            blurRadius: s.blurRadius,
+            spreadRadius: s.spreadRadius,
+            blurStyle: BlurStyle.outer),
+    ];
+    Widget withShadow(Widget card) => shadows.isEmpty
+        ? card
+        : DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: effectiveBorderRadius,
+              boxShadow: shadows,
+            ),
+            child: card,
+          );
+
     if (blur > 0) {
-      return ClipRRect(
+      return withShadow(ClipRRect(
         borderRadius: effectiveBorderRadius,
         child: BackdropFilter(
           filter: ImageFilter.blur(
@@ -72,9 +97,9 @@ class GlassCard extends StatelessWidget {
           ),
           child: decorationLayer,
         ),
-      );
+      ));
     }
 
-    return decorationLayer;
+    return withShadow(decorationLayer);
   }
 }

@@ -23,7 +23,7 @@ class LibriVoxBookItem extends StatelessWidget {
   final VoidCallback onTap;
 
   static const double tileWidth = 148;
-  static const double coverHeight = 196;
+  static const double coverHeight = tileWidth;
 
   const LibriVoxBookItem({
     super.key,

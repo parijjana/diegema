@@ -1,5 +1,10 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
+import '../core/app_settings.dart';
+import '../core/player_controls_style.dart';
 import '../core/ui_preferences.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
@@ -9,6 +14,7 @@ import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/player_scrubber.dart';
 import '../widgets/player_transport.dart';
+import '../services/ambience_service.dart';
 import '../widgets/up_next_sheet.dart';
 
 /// Screen 1 — **Now Playing**, the app's default landing screen.
@@ -72,12 +78,17 @@ class NowPlayingScreen extends StatefulWidget {
   /// side rail to hold it. Supplied by the shell.
   final Widget? headerAction;
 
+  /// Opens the Ambience screen (from the small on/off pill at the top of
+  /// the player, when there is no mix yet to switch on, or on long press).
+  final VoidCallback? onOpenAmbience;
+
   const NowPlayingScreen({
     super.key,
     required this.db,
     required this.audioService,
     required this.onGoToDiscover,
     this.headerAction,
+    this.onOpenAmbience,
     this.preferences = const UiPreferences(),
   });
 
@@ -189,8 +200,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   /// its progress row are untouched — the undo below simply clears the
   /// flag again.
   Future<void> _hide(UnifiedAudiobook book) async {
-    setState(() =>
-        _continueListening = _continueListening.where((b) => b.id != book.id).toList());
+    setState(() => _continueListening =
+        _continueListening.where((b) => b.id != book.id).toList());
     await widget.db.hideFromContinue(book.id);
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -271,10 +282,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             final progress = _reversing ? 1 - t : t;
             final leaving =
                 (progress / _outgoingEnd).clamp(0.0, 1.0).toDouble();
-            final arriving = ((progress - _incomingStart) /
-                    (1 - _incomingStart))
-                .clamp(0.0, 1.0)
-                .toDouble();
+            final arriving =
+                ((progress - _incomingStart) / (1 - _incomingStart))
+                    .clamp(0.0, 1.0)
+                    .toDouble();
 
             // How visible each layer is, 0-1, before its curve.
             final listVis = _reversing ? arriving : 1 - leaving;
@@ -335,6 +346,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             audioService: widget.audioService,
                             onShowUpNext: _showUpNext,
                             headerAction: widget.headerAction,
+                            onOpenAmbience: widget.onOpenAmbience,
                           ),
                         ),
                       ),
@@ -562,8 +574,8 @@ class _SectionHeader extends StatelessWidget {
               header: true,
               // Sentence case at title-sm. The old build rendered this slot
               // as `TITLE`.toUpperCase() at 11px with letterSpacing 1.5.
-              child: Text(title,
-                  style: AppType.titleSm.copyWith(color: c.text)),
+              child:
+                  Text(title, style: AppType.titleSm.copyWith(color: c.text)),
             ),
           ),
           if (trailing != null) trailing!,
@@ -615,12 +627,12 @@ class _PinnedRow extends StatelessWidget {
     if (books.isEmpty) return const SizedBox.shrink();
 
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    const coverHeight = 148.0;
+    const coverSize = 112.0;
     // Two `body` lines at 24px line-height, plus the gap above them and the
     // list's own vertical padding. Derived rather than a fixed number so
     // 200% OS text does not clip — the first cut used a flat 148+48 and
     // overflowed by 16px the moment a title wrapped to two lines.
-    final rowHeight = coverHeight + Sp.x2 + (24 * 2) * textScale + Sp.x2;
+    final rowHeight = coverSize + Sp.x2 + (24 * 2) * textScale + Sp.x2;
 
     return SizedBox(
       height: rowHeight,
@@ -639,7 +651,7 @@ class _PinnedRow extends StatelessWidget {
               onTap: () => onPlay(book),
               borderRadius: R.md,
               child: SizedBox(
-                width: 112,
+                width: coverSize,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -649,8 +661,8 @@ class _PinnedRow extends StatelessWidget {
                           bookId: book.id,
                           title: book.title,
                           coverUrl: book.coverArtUrlOrPath,
-                          width: 112,
-                          height: coverHeight,
+                          width: coverSize,
+                          height: coverSize,
                         ),
                         Positioned(
                           top: Sp.x1,
@@ -732,7 +744,7 @@ class _ContinueListeningItem extends StatelessWidget {
               title: book.title,
               coverUrl: book.coverArtUrlOrPath,
               width: 56,
-              height: 74,
+              height: 56,
             ),
             const SizedBox(width: Sp.x3),
             Expanded(
@@ -782,9 +794,7 @@ class _ContinueListeningItem extends StatelessWidget {
                 tooltip: isPinned ? 'Unpin' : 'Pin',
                 onPressed: onTogglePin,
                 icon: Icon(
-                  isPinned
-                      ? Icons.push_pin_rounded
-                      : Icons.push_pin_outlined,
+                  isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
                   color: isPinned ? c.accentText : c.textSecondary,
                 ),
               ),
@@ -829,6 +839,7 @@ class _DismissBackground extends StatelessWidget {
     );
   }
 }
+
 class _ActiveView extends StatelessWidget {
   final UnifiedAudiobook book;
   final AudioPlaybackService audioService;
@@ -842,12 +853,14 @@ class _ActiveView extends StatelessWidget {
   /// layout entirely for as long as a book was loaded. The idle view's
   /// title bar is the only other place it lives.
   final Widget? headerAction;
+  final VoidCallback? onOpenAmbience;
 
   const _ActiveView({
     required this.book,
     required this.audioService,
     required this.onShowUpNext,
     this.headerAction,
+    this.onOpenAmbience,
   });
 
   @override
@@ -858,127 +871,601 @@ class _ActiveView extends StatelessWidget {
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= Dim.wideBreakpoint;
         final gutter = wide ? Sp.gutterDesktop : Sp.gutterPhone;
-        // Cover is sized from the *smaller* of the two axes so it can never
-        // push the transport off a short window.
-        final coverSize = (constraints.maxHeight * 0.30)
-            .clamp(120.0, wide ? 280.0 : 220.0)
-            .toDouble();
+        // Cover art is square (see `app_book_cover.dart`). Wide sizes it
+        // from the window height inside its 640px column; phone ignores
+        // this and fills the space it is given (the giant cover, below).
+        final coverSize =
+            (constraints.maxHeight * 0.30).clamp(120.0, 280.0).toDouble();
+
+        // [bleed] draws the cover edge to edge (phone's giant cover); the
+        // title and chapter line always keep the gutter.
+        Widget headerFor(double size, {bool bleed = false}) => Padding(
+              padding: EdgeInsets.fromLTRB(
+                  bleed ? 0 : Sp.x4, bleed ? 0 : Sp.x2, bleed ? 0 : Sp.x4, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  AppBookCover(
+                    bookId: book.id,
+                    title: book.title,
+                    coverUrl: book.coverArtUrlOrPath,
+                    width: size,
+                    height: size,
+                  ),
+                  const SizedBox(height: Sp.x5),
+                  Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: bleed ? Sp.x4 : 0),
+                    child: Text(
+                      book.title,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppType.serif(AppType.titleMd)
+                          .copyWith(color: c.text),
+                    ),
+                  ),
+                  const SizedBox(height: Sp.x1),
+                  ValueListenableBuilder<int>(
+                    valueListenable: audioService.chapterIndexNotifier,
+                    builder: (context, index, _) {
+                      final chapterLabel = index < book.chapters.length &&
+                              book.chapters.isNotEmpty
+                          ? '${book.author} · ${book.chapters[index].title} of '
+                              '${book.chapters.length}'
+                          : book.author;
+                      return Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: bleed ? Sp.x4 : 0),
+                        child: Text(
+                          chapterLabel,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.body.copyWith(color: c.textSecondary),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+
+        final footer = Padding(
+          padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Sp.x6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PlayerScrubber(audioService: audioService),
+              const SizedBox(height: Sp.x5),
+              PlayerTransport(audioService: audioService, book: book),
+              const SizedBox(height: Sp.x5),
+              wide
+                  ? Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: Sp.x3,
+                      runSpacing: Sp.x3,
+                      children: [
+                        SpeedSelector(audioService: audioService),
+                        SleepTimerSelector(audioService: audioService),
+                      ],
+                    )
+                  : _ActionRow(
+                      audioService: audioService,
+                      book: book,
+                      onShowUpNext: onShowUpNext,
+                    ),
+            ],
+          ),
+        );
 
         return Container(
           color: c.bg,
-          child: Column(
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              // The way back to the list. Never touches playback.
-              Padding(
-                padding: const EdgeInsets.fromLTRB(Sp.x2, Sp.x2, Sp.x4, 0),
-                child: Row(
-                  children: [
-                    Semantics(
-                      button: true,
-                      label: 'Up next. The chapters in this book.',
-                      excludeSemantics: true,
-                      child: TextButton.icon(
-                        onPressed: onShowUpNext,
-                        icon: const Icon(Icons.queue_music_rounded),
-                        label: const Text('Up next'),
-                      ),
-                    ),
-                    const Spacer(),
-                    ValueListenableBuilder<PlaybackState>(
-                      valueListenable: audioService.stateNotifier,
-                      builder: (context, state, _) {
-                        if (state != PlaybackState.error) {
-                          return const SizedBox.shrink();
-                        }
-                        return Row(
-                          mainAxisSize: MainAxisSize.min,
+              _CoverBackdrop(book: book),
+              Column(
+                children: [
+                  // Slim top-right row. It hosts only the playback-error
+                  // indicator and (on phone) the theme toggle passed down as
+                  // `headerAction` — neither of which touches playback — and
+                  // takes no space at all when both are absent. The "Up next"
+                  // row that used to live here on phone has moved into the
+                  // action tile row at the bottom, in the thumb zone.
+                  ValueListenableBuilder<PlaybackState>(
+                    valueListenable: audioService.stateNotifier,
+                    builder: (context, state, _) {
+                      final showError = state == PlaybackState.error;
+                      final showHeaderAction = !wide && headerAction != null;
+                      final ambience = AmbienceScope.maybeOf(context);
+                      if (!showError && !showHeaderAction && ambience == null) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding:
+                            const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Icon(Icons.error_outline_rounded, color: c.danger),
-                            const SizedBox(width: Sp.x2),
-                            Text('Playback failed',
-                                style:
-                                    AppType.label.copyWith(color: c.danger)),
-                          ],
-                        );
-                      },
-                    ),
-                    // Narrow only: the top tab bar holds the wide layout's
-                    // copy, and a bottom NavigationBar has nowhere for it.
-                    if (!wide && headerAction != null) ...[
-                      const SizedBox(width: Sp.x2),
-                      headerAction!,
-                    ],
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(horizontal: gutter),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 640),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppBookCover(
-                            bookId: book.id,
-                            title: book.title,
-                            coverUrl: book.coverArtUrlOrPath,
-                            width: coverSize * 0.76,
-                            height: coverSize,
-                          ),
-                          const SizedBox(height: Sp.x5),
-                          Text(
-                            book.title,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppType.serif(AppType.titleMd)
-                                .copyWith(color: c.text),
-                          ),
-                          const SizedBox(height: Sp.x1),
-                          ValueListenableBuilder<int>(
-                            valueListenable: audioService.chapterIndexNotifier,
-                            builder: (context, index, _) {
-                              final title = index < book.chapters.length
-                                  ? book.chapters[index].title
-                                  : book.author;
-                              return Text(
-                                title,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppType.body
-                                    .copyWith(color: c.textSecondary),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: Sp.x5),
-                          PlayerScrubber(audioService: audioService),
-                          const SizedBox(height: Sp.x5),
-                          PlayerTransport(
-                              audioService: audioService, book: book),
-                          const SizedBox(height: Sp.x6),
-                          Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: Sp.x3,
-                            runSpacing: Sp.x3,
-                            children: [
-                              SpeedSelector(audioService: audioService),
-                              SleepTimerSelector(audioService: audioService),
+                            if (showError) ...[
+                              Icon(Icons.error_outline_rounded,
+                                  color: c.danger),
+                              const SizedBox(width: Sp.x2),
+                              Text('Playback failed',
+                                  style:
+                                      AppType.label.copyWith(color: c.danger)),
                             ],
+                            if (showError &&
+                                (showHeaderAction || ambience != null))
+                              const SizedBox(width: Sp.x3),
+                            // The quick ambience switch: small and up here,
+                            // out of the thumb zone and away from the book's
+                            // own controls. The full mixer is its own screen.
+                            if (ambience != null)
+                              _AmbienceToggle(
+                                  service: ambience, onOpen: onOpenAmbience),
+                            if (ambience != null && showHeaderAction)
+                              const SizedBox(width: Sp.x2),
+                            if (showHeaderAction) headerAction!,
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  if (wide)
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.symmetric(horizontal: gutter),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 640),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                headerFor(coverSize),
+                                const SizedBox(height: Sp.x5),
+                                footer,
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: Sp.x8),
+                        ),
+                      ),
+                    )
+                  else
+                    // Phone: cover/title/chapter pinned at the top, scrubber
+                    // and transport pushed to the BOTTOM of the available
+                    // space (the thumb zone).
+                    //
+                    // `Expanded(SingleChildScrollView(header)) + footer` rather
+                    // than the more obvious `ConstrainedBox(minHeight) +
+                    // IntrinsicHeight + Spacer`: that combination was tried
+                    // first, but a `Spacer`'s intrinsic height contribution is
+                    // unbounded, so `IntrinsicHeight` computed an infinite
+                    // intrinsic size for the column and crashed layout as soon
+                    // as anything below it (the action-tile row's fixed-height
+                    // `SizedBox`es) tried to enforce a concrete height against
+                    // it. Here the footer is a normal, non-scrolling sibling
+                    // pinned below an `Expanded` scroll area: on a tall screen
+                    // the header sits at the scroll area's top with blank
+                    // space below it and the footer directly under that, and
+                    // on a short one the scroll area simply scrolls — no
+                    // intrinsic pass involved at all.
+                    Expanded(
+                      child: Column(
+                        children: [
+                          // The giant cover: as wide as the screen, and as tall
+                          // as the space left once the title lines are
+                          // reserved, so it grows to fill the phone and only
+                          // ever shrinks (never overflows) on short screens or
+                          // at large text sizes.
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, box) {
+                                final scale =
+                                    MediaQuery.textScalerOf(context).scale(1);
+                                final titleReserve =
+                                    Sp.x5 + Sp.x1 + Sp.x4 + 84 * scale;
+                                final size = math
+                                    .min(box.maxWidth,
+                                        box.maxHeight - titleReserve)
+                                    .clamp(120.0, box.maxWidth)
+                                    .toDouble();
+                                return SingleChildScrollView(
+                                  child: headerFor(size, bleed: true),
+                                );
+                              },
+                            ),
+                          ),
+                          footer,
                         ],
                       ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// A blurred, washed-out copy of the cover filling the whole player, so
+/// the screen takes on the book's colours. The scrim keeps text contrast
+/// close to the plain background's; purely decorative, so it is hidden
+/// from screen readers and ignores touches.
+class _CoverBackdrop extends StatelessWidget {
+  final UnifiedAudiobook book;
+  const _CoverBackdrop({required this.book});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ExcludeSemantics(
+      child: IgnorePointer(
+        child: ClipRect(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ImageFiltered(
+                imageFilter: ui.ImageFilter.blur(
+                    sigmaX: 40, sigmaY: 40, tileMode: TileMode.clamp),
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  clipBehavior: Clip.hardEdge,
+                  child: AppBookCover(
+                    bookId: book.id,
+                    title: book.title,
+                    coverUrl: book.coverArtUrlOrPath,
+                    width: 200,
+                    height: 200,
+                  ),
+                ),
+              ),
+              ColoredBox(color: c.bg.withValues(alpha: 0.78)),
+              // Fade the tint out into the nav bar's colour over the last
+              // stretch, so the backdrop has no hard seam where the bar
+              // starts (and the bar's optional upward shadow shows).
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [c.surface.withValues(alpha: 0), c.surface],
                     ),
                   ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Phone-only action row directly above the bottom nav: Up next, Speed,
+/// Sleep, drawn in the shape chosen in Settings ("Player buttons": tiles,
+/// round or bar). Speed and Sleep reuse [SpeedSelector]/[SleepTimerSelector]
+/// (their popup-menu logic is not duplicated here) and are only given a
+/// different face via [ActionFaceBuilder], so all three always match.
+class _ActionRow extends StatelessWidget {
+  final AudioPlaybackService audioService;
+  final UnifiedAudiobook book;
+  final VoidCallback onShowUpNext;
+  const _ActionRow({
+    required this.audioService,
+    required this.book,
+    required this.onShowUpNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final style = SettingsScope.maybeOf(context)?.controlsStyle ??
+        PlayerControlsStyle.tiles;
+    Widget face(BuildContext context, ActionFace f) => switch (style) {
+          PlayerControlsStyle.tiles => _TileFace(face: f),
+          PlayerControlsStyle.round => _RoundFace(face: f),
+          PlayerControlsStyle.bar => _BarFace(face: f),
+        };
+    final radius = switch (style) {
+      PlayerControlsStyle.tiles => R.md,
+      PlayerControlsStyle.round => R.md,
+      PlayerControlsStyle.bar => BorderRadius.zero,
+    };
+    final children = [
+      _UpNextButton(
+        audioService: audioService,
+        book: book,
+        onPressed: onShowUpNext,
+        face: face,
+        radius: radius,
+      ),
+      SpeedSelector(audioService: audioService, face: face),
+      SleepTimerSelector(audioService: audioService, face: face),
+    ];
+    final count = children.length;
+
+    // Fixed-width slots computed from a `LayoutBuilder`, not `Expanded`:
+    // this row sits under `AnimatedBuilder`/`Opacity`/`Transform.scale`
+    // during the idle<->player cross-fade, and a `PopupMenuButton` (which
+    // both `SpeedSelector` and `SleepTimerSelector` are, under the hood)
+    // runs an internal dry-layout pass to size its overlay that gave an
+    // `Expanded` ancestor here unbounded height and crashed. Explicit-width
+    // `SizedBox`es sidestep flex layout entirely.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        switch (style) {
+          case PlayerControlsStyle.tiles:
+          case PlayerControlsStyle.round:
+            // A tile holds two lines (caption over value), so it grows
+            // with the text scale rather than clipping them at 2x.
+            final scale = MediaQuery.textScalerOf(context).scale(1);
+            final height = style == PlayerControlsStyle.tiles
+                ? math.max(56.0, 20 + 37 * scale)
+                : null;
+            final width = (constraints.maxWidth - Sp.x2 * (count - 1)) / count;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < children.length; i++) ...[
+                  if (i > 0) const SizedBox(width: Sp.x2),
+                  SizedBox(width: width, height: height, child: children[i]),
+                ],
+              ],
+            );
+          case PlayerControlsStyle.bar:
+            // Icon over label, so four segments still fit; grows with text.
+            final scale = MediaQuery.textScalerOf(context).scale(1);
+            final height = math.max(56.0, 32 + 18 * scale);
+            // 1px border each side, a 1px divider between segments.
+            final width = (constraints.maxWidth - 2 - (count - 1)) / count;
+            return Container(
+              decoration: BoxDecoration(
+                color: c.glassSurface,
+                borderRadius: R.lg,
+                border: Border.all(color: c.border),
+                boxShadow: c.shadowUi,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Row(
+                children: [
+                  for (var i = 0; i < children.length; i++) ...[
+                    if (i > 0)
+                      Container(width: 1, height: height - 20, color: c.border),
+                    SizedBox(width: width, height: height, child: children[i]),
+                  ],
+                ],
+              ),
+            );
+        }
+      },
+    );
+  }
+}
+
+/// A small pill that switches the ambience mix on and off. With no mix
+/// chosen yet (or on long press) it opens the Ambience screen instead.
+class _AmbienceToggle extends StatelessWidget {
+  final AmbienceService service;
+  final VoidCallback? onOpen;
+  const _AmbienceToggle({required this.service, this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ValueListenableBuilder<AmbienceState>(
+      valueListenable: service.state,
+      builder: (context, s, _) {
+        final hasMix = s.mix.isNotEmpty;
+        final on = s.on && hasMix;
+        final fg = on ? c.accentText : c.textSecondary;
+        return Semantics(
+          button: true,
+          toggled: hasMix ? on : null,
+          label: 'Ambience',
+          hint: hasMix ? null : 'Opens the Ambience screen to pick sounds',
+          excludeSemantics: true,
+          child: InkWell(
+            onTap: hasMix ? () => service.setOn(!s.on) : onOpen,
+            onLongPress: onOpen,
+            customBorder: const StadiumBorder(),
+            // A 44px tap target around a 32px pill.
+            child: SizedBox(
+              height: Dim.tapMin,
+              child: Center(
+                child: Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: Sp.x3),
+                  decoration: BoxDecoration(
+                    color: on ? c.accentWash : c.glassSurface,
+                    borderRadius: R.pill,
+                    border: Border.all(color: on ? c.accent : c.border),
+                    boxShadow: c.shadowUi,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                          on
+                              ? Icons.surround_sound_rounded
+                              : Icons.surround_sound_outlined,
+                          size: 16,
+                          color: fg),
+                      const SizedBox(width: Sp.x1),
+                      Text(on ? 'On' : 'Off',
+                          style: AppType.caption.copyWith(
+                              color: fg, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         );
       },
+    );
+  }
+}
+
+class _UpNextButton extends StatelessWidget {
+  final AudioPlaybackService audioService;
+  final UnifiedAudiobook book;
+  final VoidCallback onPressed;
+  final ActionFaceBuilder face;
+  final BorderRadius radius;
+  const _UpNextButton({
+    required this.audioService,
+    required this.book,
+    required this.onPressed,
+    required this.face,
+    required this.radius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Up next. The chapters in this book.',
+      excludeSemantics: true,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: radius,
+          child: ValueListenableBuilder<int>(
+            valueListenable: audioService.chapterIndexNotifier,
+            builder: (context, index, _) {
+              final next = index + 1 < book.chapters.length
+                  ? book.chapters[index + 1].title
+                  : 'Chapters';
+              return face(
+                context,
+                ActionFace(
+                  icon: Icons.queue_music_rounded,
+                  caption: 'Up next',
+                  value: next,
+                  short: 'Up next',
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Style A: a tile with a small icon and caption over the live value.
+/// Stacked rather than side by side, so four tiles fit a phone's width.
+class _TileFace extends StatelessWidget {
+  final ActionFace face;
+  const _TileFace({required this.face});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
+      decoration: BoxDecoration(
+        color: face.active ? c.accentWash : c.glassSurface,
+        borderRadius: R.md,
+        border: Border.all(color: face.active ? c.accent : c.border),
+        boxShadow: c.shadowUi,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(face.icon, size: 16, color: c.accentText),
+              const SizedBox(width: Sp.x1),
+              Flexible(
+                child: Text(face.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.caption.copyWith(color: c.textSecondary)),
+              ),
+            ],
+          ),
+          Text(face.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.label
+                  .copyWith(color: c.text, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Style B: a round icon button with a caption underneath.
+class _RoundFace extends StatelessWidget {
+  final ActionFace face;
+  const _RoundFace({required this.face});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Sp.x1),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: face.active ? c.accentWash : c.glassSurface,
+              border: Border.all(color: face.active ? c.accent : c.border),
+              boxShadow: c.shadowUi,
+            ),
+            child: Icon(face.icon, size: Dim.iconMd, color: c.accentText),
+          ),
+          const SizedBox(height: Sp.x1),
+          Text(face.short,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppType.caption
+                  .copyWith(color: c.text, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Style C: one segment of a shared bar (the bar itself is drawn by
+/// [_ActionRow]), icon over a one-word label.
+class _BarFace extends StatelessWidget {
+  final ActionFace face;
+  const _BarFace({required this.face});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      color: face.active ? c.accentWash : Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: Sp.x1),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(face.icon, size: Dim.iconSm, color: c.accentText),
+          const SizedBox(height: 2),
+          Text(face.short,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.caption
+                  .copyWith(color: c.text, fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
 }

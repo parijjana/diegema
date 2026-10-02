@@ -15,9 +15,9 @@ void _showUnavailable(BuildContext context) {
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(
-      content: Text(
-          'Importing local files is not available in this web demo — see '
-          'the desktop app for full library import.'),
+      content:
+          Text('Importing local files is not available in this web demo — see '
+              'the desktop app for full library import.'),
     ),
   );
 }

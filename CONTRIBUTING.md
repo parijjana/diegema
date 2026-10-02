@@ -24,6 +24,8 @@ Thank you for your interest in contributing to **Diegema**! We welcome bug fixes
 
 ---
 
-## 🎙️ LibriVox Community Alignment
+## 🎙️ Project values
 
-This project is a 100% free, non-commercial, ad-free public domain initiative. Contributions must respect user privacy, maintain zero telemetry in open-source builds, and honor the CC0 / Public Domain mission of LibriVox.
+This project is a 100% free, non-commercial, ad-free player for public domain recordings. Contributions must respect user privacy and maintain zero telemetry in open-source builds.
+
+Diegema is an independent project, not affiliated with or endorsed by LibriVox or the Internet Archive. We strongly support LibriVox and its mission; keep project text factual about where recordings come from, and never imply a partnership or endorsement.

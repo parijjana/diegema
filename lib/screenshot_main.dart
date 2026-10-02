@@ -236,11 +236,17 @@ String _currentShotId = '';
 /// that is the exact pixel size each store expects; verify captured PNGs against
 /// it (see the reference doc's verification checklist).
 class _Target {
-  final String store; // store id, e.g. 'ios-app-store' (matches store-fields.json)
-  final String device; // device id, e.g. 'ipad-13-landscape' (matches store-fields.json)
-  final String dir; // output subfolder under _outRoot; may be nested, e.g. 'ios/ipad13'
-  final String prefix; // filename prefix to disambiguate orientations sharing a dir
-  final double w, h, ratio; // logical size + pixelRatio  (px = w*ratio by h*ratio)
+  final String
+      store; // store id, e.g. 'ios-app-store' (matches store-fields.json)
+  final String
+      device; // device id, e.g. 'ipad-13-landscape' (matches store-fields.json)
+  final String
+      dir; // output subfolder under _outRoot; may be nested, e.g. 'ios/ipad13'
+  final String
+      prefix; // filename prefix to disambiguate orientations sharing a dir
+  final double w,
+      h,
+      ratio; // logical size + pixelRatio  (px = w*ratio by h*ratio)
   final ScreenshotLayout layout;
   final ScreenshotWindowControls controls;
   final List<int> scenes; // scene numbers to render for this target
@@ -271,11 +277,43 @@ const List<_Target> _targets = [
   // renders every size from the same macOS process.
   //
   // store             device               dir             prefix   w     h     ratio  layout                        controls                        scenes
-  _Target('mac-app-store', 'mac',               'mac',          '',      1440, 900,  2.0, ScreenshotLayout.desktop,     ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
-  _Target('ios-app-store', 'iphone-6.9',        'ios/iphone69', '',      430,  932,  3.0, ScreenshotLayout.mobilePhone, ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
-  _Target('ios-app-store', 'iphone-6.5',        'ios/iphone65', '',      428,  926,  3.0, ScreenshotLayout.mobilePhone, ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
-  _Target('ios-app-store', 'ipad-13',           'ios/ipad13',   '',      1024, 1366, 2.0, ScreenshotLayout.tablet,      ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
-  _Target('ios-app-store', 'ipad-13-landscape', 'ios/ipad13',   'land-', 1366, 1024, 2.0, ScreenshotLayout.tablet,      ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
+  _Target('mac-app-store', 'mac', 'mac', '', 1440, 900, 2.0,
+      ScreenshotLayout.desktop, ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
+  _Target(
+      'ios-app-store',
+      'iphone-6.9',
+      'ios/iphone69',
+      '',
+      430,
+      932,
+      3.0,
+      ScreenshotLayout.mobilePhone,
+      ScreenshotWindowControls.none,
+      [1, 2, 3, 4, 5]),
+  _Target(
+      'ios-app-store',
+      'iphone-6.5',
+      'ios/iphone65',
+      '',
+      428,
+      926,
+      3.0,
+      ScreenshotLayout.mobilePhone,
+      ScreenshotWindowControls.none,
+      [1, 2, 3, 4, 5]),
+  _Target('ios-app-store', 'ipad-13', 'ios/ipad13', '', 1024, 1366, 2.0,
+      ScreenshotLayout.tablet, ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
+  _Target(
+      'ios-app-store',
+      'ipad-13-landscape',
+      'ios/ipad13',
+      'land-',
+      1366,
+      1024,
+      2.0,
+      ScreenshotLayout.tablet,
+      ScreenshotWindowControls.none,
+      [1, 2, 3, 4, 5]),
 ];
 
 // FILL: human-readable, zero-padded, ordered filenames per scene number. These
@@ -444,8 +482,7 @@ class _CapturePlan {
   final List<String> errors; // non-empty => abort before touching anything
   final bool partial; // true iff either filter was supplied
   const _CapturePlan(this.selected, this.skipped, this.errors, this.partial);
-  int get shotCount =>
-      selected.fold<int>(0, (a, p) => a + p.scenes.length);
+  int get shotCount => selected.fold<int>(0, (a, p) => a + p.scenes.length);
 }
 
 /// Total shots a FULL run would produce — the size of the shipped set.
@@ -552,21 +589,26 @@ class _CaptureAppState extends State<_CaptureApp> {
   final GlobalKey _boundaryKey = GlobalKey();
   final List<String> _written = [];
   final List<String> _skipped = [];
+
   /// Shots whose tree never reached visual rest within [_settleTimeout] — each
   /// one may have been rasterized mid-animation, so it needs a human look.
   /// Surfaced by validate_screenshots.py check 8 [SETTLE].
   final List<String> _settleTimeouts = [];
+
   /// Shots that landed on the wrong screen and recovered on the retry.
   /// Informational: the written PNG is correct, but the flake is real.
   /// Surfaced by validate_screenshots.py as a non-fatal [scene-retry].
   final List<String> _sceneRetries = [];
+
   /// Shots still on the wrong screen AFTER the retry — the PNG shows a different
   /// screen than its filename claims. A validator failure (check 9 [SCENE]).
   final List<String> _sceneMismatches = [];
+
   /// Scenes whose [_expectedWidget] entry was never filled in, so the mount
   /// guard did not run for them. Reported, non-fatal.
   final Set<int> _guardUnset = <int>{};
-  final List<Map<String, dynamic>> _manifestShots = []; // one entry per written PNG
+  final List<Map<String, dynamic>> _manifestShots =
+      []; // one entry per written PNG
   bool _started = false;
   Widget? _shot;
   String _shotId = '';
@@ -836,8 +878,12 @@ class _CaptureAppState extends State<_CaptureApp> {
     final seen = <String>{};
     void walk(Element el) {
       final n = el.widget.runtimeType.toString();
-      if (n.endsWith('Screen') || n.endsWith('Pane') || n.endsWith('Shell') ||
-          n.endsWith('App') || n.endsWith('Bar') || n.endsWith('View')) {
+      if (n.endsWith('Screen') ||
+          n.endsWith('Pane') ||
+          n.endsWith('Shell') ||
+          n.endsWith('App') ||
+          n.endsWith('Bar') ||
+          n.endsWith('View')) {
         seen.add(n);
       }
       el.visitChildren(walk);
@@ -980,7 +1026,8 @@ class _CaptureAppState extends State<_CaptureApp> {
     };
     const path = '$_outRoot/capture_manifest.json';
     if (plan.partial) _mergeIntoManifest(manifest, plan, path);
-    File(path).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(manifest));
+    File(path).writeAsStringSync(
+        const JsonEncoder.withIndent('  ').convert(manifest));
     // ignore: avoid_print
     print('MANIFEST_WRITTEN: $path');
   }

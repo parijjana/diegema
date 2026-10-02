@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 import 'app_metrics.dart';
+import 'app_palettes.dart';
 import 'app_typography.dart';
 
 export 'app_colors.dart';
+export 'app_palettes.dart';
 export 'app_metrics.dart';
 export 'app_typography.dart';
 
@@ -28,8 +30,25 @@ extension AppColorsContext on BuildContext {
 /// minimum sizes, card surfaces, input decoration, slider metrics, the
 /// focus ring. Per-call-site `styleFrom` is a bug, not a style choice.
 abstract final class AppTheme {
-  static ThemeData light() => _build(Brightness.light, AppColors.light);
-  static ThemeData dark() => _build(Brightness.dark, AppColors.dark);
+  static ThemeData light({
+    AccentPalette accent = AccentPalette.fallback,
+    BackgroundPair background = BackgroundPair.fallback,
+    ShadowStyle shadows = ShadowStyle.off,
+  }) =>
+      _build(
+          Brightness.light,
+          AppColors.themed(Brightness.light,
+              accent: accent, background: background, shadows: shadows));
+
+  static ThemeData dark({
+    AccentPalette accent = AccentPalette.fallback,
+    BackgroundPair background = BackgroundPair.fallback,
+    ShadowStyle shadows = ShadowStyle.off,
+  }) =>
+      _build(
+          Brightness.dark,
+          AppColors.themed(Brightness.dark,
+              accent: accent, background: background, shadows: shadows));
 
   static ThemeData _build(Brightness brightness, AppColors c) {
     final textTheme = AppType.textTheme(c.text, c.textSecondary);
@@ -78,12 +97,14 @@ abstract final class AppTheme {
         ),
         // No uppercase, no letter-spacing.
         textStyle: const WidgetStatePropertyAll(AppType.label),
-        foregroundColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.disabled) ? c.textDisabled : foreground),
+        foregroundColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.disabled) ? c.textDisabled : foreground),
         backgroundColor: background == null
             ? null
             : WidgetStateProperty.resolveWith((s) =>
-                s.contains(WidgetState.disabled) ? c.surfaceSunken : background),
+                s.contains(WidgetState.disabled)
+                    ? c.surfaceSunken
+                    : background),
         side: side == null ? null : WidgetStatePropertyAll(side),
         overlayColor: WidgetStatePropertyAll(c.accent.withValues(alpha: 0.10)),
         elevation: const WidgetStatePropertyAll(0),
@@ -104,7 +125,10 @@ abstract final class AppTheme {
       dividerTheme: DividerThemeData(color: c.border, space: 1, thickness: 1),
       cardTheme: CardThemeData(
         color: c.surface,
-        elevation: 0,
+        // Material cards take the optional drop shadow as an elevation in
+        // the same colour (dark ink, or the accent glow in dark mode).
+        elevation: c.shadowUi.isEmpty ? 0 : c.shadowUi.first.blurRadius / 3,
+        shadowColor: c.shadowUi.isEmpty ? null : c.shadowUi.first.color,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: R.md,
@@ -129,12 +153,10 @@ abstract final class AppTheme {
         minVerticalPadding: Sp.x2,
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: baseButton(
-            foreground: c.textOnAccent, background: c.accentFill),
+        style: baseButton(foreground: c.textOnAccent, background: c.accentFill),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: baseButton(
-            foreground: c.textOnAccent, background: c.accentFill),
+        style: baseButton(foreground: c.textOnAccent, background: c.accentFill),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: baseButton(
@@ -201,7 +223,8 @@ abstract final class AppTheme {
         overlayColor: c.accent.withValues(alpha: 0.16),
         thumbShape:
             const RoundSliderThumbShape(enabledThumbRadius: Dim.scrubThumb / 2),
-        overlayShape: const RoundSliderOverlayShape(overlayRadius: Dim.tapMin / 2),
+        overlayShape:
+            const RoundSliderOverlayShape(overlayRadius: Dim.tapMin / 2),
         trackShape: const RoundedRectSliderTrackShape(),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
@@ -249,13 +272,15 @@ abstract final class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith(
           (s) => s.contains(WidgetState.selected)
               ? AppType.label.copyWith(color: c.accentText)
-              : AppType.label
-                  .copyWith(color: c.textSecondary, fontWeight: FontWeight.w500),
+              : AppType.label.copyWith(
+                  color: c.textSecondary, fontWeight: FontWeight.w500),
         ),
         iconTheme: WidgetStateProperty.resolveWith(
           (s) => IconThemeData(
             size: Dim.iconMd,
-            color: s.contains(WidgetState.selected) ? c.accentText : c.textSecondary,
+            color: s.contains(WidgetState.selected)
+                ? c.accentText
+                : c.textSecondary,
           ),
         ),
       ),
@@ -264,8 +289,8 @@ abstract final class AppTheme {
         indicatorColor: c.accentWash,
         indicatorShape: const RoundedRectangleBorder(borderRadius: R.pill),
         selectedLabelTextStyle: AppType.label.copyWith(color: c.accentText),
-        unselectedLabelTextStyle:
-            AppType.label.copyWith(color: c.textSecondary, fontWeight: FontWeight.w500),
+        unselectedLabelTextStyle: AppType.label
+            .copyWith(color: c.textSecondary, fontWeight: FontWeight.w500),
         selectedIconTheme: IconThemeData(color: c.accentText, size: Dim.iconMd),
         unselectedIconTheme:
             IconThemeData(color: c.textSecondary, size: Dim.iconMd),

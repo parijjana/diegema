@@ -41,8 +41,7 @@ class LibriVoxShelfView extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: Sp.x4),
           child: Semantics(
             header: true,
-            child: Text(title,
-                style: AppType.titleSm.copyWith(color: c.text)),
+            child: Text(title, style: AppType.titleSm.copyWith(color: c.text)),
           ),
         ),
         const SizedBox(height: Sp.x3),

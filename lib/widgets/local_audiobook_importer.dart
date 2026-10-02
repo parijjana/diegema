@@ -42,10 +42,11 @@ class LocalAudiobookImporter {
             const SizedBox(height: 16),
             ListTile(
               leading: Icon(Icons.folder_open_rounded, color: primary),
-              title: const Text('Import Audiobook Folder',
+              title: const Text('Add a library folder',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               subtitle: const Text(
-                  'Select a directory containing MP3, M4A, or FLAC chapters',
+                  'A book or a folder of books. Read where it is: nothing is '
+                  'copied or changed.',
                   style: TextStyle(fontSize: 11)),
               onTap: () {
                 Navigator.pop(context);

@@ -40,6 +40,10 @@ class AudioPlaybackService {
   final ValueNotifier<double> speedNotifier = ValueNotifier(1.0);
   final ValueNotifier<Duration?> sleepTimerNotifier = ValueNotifier(null);
 
+  /// Bumped each time the sleep timer runs out (not when it is cancelled),
+  /// so the ambience channel can stop with the book.
+  final ValueNotifier<int> sleepTimerFired = ValueNotifier(0);
+
   AudioPlaybackService({AudioPlayer? player, AppDatabase? db})
       : _player = player ?? AudioPlayer(),
         _db = db {
@@ -155,7 +159,8 @@ class AudioPlaybackService {
 
     if (book.chapters.isEmpty) return;
 
-    await _playCurrentChapter(seekToPosition: targetPosition, autoPlay: autoPlay);
+    await _playCurrentChapter(
+        seekToPosition: targetPosition, autoPlay: autoPlay);
   }
 
   Future<void> _playCurrentChapter(
@@ -175,7 +180,16 @@ class AudioPlaybackService {
           chapter.audioPathOrUrl.startsWith('https://')) {
         await _player.setUrl(chapter.audioPathOrUrl);
       } else {
-        final loaded = await playLocalFile(_player, chapter.audioPathOrUrl);
+        final loaded = await playLocalFile(
+          _player,
+          chapter.audioPathOrUrl,
+          start: chapter.startMs != null
+              ? Duration(milliseconds: chapter.startMs!)
+              : null,
+          end: chapter.endMs != null
+              ? Duration(milliseconds: chapter.endMs!)
+              : null,
+        );
         if (!loaded) {
           stateNotifier.value = PlaybackState.error;
           return;
@@ -203,8 +217,7 @@ class AudioPlaybackService {
         try {
           await _player.play();
         } catch (e) {
-          debugPrint(
-              'AudioPlaybackService: start refused, leaving paused: $e');
+          debugPrint('AudioPlaybackService: start refused, leaving paused: $e');
           stateNotifier.value = PlaybackState.paused;
         }
       } else {
@@ -236,6 +249,7 @@ class AudioPlaybackService {
       stateNotifier.value = PlaybackState.paused;
     }
   }
+
   Future<void> pause() async {
     await _player.pause();
     await _persistCurrentProgress();
@@ -314,6 +328,7 @@ class AudioPlaybackService {
     _sleepTimer = Timer(duration, () async {
       await pause();
       cancelSleepTimer();
+      sleepTimerFired.value++;
     });
 
     _sleepTimerTicker = Timer.periodic(const Duration(seconds: 1), (timer) {

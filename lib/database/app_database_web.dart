@@ -168,6 +168,24 @@ class AppDatabase {
     _userCoverPaths.remove(audiobookId);
   }
 
+  /// Mirrors `app_database_io.dart`'s `setCoverUrl` — see its doc comment.
+  Future<void> setCoverUrl(String audiobookId, String coverUrl) async {
+    final book = _audiobooks[audiobookId];
+    if (book == null) return;
+    _audiobooks[audiobookId] = domain.UnifiedAudiobook(
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      description: book.description,
+      coverArtUrlOrPath: coverUrl,
+      source: book.source,
+      origin: book.origin,
+      narrators: book.narrators,
+      chapters: book.chapters,
+      isDownloaded: book.isDownloaded,
+    );
+  }
+
   Future<void> addBookmark({
     required String id,
     required String audiobookId,
@@ -191,9 +209,10 @@ class AppDatabase {
   }
 
   Future<List<Bookmark>> getBookmarks(String audiobookId) async {
-    final matches =
-        _bookmarks.where((b) => b.audiobookId == audiobookId).toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final matches = _bookmarks
+        .where((b) => b.audiobookId == audiobookId)
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return matches;
   }
 
@@ -226,6 +245,48 @@ class AppDatabase {
 
   Future<void> deleteBookmark(String id) async {
     _bookmarks.removeWhere((b) => b.id == id);
+  }
+
+  Future<void> deleteAudiobook(String id) async {
+    _audiobooks.remove(id);
+  }
+
+  /// Mirrors `app_database_io.dart`'s `updateChapterAudioPath` — see its
+  /// doc comment. Local import doesn't exist on web (see
+  /// `services/local_audiobook_import_web.dart`), so nothing ever calls
+  /// this in practice; it exists only so both platforms expose the same
+  /// `AppDatabase` surface.
+  Future<void> updateChapterAudioPath(
+      String chapterId, String newAudioPathOrUrl) async {
+    for (final entry in _audiobooks.entries) {
+      final book = entry.value;
+      final chapterIndex = book.chapters.indexWhere((c) => c.id == chapterId);
+      if (chapterIndex == -1) continue;
+      final oldChapter = book.chapters[chapterIndex];
+      final newChapters = List<domain.AudiobookChapter>.from(book.chapters);
+      newChapters[chapterIndex] = domain.AudiobookChapter(
+        id: oldChapter.id,
+        title: oldChapter.title,
+        audioPathOrUrl: newAudioPathOrUrl,
+        durationSeconds: oldChapter.durationSeconds,
+        isStream: oldChapter.isStream,
+        startMs: oldChapter.startMs,
+        endMs: oldChapter.endMs,
+      );
+      _audiobooks[entry.key] = domain.UnifiedAudiobook(
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        description: book.description,
+        coverArtUrlOrPath: book.coverArtUrlOrPath,
+        source: book.source,
+        origin: book.origin,
+        narrators: book.narrators,
+        chapters: newChapters,
+        isDownloaded: book.isDownloaded,
+      );
+      return;
+    }
   }
 
   Future<void> close() async {}

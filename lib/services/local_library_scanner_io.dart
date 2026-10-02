@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
+import 'library_locations_scanner_io.dart';
+import 'library_locations_store.dart';
 
 /// Resolves the directory the app keeps its data in. Returning `null` means
 /// "there is no documents directory here", and the scan is skipped rather
@@ -26,21 +28,44 @@ Future<String?> _platformDocumentsRoot() async {
 }
 
 /// Scans `<documents root>/diegema/downloads` (the directory
-/// `BookDetailPane`'s ZIP downloader writes into) and registers any
-/// not-yet-known book folders in [db].
+/// `BookDetailPane`'s ZIP downloader writes into), then every library
+/// location the user added (read in place — see
+/// `library_locations_scanner_io.dart`), and registers any not-yet-known
+/// books in [db].
 Future<void> scanDownloadedLibrary(
   AppDatabase db, {
   DocumentsRootResolver? documentsRoot,
+  LibraryLocationsStore locations = const LibraryLocationsStore(),
 }) async {
+  await _scanDownloads(db, documentsRoot);
+  await scanLibraryLocations(db, store: locations);
+}
+
+Future<void> _scanDownloads(
+  AppDatabase db,
+  DocumentsRootResolver? documentsRoot,
+) async {
   final rootPath = await (documentsRoot ?? _platformDocumentsRoot)();
   if (rootPath == null) return;
 
-  final downloadsDir =
-      Directory(p.join(rootPath, 'diegema', 'downloads'));
+  final downloadsDir = Directory(p.join(rootPath, 'diegema', 'downloads'));
 
   if (!await downloadsDir.exists()) return;
 
   final List<FileSystemEntity> entities = await downloadsDir.list().toList();
+
+  // A Discover download lands in this same directory but is saved under
+  // its archive.org id, not the path hash below. Without this map the scan
+  // re-registered every such download as a second "Downloaded Audiobook".
+  final owners = <String, String>{};
+  for (final book in await db.getAllAudiobooks()) {
+    if (book.id.startsWith(BookIdentity.localIdPrefix)) continue;
+    for (final ch in book.chapters) {
+      if (ch.isStream) continue;
+      owners.putIfAbsent(
+          p.normalize(p.dirname(ch.audioPathOrUrl)), () => book.id);
+    }
+  }
   for (final entity in entities) {
     if (entity is! Directory) continue;
 
@@ -58,6 +83,17 @@ Future<void> scanDownloadedLibrary(
     // core/utils/book_identity.dart).
     final bookId = BookIdentity.localIdForPath(entity.path);
     final existing = await db.getAudiobook(bookId);
+
+    // Another book already owns this folder: drop a duplicate an earlier
+    // scan made, unless the user has since listened to or bookmarked it.
+    if (owners.containsKey(p.normalize(entity.path))) {
+      if (existing != null &&
+          await db.getProgress(bookId) == null &&
+          (await db.getBookmarks(bookId)).isEmpty) {
+        await db.deleteAudiobook(bookId);
+      }
+      continue;
+    }
     if (existing != null) continue;
 
     final chapters = mp3Files.asMap().entries.map((e) {

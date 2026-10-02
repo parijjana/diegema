@@ -43,7 +43,8 @@ class DemoDeepLink {
 
   static const DemoDeepLink none = DemoDeepLink();
 
-  bool get isEmpty => screen == 0 && dark == null && play == null && book == null;
+  bool get isEmpty =>
+      screen == 0 && dark == null && play == null && book == null;
 
   factory DemoDeepLink.fromUri(Uri uri) {
     if (!kDemoMode) return none;

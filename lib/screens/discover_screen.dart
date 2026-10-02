@@ -79,6 +79,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   final TextEditingController _search = TextEditingController();
 
   Map<String, List<LibriVoxBook>> _shelves = {};
+
+  /// Shelves still in flight, and a counter that lets a retry discard
+  /// results from the load it replaced.
+  int _shelvesPending = 0;
+  int _shelfGeneration = 0;
+
+  /// Browse-mode state, kept apart from [_loading]/[_error] (search mode)
+  /// so shelves landing mid-search cannot clear the search spinner.
+  bool _shelvesLoading = true;
+  Object? _shelvesError;
   List<LibriVoxBook> _results = [];
   LibriVoxBook? _selected;
   bool _loading = true;
@@ -103,46 +113,45 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Future<void> _loadShelves() async {
+    final generation = ++_shelfGeneration;
     setState(() {
-      _loading = true;
-      _error = null;
+      _shelves = {};
+      _shelvesPending = _categories.length;
+      _shelvesLoading = true;
+      _shelvesError = null;
     });
-    try {
-      final results = <String, List<LibriVoxBook>>{};
-      final featured = await widget.libriVoxService.searchBooks('', limit: 12);
-      results[''] = featured;
 
-      final entries = await Future.wait(
-        _categories.skip(1).map((cat) async {
-          final books =
-              await widget.libriVoxService.searchBooks(cat.query, limit: 10);
-          return MapEntry(cat.query, books);
-        }),
-      );
-      for (final e in entries) {
-        results[e.key] = e.value;
+    // Every shelf is fetched independently and rendered the moment it
+    // lands, so a slow LibriVox feed never holds back the category shelves.
+    await Future.wait(_categories.map((cat) async {
+      var books = const <LibriVoxBook>[];
+      try {
+        books = await widget.libriVoxService
+            .searchBooks(cat.query, limit: cat.query.isEmpty ? 12 : 10);
+      } catch (_) {
+        // An individual shelf failing just leaves that shelf out.
       }
-
-      if (!mounted) return;
+      // A retry started a newer load; this result belongs to the old one.
+      if (!mounted || generation != _shelfGeneration) return;
       setState(() {
-        _shelves = results;
-        final requested = widget.openBookId;
-        if (requested != null && featured.isNotEmpty) {
-          _selected = featured.firstWhere(
-            (b) => b.id == requested,
-            orElse: () => featured.first,
-          );
+        _shelves[cat.query] = books;
+        _shelvesPending--;
+        if (books.isNotEmpty) _shelvesLoading = false;
+        if (cat.query.isEmpty && books.isNotEmpty) {
+          final requested = widget.openBookId;
+          _selected ??= requested == null
+              ? books.first
+              : books.firstWhere((b) => b.id == requested,
+                  orElse: () => books.first);
         }
-        _selected ??= featured.isNotEmpty ? featured.first : null;
-        _loading = false;
+        if (_shelvesPending == 0) {
+          _shelvesLoading = false;
+          if (_shelves.values.every((b) => b.isEmpty)) {
+            _shelvesError = 'No shelves could be loaded';
+          }
+        }
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e;
-        _loading = false;
-      });
-    }
+    }));
   }
 
   Future<void> _performSearch(String query) async {
@@ -157,8 +166,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       _error = null;
     });
     try {
-      final results =
-          await widget.libriVoxService.searchBooks(term, limit: 20);
+      final results = await widget.libriVoxService.searchBooks(term, limit: 20);
       if (!mounted) return;
       setState(() {
         _results = results;
@@ -214,6 +222,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 downloader: widget.downloader,
                 audioService: widget.audioService,
                 db: widget.db,
+                libriVoxService: widget.libriVoxService,
+                wide: true,
               ),
             ),
           ),
@@ -235,6 +245,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             downloader: widget.downloader,
             audioService: widget.audioService,
             db: widget.db,
+            libriVoxService: widget.libriVoxService,
           ),
         ),
       ),
@@ -254,7 +265,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         // dialog) rather than a persistent pane, so a deep-linked book has
         // to be pushed open explicitly once the shelves exist, regardless
         // of width.
-        if (_pendingOpen && !_loading && _selected != null) {
+        if (_pendingOpen && !_shelvesLoading && _selected != null) {
           final book = _selected!;
           _pendingOpen = false;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -266,10 +277,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         // own scrollable; the centred states do not, so the column adds it.
         var childReservesInset = false;
 
+        final loading = _searching ? _loading : _shelvesLoading;
+        final error = _searching ? _error : _shelvesError;
+
         final Widget browse;
-        if (_loading) {
+        if (loading) {
           browse = const AppLoadingView(label: 'Loading the LibriVox catalog');
-        } else if (_error != null) {
+        } else if (error != null) {
           browse = AppStateView.error(
             headline: 'Could not reach LibriVox',
             body: 'Check your connection and try again.',
@@ -314,16 +328,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   selectedBook: _selected,
                   onSelectBook: (b) => _select(context, b, wide: wide),
                 ),
+              if (_shelvesPending > 0)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: Sp.x6),
+                  child: Center(
+                    child: SizedBox.square(
+                      dimension: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                  ),
+                ),
             ],
           );
         }
 
         final header = Padding(
-          padding: EdgeInsets.fromLTRB(
-              wide ? Sp.gutterDesktop : Sp.gutterPhone,
-              Sp.x5,
-              wide ? Sp.gutterDesktop : Sp.gutterPhone,
-              Sp.x4),
+          padding: EdgeInsets.fromLTRB(wide ? Sp.gutterDesktop : Sp.gutterPhone,
+              Sp.x5, wide ? Sp.gutterDesktop : Sp.gutterPhone, Sp.x4),
           child: Row(
             children: [
               Expanded(
@@ -463,6 +484,8 @@ class _SearchField extends StatelessWidget {
       child: elevated
           ? DecoratedBox(
               decoration: BoxDecoration(
+                // Opaque, so the shadow can't show through the field.
+                color: c.surface,
                 borderRadius: R.sm,
                 boxShadow: c.shadow3,
               ),

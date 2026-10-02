@@ -78,10 +78,19 @@ void main() {
     // Left Now Playing, arrived at Library. The download scan no longer
     // explodes under the test binding (it resolves no documents root and
     // skips), so the body settles on the honest empty state.
+    //
+    // At this (phone) width the header's Import/Refresh icon buttons are
+    // gone -- Import lives in the floating button above the mini player
+    // and Refresh is pull-to-refresh on the list -- so this asserts their
+    // replacements instead of the icons themselves. The empty state's own
+    // "Import a book" button is a third, pre-existing way to reach the
+    // same action, and both it and the floating button coexisting here is
+    // expected, not a duplicate bug.
     expect(find.text('Nothing in progress'), findsNothing);
-    expect(find.byTooltip('Refresh library'), findsOneWidget);
+    expect(find.byTooltip('Refresh library'), findsNothing);
     expect(find.text('Your library is empty'), findsOneWidget);
-    expect(find.byTooltip('Import a book'), findsOneWidget);
+    expect(find.byTooltip('Import a book'), findsNothing);
+    expect(find.bySemanticsLabel('Import a book'), findsWidgets);
 
     await unmount(tester);
   });

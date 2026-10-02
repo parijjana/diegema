@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'core/app_info.dart';
 import 'core/app_settings.dart';
@@ -12,6 +14,9 @@ import 'services/artwork_enrichment_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
+import 'services/ambience_service.dart';
+import 'services/local_cover_backfill_service.dart';
+import 'services/local_import_migration_service.dart';
 import 'theme/app_theme.dart';
 
 /// Root widget. [database], [libriVoxService], [downloader], and
@@ -23,6 +28,21 @@ import 'theme/app_theme.dart';
 /// services without forking any widget.
 class AudiobookApp extends StatefulWidget {
   final AppDatabase? database;
+
+  /// Whether to run the once-per-launch cover backfill for imported books.
+  /// Only `main.dart` turns this on.
+  final bool runCoverBackfill;
+
+  /// Whether to run the once-per-launch local-import path migration (moves
+  /// already-imported chapters that still point outside
+  /// `diegema/library/<bookId>/` — e.g. file_picker's Android cache dir —
+  /// into that durable location; see
+  /// `services/local_import_migration_service_io.dart`). A sibling of
+  /// [runCoverBackfill], set only by `main.dart` for the same reason: tests
+  /// leave it off so they never touch real storage, and it runs before the
+  /// cover backfill so a freshly-migrated book's files are already in
+  /// their durable location by the time the backfill re-reads them.
+  final bool runImportMigration;
   final LibriVoxService? libriVoxService;
   final LibriVoxStreamAndDownloader? downloader;
   final ArtworkEnrichmentService? artworkService;
@@ -31,6 +51,10 @@ class AudiobookApp extends StatefulWidget {
   /// `just_audio`-backed service — see the identical doc comment on
   /// `AppShell.audioService`, which this is threaded straight through to.
   final AudioPlaybackService? audioService;
+
+  /// The background-sound channel. Null on the web demo and in tests that
+  /// don't exercise it; the player then hides the ambience controls.
+  final AmbienceService? ambience;
 
   /// Injectable UI preference store, so widget tests never need the
   /// `shared_preferences` platform channel.
@@ -54,10 +78,13 @@ class AudiobookApp extends StatefulWidget {
     super.key,
     this.initialThemeMode,
     this.database,
+    this.runCoverBackfill = false,
+    this.runImportMigration = false,
     this.libriVoxService,
     this.downloader,
     this.artworkService,
     this.audioService,
+    this.ambience,
     this.preferences = const UiPreferences(),
     this.libraryScanner,
     this.deepLink = DemoDeepLink.none,
@@ -87,7 +114,31 @@ class _AudiobookAppState extends State<AudiobookApp>
     _db = widget.database ?? AppDatabase();
     WidgetsBinding.instance.addObserver(this);
     _settings.load();
+    widget.ambience?.init();
     _syncHostPageTheme();
+
+    // Once per launch, before the cover backfill: migrate already-imported
+    // local books whose chapters still point outside
+    // `diegema/library/<bookId>/` (see
+    // `services/local_import_migration_service_io.dart`), then give
+    // already-imported local books another shot at a cover (step 4 of the
+    // local-import cover pipeline). Both are opt-in rather than inferred
+    // from "no injected database": main.dart injects its native database
+    // too (for background playback), which would silently disable this in
+    // the real app. Tests leave both off so they never touch real storage
+    // or hit [CoverLookupService]'s real network client.
+    if (!kDemoMode && (widget.runImportMigration || widget.runCoverBackfill)) {
+      unawaited(_runStartupMaintenance());
+    }
+  }
+
+  Future<void> _runStartupMaintenance() async {
+    if (widget.runImportMigration) {
+      await LocalImportMigrationService(db: _db).run();
+    }
+    if (widget.runCoverBackfill) {
+      await LocalCoverBackfillService(db: _db).run();
+    }
   }
 
   void _onSettingsChanged() {
@@ -148,7 +199,7 @@ class _AudiobookAppState extends State<AudiobookApp>
   Widget build(BuildContext context) {
     return SettingsScope(
       settings: _settings,
-      child: MaterialApp(
+      child: _withAmbience(MaterialApp(
         title: kAppName,
         debugShowCheckedModeBanner: false,
         // Both themes are supplied so the framework can cross-fade between
@@ -156,8 +207,14 @@ class _AudiobookAppState extends State<AudiobookApp>
         // two `ThemeData` blocks of raw hex that used to live here are gone
         // — every value now comes from `lib/theme/`, built from
         // `design/tokens.css`.
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
+        theme: AppTheme.light(
+            accent: _settings.accent,
+            background: _settings.background,
+            shadows: _settings.shadows),
+        darkTheme: AppTheme.dark(
+            accent: _settings.accent,
+            background: _settings.background,
+            shadows: _settings.shadows),
         themeMode: _settings.themeMode,
         home: HomeScreen(
           db: _db,
@@ -169,7 +226,14 @@ class _AudiobookAppState extends State<AudiobookApp>
           artworkService: widget.artworkService,
           audioService: widget.audioService,
         ),
-      ),
+      )),
     );
+  }
+
+  Widget _withAmbience(Widget app) {
+    final ambience = widget.ambience;
+    return ambience == null
+        ? app
+        : AmbienceScope(service: ambience, child: app);
   }
 }

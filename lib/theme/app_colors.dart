@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'app_palettes.dart';
+
 /// Primitive colour ramps from `design/tokens.css` / `design/tokens.md` §1.1.
 ///
 /// These are the *only* place raw hex literals are allowed to live. Widgets
@@ -139,6 +141,12 @@ class AppColors extends ThemeExtension<AppColors> {
   final List<BoxShadow> shadow3;
   final List<BoxShadow> shadowCover;
 
+  /// The optional drop shadow for cards, tiles and buttons (Settings >
+  /// Colours > Shadows). Empty when shadows are off, which is the default,
+  /// so a widget can always pass it to `boxShadow`. Pair it with an opaque
+  /// fill ([glassSurface]).
+  final List<BoxShadow> shadowUi;
+
   const AppColors({
     required this.bg,
     required this.surface,
@@ -167,6 +175,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.shadow2,
     required this.shadow3,
     required this.shadowCover,
+    this.shadowUi = const [],
   });
 
   static const AppColors light = AppColors(
@@ -194,22 +203,17 @@ class AppColors extends ThemeExtension<AppColors> {
     warning: Ramp.amber700,
     success: Ramp.green600,
     shadow1: [
-      BoxShadow(
-          color: Color(0x0F22201C), blurRadius: 2, offset: Offset(0, 1)),
-      BoxShadow(
-          color: Color(0x0A22201C), blurRadius: 1, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x0F22201C), blurRadius: 2, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x0A22201C), blurRadius: 1, offset: Offset(0, 1)),
     ],
     shadow2: [
-      BoxShadow(
-          color: Color(0x1422201C), blurRadius: 6, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x1422201C), blurRadius: 6, offset: Offset(0, 2)),
     ],
     shadow3: [
-      BoxShadow(
-          color: Color(0x1F22201C), blurRadius: 24, offset: Offset(0, 8)),
+      BoxShadow(color: Color(0x1F22201C), blurRadius: 24, offset: Offset(0, 8)),
     ],
     shadowCover: [
-      BoxShadow(
-          color: Color(0x2E22201C), blurRadius: 6, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x2E22201C), blurRadius: 6, offset: Offset(0, 2)),
     ],
   );
 
@@ -239,22 +243,106 @@ class AppColors extends ThemeExtension<AppColors> {
     warning: Ramp.amber300,
     success: Ramp.green300,
     shadow1: [
-      BoxShadow(
-          color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
     ],
     shadow2: [
-      BoxShadow(
-          color: Color(0x80000000), blurRadius: 8, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x80000000), blurRadius: 8, offset: Offset(0, 2)),
     ],
     shadow3: [
       BoxShadow(
           color: Color(0x99000000), blurRadius: 28, offset: Offset(0, 10)),
     ],
     shadowCover: [
-      BoxShadow(
-          color: Color(0x8C000000), blurRadius: 8, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x8C000000), blurRadius: 8, offset: Offset(0, 2)),
     ],
   );
+
+  /// The semantic tokens for a user-chosen [accent] and [background]
+  /// (Settings > Colours). The default pair returns the hand-measured
+  /// [light]/[dark] sets untouched; any other choice swaps in the palette's
+  /// surfaces and accent tones and derives the two accent tints from them,
+  /// so every combination stays opaque and measurable
+  /// (`test/theme/palette_contrast_test.dart`).
+  static AppColors themed(
+    Brightness brightness, {
+    AccentPalette accent = AccentPalette.fallback,
+    BackgroundPair background = BackgroundPair.fallback,
+    ShadowStyle shadows = ShadowStyle.off,
+  }) {
+    final dark = brightness == Brightness.dark;
+    final base = dark ? AppColors.dark : AppColors.light;
+    final a = accent.tones(brightness);
+    final withShadows = shadows == ShadowStyle.off
+        ? base
+        : () {
+            final ui = shadowsFor(brightness, shadows, a.accent, base.text);
+            // The existing elevation tokens follow the same colour, so the
+            // mini player and play button match everything else.
+            return base.copyWith(
+                shadowUi: ui, shadow1: ui, shadow2: ui, shadow3: ui);
+          }();
+    if (accent == AccentPalette.fallback &&
+        background == BackgroundPair.fallback) {
+      return withShadows;
+    }
+    final b = background.tones(brightness);
+    return withShadows.copyWith(
+      bg: b.bg,
+      surface: b.surface,
+      surfaceSunken: b.surfaceSunken,
+      surfaceRaised: b.surfaceRaised,
+      border: b.border,
+      borderContrast: b.borderContrast,
+      accent: a.accent,
+      accentText: a.accentText,
+      accentFill: a.accentFill,
+      textOnAccent: a.textOnAccent,
+      focusRing: a.accentText,
+      accentWash: accentWashFor(brightness, a, b),
+      surfaceAccent: Color.lerp(b.bg, a.accent, dark ? 0.14 : 0.06),
+    );
+  }
+
+  /// The drop shadow for [style], modelled on Material 3's elevation
+  /// shadows: a tight "key" shadow that gives the edge, plus a wider, fainter
+  /// "ambient" one with a little spread. Soft is elevation level 1, Strong
+  /// is level 2. Light mode casts them in [darkInk] (the text colour); dark
+  /// mode in a faded [accent], at lower strength, since a coloured glow
+  /// reads much more strongly than a dark shadow does.
+  static List<BoxShadow> shadowsFor(
+      Brightness brightness, ShadowStyle style, Color accent, Color darkInk) {
+    if (style == ShadowStyle.off) return const [];
+    final dark = brightness == Brightness.dark;
+    final strong = style == ShadowStyle.strong;
+    final colour = dark ? accent : darkInk;
+    final keyAlpha = dark ? 0.20 : 0.30;
+    final ambientAlpha = dark ? 0.10 : 0.15;
+    return [
+      BoxShadow(
+        color: colour.withValues(alpha: keyAlpha),
+        blurRadius: 2,
+        offset: const Offset(0, 1),
+      ),
+      BoxShadow(
+        color: colour.withValues(alpha: ambientAlpha),
+        blurRadius: strong ? 6 : 3,
+        spreadRadius: strong ? 2 : 1,
+        offset: Offset(0, strong ? 2 : 1),
+      ),
+    ];
+  }
+
+  /// The fill for the translucent "glass" controls over the Now Playing
+  /// backdrop. Opaque while shadows are on, because a shadow painted
+  /// beneath a translucent control shows through and muddies it.
+  Color get glassSurface =>
+      shadowUi.isEmpty ? surface.withValues(alpha: 0.72) : surface;
+
+  /// The tinted background behind accent text (selected rows, chips).
+  static Color accentWashFor(
+          Brightness brightness, AccentTones a, BackgroundTones b) =>
+      Color.lerp(
+          b.surface, a.accent, brightness == Brightness.dark ? 0.20 : 0.10)!;
 
   @override
   AppColors copyWith({
@@ -285,6 +373,7 @@ class AppColors extends ThemeExtension<AppColors> {
     List<BoxShadow>? shadow2,
     List<BoxShadow>? shadow3,
     List<BoxShadow>? shadowCover,
+    List<BoxShadow>? shadowUi,
   }) {
     return AppColors(
       bg: bg ?? this.bg,
@@ -314,6 +403,7 @@ class AppColors extends ThemeExtension<AppColors> {
       shadow2: shadow2 ?? this.shadow2,
       shadow3: shadow3 ?? this.shadow3,
       shadowCover: shadowCover ?? this.shadowCover,
+      shadowUi: shadowUi ?? this.shadowUi,
     );
   }
 
@@ -321,8 +411,7 @@ class AppColors extends ThemeExtension<AppColors> {
   AppColors lerp(ThemeExtension<AppColors>? other, double t) {
     if (other is! AppColors) return this;
     Color c(Color a, Color b) => Color.lerp(a, b, t)!;
-    List<BoxShadow> s(List<BoxShadow> a, List<BoxShadow> b) =>
-        t < 0.5 ? a : b;
+    List<BoxShadow> s(List<BoxShadow> a, List<BoxShadow> b) => t < 0.5 ? a : b;
     return AppColors(
       bg: c(bg, other.bg),
       surface: c(surface, other.surface),
@@ -351,6 +440,7 @@ class AppColors extends ThemeExtension<AppColors> {
       shadow2: s(shadow2, other.shadow2),
       shadow3: s(shadow3, other.shadow3),
       shadowCover: s(shadowCover, other.shadowCover),
+      shadowUi: s(shadowUi, other.shadowUi),
     );
   }
 }

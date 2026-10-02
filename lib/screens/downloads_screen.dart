@@ -147,8 +147,11 @@ class DownloadsWifiToggle extends StatelessWidget {
                         style: AppType.label.copyWith(color: c.text)),
                     const SizedBox(height: Sp.x1),
                     Text(
+                        // Android and iOS mean "unmetered": a Wi-Fi network
+                        // marked metered (a phone hotspot) does not count.
                         'Downloads wait for Wi-Fi instead of using mobile '
-                        'data.',
+                        'data. A Wi-Fi network set as metered counts as '
+                        'mobile data.',
                         style:
                             AppType.caption.copyWith(color: c.textSecondary)),
                   ],

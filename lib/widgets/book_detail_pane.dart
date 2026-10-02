@@ -268,7 +268,7 @@ class _BookDetailPaneState extends State<BookDetailPane> {
                       style: TextStyle(
                           color: theme.colorScheme.onSurface
                               .withValues(alpha: 0.6),
-                          fontSize: 12),
+                          fontSize: 13),
                     ),
                   ],
                   if (!widget.book.demoPlayable) ...[
@@ -289,7 +289,7 @@ class _BookDetailPaneState extends State<BookDetailPane> {
                           Text(
                             'PREVIEW ONLY — not streamable in this demo',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 13,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.3,
                               color: Colors.white,
@@ -355,7 +355,7 @@ class _BookDetailPaneState extends State<BookDetailPane> {
                         Text(
                           'Offline listening is in the app, not this preview',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 13,
                             color: theme.colorScheme.onSurface
                                 .withValues(alpha: 0.38),
                           ),
@@ -446,14 +446,14 @@ class _BookDetailPaneState extends State<BookDetailPane> {
                     title: Text(ch.title,
                         style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                            fontSize: 13,
                             color: playable ? null : disabledColor)),
                     subtitle: Text(
                         playable
                             ? '${(ch.durationSeconds / 60).toStringAsFixed(1)} mins'
                             : 'Preview only — not streamable in this demo',
                         style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 13,
                             color: playable ? null : disabledColor)),
                     onTap: playable
                         ? () async {
@@ -611,8 +611,10 @@ class _DownloadFooter extends StatelessWidget {
               ),
               const SizedBox(width: Sp.x3),
               Expanded(
-                child: SizedBox(
-                  height: Dim.tapComfy,
+                // A minimum, not a fixed height: the two-line label is
+                // taller than 56 at large text scales.
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: Dim.tapComfy),
                   child: Semantics(
                     button: true,
                     label: subtitle == null ? title : '$title, $subtitle',
@@ -621,6 +623,7 @@ class _DownloadFooter extends StatelessWidget {
                       onPressed: onDownload,
                       style: FilledButton.styleFrom(
                         shape: const RoundedRectangleBorder(borderRadius: R.md),
+                        minimumSize: const Size(0, Dim.tapComfy),
                         disabledBackgroundColor: c.accentFill,
                         disabledForegroundColor: c.textOnAccent,
                       ),

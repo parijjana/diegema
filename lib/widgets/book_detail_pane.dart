@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 import '../core/demo_mode.dart';
 import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/librivox_book.dart';
 import '../domain/models/audiobook.dart';
 import '../services/artwork_enrichment_service.dart';
-import '../services/downloads_location.dart';
+import '../services/download_manager.dart';
 import '../services/librivox_downloader.dart';
 import '../services/librivox_service.dart';
 import '../services/audio_playback_service.dart';
@@ -14,6 +13,7 @@ import '../theme/app_theme.dart';
 import '../core/utils/duration_format.dart';
 import 'app_book_cover.dart';
 import 'book_detail_parts.dart';
+import 'download_controls.dart';
 
 class BookDetailPane extends StatefulWidget {
   final LibriVoxBook book;
@@ -37,9 +37,6 @@ class BookDetailPane extends StatefulWidget {
   /// the phone layout.
   final bool wide;
 
-  /// Where a download is saved (see `downloads_location_io.dart`).
-  final DownloadsLocation downloadsLocation;
-
   const BookDetailPane({
     super.key,
     required this.book,
@@ -49,7 +46,6 @@ class BookDetailPane extends StatefulWidget {
     required this.db,
     this.libriVoxService,
     this.wide = false,
-    this.downloadsLocation = const DownloadsLocation(),
   });
 
   @override
@@ -62,8 +58,6 @@ class _BookDetailPaneState extends State<BookDetailPane> {
 
   /// The chapter list couldn't be fetched (offline, timeout, feed error).
   bool _chaptersFailed = false;
-  bool _isDownloading = false;
-  double _downloadProgress = 0.0;
   bool _allChapters = false;
   static const int _collapsedChapters = 5;
   bool _isDownloaded = false;
@@ -79,6 +73,28 @@ class _BookDetailPaneState extends State<BookDetailPane> {
     _loadEnrichmentData();
     _loadZipSize();
   }
+
+  /// The archive.org identifier: the saved book's id and the download's.
+  String get _bookId => BookIdentity.archiveIdentifierFor(
+        librivoxApiId: widget.book.id,
+        urlIarchive: widget.book.urlIarchive,
+      );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The queue notifies through [DownloadsScope]; when this book's
+    // download has just been saved, show the saved copy.
+    // Only on the change itself: a book downloaded earlier and since
+    // removed from the library still has a finished entry in the queue.
+    final phase = DownloadsScope.maybeOf(context)?.stateFor(_bookId)?.phase;
+    if (phase == DownloadPhase.done && _downloadPhase != DownloadPhase.done) {
+      _loadChapters();
+    }
+    _downloadPhase = phase;
+  }
+
+  DownloadPhase? _downloadPhase;
 
   @override
   void didUpdateWidget(covariant BookDetailPane oldWidget) {
@@ -145,95 +161,24 @@ class _BookDetailPaneState extends State<BookDetailPane> {
     if (mounted) setState(() => _zipSizeBytes = bytes);
   }
 
-  Future<void> _downloadBook() async {
-    if (_isDownloading) return;
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0.0;
-    });
-
+  /// Hands the book to the app-wide queue, which outlives this pane: closing
+  /// the sheet, or the app, does not stop the download.
+  Future<void> _downloadBook(DownloadManager downloads) async {
+    // The feed's section titles and durations, when the feed (not a saved
+    // copy) is what is showing; the queue uses them if they line up.
+    final streamable = _streamableBook;
+    final feed = streamable != null && !streamable.isDownloaded
+        ? streamable.chapters
+        : null;
     try {
-      final location = widget.downloadsLocation;
-      if (location.needsFolderChoice && await location.chooseFolder() != null) {
-        // Downloads made before the folder was chosen join it now.
-        await moveDownloadsToVisibleFolder(widget.db, location: location);
-      }
-      final savePath = await location.current();
-      if (savePath == null) {
-        throw StateError('No folder to download into');
-      }
-
-      final extractedFiles = await widget.downloader.downloadAndExtractZip(
-        widget.book,
-        saveDirectoryPath: savePath,
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() => _downloadProgress = progress);
-          }
-        },
-      );
-
-      // Same canonical id as `parseStreamableBook` (both derive from the
-      // archive.org identifier) so downloading a book that was already
-      // being streamed updates the *same* row instead of creating a
-      // second one with separate progress/bookmarks.
-      final canonicalId = BookIdentity.archiveIdentifierFor(
-        librivoxApiId: widget.book.id,
-        urlIarchive: widget.book.urlIarchive,
-      );
-
-      // The feed's section titles and durations, when it lists exactly the
-      // files the ZIP held (LibriVox numbers both the same way); otherwise
-      // the file names.
-      final feed = _streamableBook?.chapters;
-      final fromFeed = feed != null &&
-          !(_streamableBook?.isDownloaded ?? false) &&
-          feed.length == extractedFiles.length;
-      final List<AudiobookChapter> chapters = [];
-      for (int i = 0; i < extractedFiles.length; i++) {
-        final filePath = extractedFiles[i];
-        final filename = p.basename(filePath);
-        chapters.add(
-          AudiobookChapter(
-            id: '${canonicalId}_local_$i',
-            title: fromFeed ? feed[i].title : filename.replaceAll('.mp3', ''),
-            audioPathOrUrl: filePath,
-            durationSeconds: fromFeed ? feed[i].durationSeconds : 0,
-            isStream: false,
-          ),
-        );
-      }
-
-      final downloadedBook = UnifiedAudiobook(
-        id: canonicalId,
-        title: widget.book.title,
-        author: widget.book.authorNames,
-        description: widget.book.description,
-        source: 'Downloaded',
-        origin: BookIdentity.originLibrivox,
-        coverArtUrlOrPath: widget.book.coverArtUrl,
-        chapters: chapters,
-        isDownloaded: true,
-      );
-
-      await widget.db.saveAudiobook(downloadedBook);
-
-      if (mounted) {
-        setState(() {
-          _isDownloading = false;
-          _isDownloaded = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Downloaded ${extractedFiles.length} chapters to local storage & saved to Library!')),
-        );
-      }
+      await downloads.download(widget.book, feed: feed);
     } catch (e) {
+      debugPrint('BookDetailPane: download not started: $e');
       if (mounted) {
-        setState(() => _isDownloading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e')),
+          const SnackBar(
+              content: Text("Couldn't start the download. Choose a folder "
+                  'for downloads and try again.')),
         );
       }
     }
@@ -267,41 +212,49 @@ class _BookDetailPaneState extends State<BookDetailPane> {
         ),
       );
     }
-    final size = formatZipSize(_zipSizeBytes);
-    final String label;
-    final IconData icon;
-    if (_isDownloading) {
-      label = 'Downloading… ${(_downloadProgress * 100).round()}%';
-      icon = Icons.downloading_rounded;
-    } else if (_isDownloaded) {
-      label = 'Downloaded';
-      icon = Icons.check_circle_rounded;
-    } else {
-      label = size == null ? 'Download' : 'Download · ZIP $size';
-      icon = Icons.download_rounded;
+    final downloads = DownloadsScope.maybeOf(context);
+    final state = downloads?.stateFor(_bookId);
+    // A finished download is the saved book's business ([_isDownloaded]).
+    if (downloads == null ||
+        state == null ||
+        state.phase == DownloadPhase.done) {
+      final size = formatZipSize(_zipSizeBytes);
+      return DetailPrimaryButton(
+        icon: _isDownloaded
+            ? Icons.check_circle_rounded
+            : Icons.download_rounded,
+        label: _isDownloaded
+            ? 'Downloaded'
+            : (size == null ? 'Download' : 'Download · ZIP $size'),
+        onPressed: _isDownloaded || downloads == null
+            ? null
+            : () => _downloadBook(downloads),
+        keepFilledWhenDisabled: true,
+      );
     }
-    final inactive = _isDownloading || _isDownloaded;
+    final failed = state.phase == DownloadPhase.failed;
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DetailPrimaryButton(
-          icon: icon,
-          label: label,
-          onPressed: inactive ? null : _downloadBook,
+          icon: downloadIcon(state.phase),
+          label: failed ? 'Retry download' : downloadLabel(downloads, state),
+          onPressed: failed ? () => downloads.retry(state.id) : null,
           keepFilledWhenDisabled: true,
         ),
-        if (_isDownloading) ...[
+        if (failed && state.error != null) ...[
           const SizedBox(height: Sp.x2),
-          ClipRRect(
-            borderRadius: R.pill,
-            child: LinearProgressIndicator(
-              value: _downloadProgress,
-              minHeight: 3,
-              backgroundColor: c.accent.withValues(alpha: 0.2),
-              valueColor: AlwaysStoppedAnimation(c.accent),
-            ),
-          ),
+          Text(state.error!,
+              textAlign: TextAlign.center,
+              style: AppType.caption.copyWith(color: c.danger)),
         ],
+        if (state.phase != DownloadPhase.queued && !failed) ...[
+          const SizedBox(height: Sp.x2),
+          DownloadProgressBar(download: state),
+        ],
+        DownloadActions(
+            manager: downloads, download: state, includeRetry: false),
       ],
     );
   }

@@ -14,9 +14,13 @@ class DownloadsLocation {
   Future<String?> privateRoot() async => null;
   Future<String?> userVisibleRoot() async => null;
   Future<String?> current() async => null;
+  bool get needsFolderChoice => false;
+  Future<String?> chooseFolder() async => null;
   Future<List<String>> all() async => const [];
   Future<bool> requestMediaDelete(List<String> files) async => false;
 }
+
+Future<void> openDownloadsFolder() async {}
 
 Future<int> moveDownloadsToVisibleFolder(AppDatabase db,
         {DownloadsLocation location = const DownloadsLocation()}) async =>

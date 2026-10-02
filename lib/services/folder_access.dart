@@ -54,6 +54,25 @@ class FolderAccess {
     }
   }
 
+  /// macOS: asks where downloads go (the panel opens at ~/Audiobooks when
+  /// it exists) and returns `<picked>/Diegema`, created, open for this run
+  /// and bookmarked read-write. Null when cancelled.
+  Future<({String path, String bookmark})?> pickDownloadsFolder() async {
+    try {
+      final result = await channel
+          .invokeMapMethod<String, Object?>('pickDownloadsFolder');
+      final path = result?['path'];
+      final bookmark = result?['bookmark'];
+      if (path is! String || bookmark is! String) return null;
+      return (path: path, bookmark: bookmark);
+    } on PlatformException catch (e) {
+      debugPrint('FolderAccess.pickDownloadsFolder failed: ${e.message}');
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   /// A bookmark for [path], base64-encoded, or null when the platform needs
   /// none or the folder can't be bookmarked. Call it right after the picker
   /// returns, while the picker's own access is still live.

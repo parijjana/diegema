@@ -151,7 +151,12 @@ class _BookDetailPaneState extends State<BookDetailPane> {
     });
 
     try {
-      final savePath = await widget.downloadsLocation.current();
+      final location = widget.downloadsLocation;
+      if (location.needsFolderChoice && await location.chooseFolder() != null) {
+        // Downloads made before the folder was chosen join it now.
+        await moveDownloadsToVisibleFolder(widget.db, location: location);
+      }
+      final savePath = await location.current();
       if (savePath == null) {
         throw StateError('No folder to download into');
       }

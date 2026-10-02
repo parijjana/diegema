@@ -78,6 +78,7 @@ Future<void> main() async {
     // Before anything scans or plays from a library folder: on macOS/iOS
     // the sandbox forgets picked folders between launches.
     await openLibraryLocations();
+    await openDownloadsFolder();
     nativeDb = demoDb ?? AppDatabase();
     // Before playback restores the last book: iOS moves the app's folder
     // on every update, and the database stores absolute paths into it.

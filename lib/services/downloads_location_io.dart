@@ -4,8 +4,10 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database/app_database.dart';
+import 'folder_access.dart';
 
 /// Resolves a directory, or `null` when there is none on this platform.
 typedef DirectoryResolver = Future<String?> Function();
@@ -21,30 +23,31 @@ Future<String?> _platformDocumentsRoot() async {
 
 const MethodChannel _channel = MethodChannel('diegema/downloads_location');
 
-/// `<Music>/Diegema` on macOS and Windows, `Audiobooks/Diegema` in shared
-/// storage on Android 11+. `null` (downloads stay app-private) on iOS (owner
-/// decision), Android 10 and older (no file-API writes to shared storage),
-/// and under `flutter test`, which must never touch the real Music folder.
+const String _macFolderKey = 'downloads_location.folder.v1';
+const String _macBookmarkKey = 'downloads_location.bookmark.v1';
+
+/// The macOS downloads folder, once chosen and opened this run.
+String? _macRoot;
+
+bool get _underTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+/// `Audiobooks/Diegema` in shared storage on Android 11+ and in the user's
+/// folder on Windows; on macOS, `<chosen>/Diegema` once the user has picked
+/// where (the sandbox can't write to ~/Audiobooks unasked). `null`
+/// (downloads stay app-private) on iOS (owner decision), Android 10 and
+/// older (no file-API writes to shared storage), macOS before a folder is
+/// chosen, and under `flutter test`, which must never touch real folders.
 Future<String?> _platformVisibleRoot() async {
-  if (Platform.environment.containsKey('FLUTTER_TEST')) return null;
+  if (_underTest) return null;
   try {
     if (Platform.isAndroid) {
       return await _channel.invokeMethod<String>('audiobooksDirectory');
     }
-    if (Platform.isMacOS) {
-      // Sandboxed, HOME is the app container; its Music entry is the
-      // system's link to the real ~/Music (needs the assets.music
-      // entitlement). Resolve it so stored paths don't depend on the link.
-      final home = Platform.environment['HOME'];
-      if (home == null) return null;
-      final music = Directory(p.join(home, 'Music'));
-      if (!await music.exists()) return null;
-      return p.join(await music.resolveSymbolicLinks(), 'Diegema');
-    }
+    if (Platform.isMacOS) return _macRoot;
     if (Platform.isWindows) {
       final profile = Platform.environment['USERPROFILE'];
       if (profile == null) return null;
-      return p.join(profile, 'Music', 'Diegema');
+      return p.join(profile, 'Audiobooks', 'Diegema');
     }
   } on MissingPluginException {
     return null;
@@ -52,6 +55,27 @@ Future<String?> _platformVisibleRoot() async {
     debugPrint('DownloadsLocation: no visible folder: $e');
   }
   return null;
+}
+
+/// macOS: re-opens the chosen downloads folder from its bookmark. Call at
+/// startup, before anything scans or plays downloads.
+Future<void> openDownloadsFolder() async {
+  if (_underTest || !Platform.isMacOS) return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final bookmark = prefs.getString(_macBookmarkKey);
+    if (bookmark == null) return;
+    final opened = await FolderAccess().open(bookmark);
+    if (opened == null) {
+      debugPrint('Downloads folder could not be opened; asking again.');
+      await prefs.remove(_macBookmarkKey);
+      await prefs.remove(_macFolderKey);
+      return;
+    }
+    _macRoot = opened.path;
+  } catch (e) {
+    debugPrint('openDownloadsFolder failed: $e');
+  }
 }
 
 /// Where Discover downloads live (DOWNLOADS_LOCATION.md).
@@ -77,6 +101,23 @@ class DownloadsLocation {
 
   Future<String?> userVisibleRoot() =>
       (visibleRoot ?? _platformVisibleRoot)();
+
+  /// macOS before a folder is chosen: [chooseFolder] must ask first.
+  bool get needsFolderChoice =>
+      visibleRoot == null && !_underTest && Platform.isMacOS && _macRoot == null;
+
+  /// Asks where downloads go (macOS) and remembers it. Returns the new
+  /// root, or null when the user cancelled (that download stays private,
+  /// and the next one asks again).
+  Future<String?> chooseFolder() async {
+    final picked = await FolderAccess(enabled: true).pickDownloadsFolder();
+    if (picked == null) return null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_macFolderKey, picked.path);
+    await prefs.setString(_macBookmarkKey, picked.bookmark);
+    _macRoot = picked.path;
+    return picked.path;
+  }
 
   /// The folder a new download is saved into.
   Future<String?> current() async =>

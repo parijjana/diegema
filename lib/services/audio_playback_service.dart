@@ -40,6 +40,10 @@ class AudioPlaybackService {
   final ValueNotifier<double> speedNotifier = ValueNotifier(1.0);
   final ValueNotifier<Duration?> sleepTimerNotifier = ValueNotifier(null);
 
+  /// True while the "end of chapter" sleep timer is armed. Separate from
+  /// [sleepTimerNotifier] because there is no countdown to show.
+  final ValueNotifier<bool> sleepAtChapterEndNotifier = ValueNotifier(false);
+
   /// Bumped each time the sleep timer runs out (not when it is cancelled),
   /// so the ambience channel can stop with the book.
   final ValueNotifier<int> sleepTimerFired = ValueNotifier(0);
@@ -230,6 +234,10 @@ class AudioPlaybackService {
   }
 
   void _onChapterCompleted() {
+    if (sleepAtChapterEndNotifier.value) {
+      _finishChapterEndSleep();
+      return;
+    }
     if (_currentBook != null &&
         _currentChapterIndex < _currentBook!.chapters.length - 1) {
       nextChapter();
@@ -237,6 +245,29 @@ class AudioPlaybackService {
       stateNotifier.value = PlaybackState.completed;
     }
   }
+
+  /// The end-of-chapter sleep timer fired. Cueing the next chapter paused
+  /// (rather than leaving the finished one selected) means the next Play
+  /// continues where the listener would expect, and the saved progress
+  /// points there too. The last chapter just stays completed.
+  ///
+  /// Driven by the player's `completed` state, which a chapter that is a
+  /// clip of a shared M4B (`ClippingAudioSource`) reaches at the clip end
+  /// exactly like a separate file reaches its end.
+  Future<void> _finishChapterEndSleep() async {
+    cancelSleepTimer();
+    sleepTimerFired.value++;
+    final book = _currentBook;
+    if (book != null && _currentChapterIndex < book.chapters.length - 1) {
+      _currentChapterIndex++;
+      chapterIndexNotifier.value = _currentChapterIndex;
+      await _playCurrentChapter(autoPlay: false);
+      await _persistCurrentProgress();
+    }
+  }
+
+  @visibleForTesting
+  void debugCompleteChapter() => _onChapterCompleted();
 
   /// Resumes playback. A refused start leaves the book paused rather than
   /// raising — same reasoning as `_playCurrentChapter`: the media is loaded,
@@ -342,7 +373,15 @@ class AudioPlaybackService {
     });
   }
 
+  /// Stops playback when the current chapter ends instead of after a
+  /// duration. Replaces any running timer.
+  void setSleepTimerEndOfChapter() {
+    cancelSleepTimer();
+    sleepAtChapterEndNotifier.value = true;
+  }
+
   void cancelSleepTimer() {
+    sleepAtChapterEndNotifier.value = false;
     _sleepTimer?.cancel();
     _sleepTimerTicker?.cancel();
     _sleepTimer = null;

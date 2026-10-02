@@ -299,13 +299,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     padding: EdgeInsets.fromLTRB(
                         gutter, 0, gutter, _LibraryFab.reservedHeight),
                     sliver: SliverList(
-                      delegate: SliverChildListDelegate(rows),
-                    ),
-                  ),
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _RoomForMorePrompt(
-                      onBrowseDiscover: widget.onGoToDiscover,
+                      delegate: SliverChildListDelegate([
+                        ...rows,
+                        // Directly under the last card (not pinned to the
+                        // bottom of the viewport), so a short list doesn't
+                        // leave a gap before the prompt.
+                        _RoomForMorePrompt(
+                          onBrowseDiscover: widget.onGoToDiscover,
+                        ),
+                      ]),
                     ),
                   ),
                 ],
@@ -437,8 +439,7 @@ class _LibraryFab extends StatelessWidget {
   }
 }
 
-/// Fills the space below a short book list with a quiet nudge rather than
-/// leaving it blank, reusing the same callback the empty state's own
+/// A quiet nudge that follows the last card of the book list, reusing the same callback the empty state's own
 /// "Browse Discover" button calls.
 class _RoomForMorePrompt extends StatelessWidget {
   final VoidCallback onBrowseDiscover;
@@ -450,7 +451,7 @@ class _RoomForMorePrompt extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Sp.x6, vertical: Sp.x4),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             'Room for more. Find a free classic, or import one you already '

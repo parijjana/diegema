@@ -19,8 +19,7 @@ class LibraryLocationsStore {
     final overrides = _overrides;
     if (overrides != null) return List.of(overrides[_key] ?? const []);
     try {
-      return (await SharedPreferences.getInstance()).getStringList(_key) ??
-          [];
+      return (await SharedPreferences.getInstance()).getStringList(_key) ?? [];
     } catch (_) {
       return [];
     }

@@ -4,6 +4,7 @@ import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import 'library_locations_store.dart';
+import 'removed_books_store.dart';
 import 'local_audiobook_import_io.dart' show chaptersForFiles;
 import 'local_book_metadata_io.dart';
 
@@ -35,11 +36,14 @@ Future<int> scanLibraryLocations(
   AppDatabase db, {
   LibraryLocationsStore store = const LibraryLocationsStore(),
   String? only,
+  RemovedBooksStore removedStore = const RemovedBooksStore(),
 }) async {
+  final removed = await removedStore.read();
   final locations = only != null ? [only] : await store.read();
   var added = 0;
   for (final location in locations) {
     for (final candidate in await _findBooks(Directory(location))) {
+      if (removed.contains(candidate.id)) continue;
       if (await db.getAudiobook(candidate.id) != null) continue;
       await db.saveAudiobook(await _buildBook(candidate));
       added++;
@@ -178,8 +182,7 @@ Future<UnifiedAudiobook> _buildBook(_Candidate c) async {
     id: c.id,
     title: _nonEmpty(metadata?.title) ?? fallbackTitle.replaceAll('_', ' '),
     author: _nonEmpty(metadata?.author) ?? 'Local Audiobook',
-    description:
-        _nonEmpty(metadata?.description) ?? 'Read from ${c.keyPath}',
+    description: _nonEmpty(metadata?.description) ?? 'Read from ${c.keyPath}',
     coverArtUrlOrPath: coverPath,
     source: kLibraryLocationSource,
     origin: BookIdentity.originLocal,

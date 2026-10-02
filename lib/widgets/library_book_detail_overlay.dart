@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../core/utils/duration_format.dart';
 import '../domain/models/audiobook.dart';
+import '../database/app_database.dart';
 import '../services/audio_playback_service.dart';
+import '../services/book_removal.dart';
 import '../theme/app_theme.dart';
 import 'app_book_cover.dart';
 import 'book_detail_pane.dart' show EmptyChaptersNote;
@@ -23,11 +25,47 @@ class LibraryBookDetailOverlay extends StatelessWidget {
   final UnifiedAudiobook book;
   final AudioPlaybackService audioService;
 
+  /// When set, the overlay offers "Remove from library".
+  final AppDatabase? db;
+
+  /// Called after the book has been removed (the library list should reload).
+  final VoidCallback? onRemoved;
+
+  /// Overrides the documents directory the removal plan/removal use (tests).
+  final String? documentsPath;
+
   const LibraryBookDetailOverlay({
     super.key,
     required this.book,
     required this.audioService,
+    this.db,
+    this.onRemoved,
+    this.documentsPath,
   });
+
+  Future<void> _remove(BuildContext context) async {
+    final database = db;
+    if (database == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final plan = await planBookRemoval(book, documentsPath: documentsPath);
+    if (!context.mounted) return;
+    final ok =
+        await showRemoveBookDialog(context, title: book.title, plan: plan);
+    if (!ok) return;
+    // Stop first, and before any rows go: a playing book would otherwise
+    // write its progress straight back.
+    await audioService.stopIfCurrent(book.id);
+    final freed =
+        await removeBook(database, book, documentsPath: documentsPath);
+    navigator.pop();
+    messenger.showSnackBar(SnackBar(
+      content: Text(freed > 0
+          ? 'Removed "${book.title}" - freed ${formatBytes(freed)}'
+          : 'Removed "${book.title}" from your library'),
+    ));
+    onRemoved?.call();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +127,17 @@ class LibraryBookDetailOverlay extends StatelessWidget {
             label: const Text('Play'),
           ),
         ),
+        if (db != null) ...[
+          const SizedBox(height: Sp.x2),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _remove(context),
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('Remove from library'),
+            ),
+          ),
+        ],
         const SizedBox(height: Sp.x5),
         if (book.description.trim().isNotEmpty) ...[
           BookDescriptionView(description: book.description, compact: true),
@@ -157,4 +206,55 @@ class _ChapterTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Human-readable size, e.g. `12 MB`.
+String formatBytes(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  var value = bytes / 1024;
+  var i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i++;
+  }
+  return '${value.toStringAsFixed(value < 10 ? 1 : 0)} ${units[i]}';
+}
+
+/// Confirmation for "Remove from library". Says plainly what happens to
+/// files: a library-folder book's files are never touched; app-owned
+/// downloads/copies are deleted (with their size). Returns true on confirm.
+Future<bool> showRemoveBookDialog(
+  BuildContext context, {
+  required String title,
+  required BookRemovalPlan plan,
+}) async {
+  final String body;
+  if (plan.filesUntouched) {
+    body = 'Files in your library folder are not touched. The book is '
+        'removed from Diegema, along with its progress and bookmarks, and '
+        'will not be added again when the folder is rescanned.';
+  } else if (plan.deletePaths.isNotEmpty) {
+    body = 'Downloaded files are deleted (${formatBytes(plan.bytes)}). '
+        'Your progress and bookmarks for this book are deleted too.';
+  } else {
+    body = 'The book, its progress and bookmarks are removed. '
+        'No files are stored on this device for it.';
+  }
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('Remove "$title"?'),
+      content: Text(body),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel')),
+        FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Remove')),
+      ],
+    ),
+  );
+  return result ?? false;
 }

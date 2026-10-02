@@ -45,13 +45,15 @@ void main() {
   }
 
   testWidgets('says so when there are no library folders', (tester) async {
-    await pump(tester, LibraryLocationsStore(overrides: <String, List<String>>{}..clear()));
+    await pump(tester,
+        LibraryLocationsStore(overrides: <String, List<String>>{}..clear()));
     expect(find.text('No library folders yet.'), findsOneWidget);
   });
 
   testWidgets('removing a folder forgets only its books, after confirming',
       (tester) async {
-    final store = LibraryLocationsStore(overrides: <String, List<String>>{}..clear());
+    final store =
+        LibraryLocationsStore(overrides: <String, List<String>>{}..clear());
     await store.add('/sdcard/Audiobooks');
     await db.saveAudiobook(
         book('mine', '/sdcard/Audiobooks/Emma/01.mp3', kLibraryLocationSource));

@@ -251,6 +251,13 @@ class AppDatabase {
     _audiobooks.remove(id);
   }
 
+  /// Mirrors `app_database_io.dart`'s `deleteAudiobookAndUserData`.
+  Future<void> deleteAudiobookAndUserData(String id) async {
+    _audiobooks.remove(id);
+    _progress.remove(id);
+    _bookmarks.removeWhere((b) => b.audiobookId == id);
+  }
+
   /// Mirrors `app_database_io.dart`'s `updateChapterAudioPath` — see its
   /// doc comment. Local import doesn't exist on web (see
   /// `services/local_audiobook_import_web.dart`), so nothing ever calls

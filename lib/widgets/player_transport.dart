@@ -16,7 +16,7 @@ import 'skip_interval_icon.dart';
 /// Differences from the original controls implementation it replaced
 /// (`now_playing_controls.dart`, since deleted):
 /// - **No outer `FittedBox(scaleDown)`.** When the cluster does not fit it
-///   [Wrap]s onto a second line; it never shrinks controls below the 44px
+///   [Wrap]s onto a second line; it never shrinks controls below the 48px
 ///   minimum target.
 /// - **No coloured bloom** behind the play button (the 24px teal glow was
 ///   neon-pass residue). Elevation comes from `shadow-2`.
@@ -72,9 +72,9 @@ class PlayerTransport extends StatelessWidget {
         child: SkipIntervalIcon(
           direction: SkipDirection.backward,
           seconds: skipSeconds,
-          // iconLg, not iconMd: these two carry a number inside them, so
-          // they need more room than a plain glyph.
-          size: Dim.iconLg,
+          // iconXl, not iconMd: these two carry a number inside them, and
+          // it must stay at the 13px floor without touching the ring.
+          size: Dim.iconXl,
           color: c.text,
         ),
       ),
@@ -86,7 +86,7 @@ class PlayerTransport extends StatelessWidget {
         child: SkipIntervalIcon(
           direction: SkipDirection.forward,
           seconds: skipSeconds,
-          size: Dim.iconLg,
+          size: Dim.iconXl,
           color: c.text,
         ),
       ),
@@ -109,7 +109,7 @@ class PlayerTransport extends StatelessWidget {
     switch (style) {
       case PlayerControlsStyle.round:
         // The original cluster. When it does not fit it wraps onto a
-        // second line; it never shrinks controls below the 44px minimum.
+        // second line; it never shrinks controls below the 48px minimum.
         return Wrap(
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,

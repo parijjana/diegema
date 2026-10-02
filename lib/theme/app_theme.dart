@@ -86,7 +86,7 @@ abstract final class AppTheme {
       BorderSide? side,
     }) {
       return ButtonStyle(
-        // 44px minimum on every button, enforced here rather than by each
+        // 48px minimum on every button, enforced here rather than by each
         // caller's padding.
         minimumSize: const WidgetStatePropertyAll(Size(0, Dim.tapMin)),
         padding: const WidgetStatePropertyAll(

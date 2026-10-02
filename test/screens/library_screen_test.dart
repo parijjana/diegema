@@ -201,5 +201,19 @@ void main() {
       expect(
           find.widgetWithText(TextButton, 'Browse Discover'), findsOneWidget);
     });
+
+    testWidgets('the prompt follows the last card, centred', (tester) async {
+      await setSurface(tester, const Size(390, 844));
+      await tester.pumpWidget(wrap(scanLibrary: (db) async {
+        await seedBook(db, id: 'a', title: 'Only Book');
+      }));
+      await pumpFrames(tester);
+
+      final card = tester.getRect(find.text('Only Book'));
+      final prompt = tester.getRect(find.textContaining('Room for more'));
+      // Close beneath the card, not pinned to the bottom of the screen.
+      expect(prompt.top - card.bottom, lessThan(120));
+      expect(prompt.center.dx, closeTo(390 / 2, 1));
+    });
   });
 }

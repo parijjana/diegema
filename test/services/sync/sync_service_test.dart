@@ -3,7 +3,9 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:diegema/database/app_database_io.dart';
 import 'package:diegema/domain/models/audiobook.dart';
+import 'package:diegema/services/sync/sync_controller.dart';
 import 'package:diegema/services/sync/sync_service_io.dart';
+import 'package:diegema/sync/link_code.dart';
 import 'package:diegema/sync/sync_group.dart';
 
 import '../../helpers/fake_discovery.dart';
@@ -170,6 +172,66 @@ void main() {
       expect(remote.map((b) => b.title), ['Emma']);
       expect(phoneSync.view.value!.otherDeviceIds(), hasLength(1));
       await phoneSync.background();
+    });
+  });
+
+  group('linking with a code', () {
+    late FakeNetwork net;
+    setUp(() => net = FakeNetwork());
+
+    SyncService unlinked(Device d, {required bool listens}) => SyncService(d.db,
+        identity: DeviceIdentityStore(overrides: {
+          'sync.device_id.v1': d == mac ? 'mac' : 'phone',
+          'sync.device_name.v1': d == mac ? 'MacBook' : 'Pixel',
+        }),
+        now: () => d.clock,
+        secrets: InMemorySecretStore(),
+        discovery: FakeDiscovery(net),
+        listens: listens,
+        localAddresses: () async => ['127.0.0.1']);
+
+    test('phone shows, Mac scans: linked and synced at once', () async {
+      await phone.db.saveAudiobook(emma());
+      final p = unlinked(phone, listens: true);
+      final m = unlinked(mac, listens: false);
+      expect(await p.isLinked(), isFalse);
+      final offer = await p.createLinkOffer();
+      expect(await p.isLinked(), isTrue);
+      expect(await m.joinWithCode(offer.code), JoinOutcome.linked);
+      expect(m.view.value!.remoteOnly({}).map((b) => b.title), ['Emma']);
+      expect(p.view.value!.deviceName(p.view.value!.otherDeviceIds().single),
+          'MacBook');
+    });
+
+    test('Mac shows, phone scans: the Mac dials the phone', () async {
+      await mac.db.saveAudiobook(emma());
+      final m = unlinked(mac, listens: false);
+      final p = unlinked(phone, listens: true);
+      final offer = await m.createLinkOffer();
+      expect(net.services, isEmpty, reason: 'a Mac never listens');
+      expect(await p.joinWithCode(offer.code), JoinOutcome.linkedNotSynced);
+      expect(net.services, hasLength(1), reason: 'the phone listens now');
+      // What the Mac's link dialog does while it waits.
+      expect(await m.syncNow(), 1);
+      expect(p.view.value!.remoteOnly({}).map((b) => b.title), ['Emma']);
+    });
+
+    test('expired, invalid, and another group', () async {
+      final p = unlinked(phone, listens: true);
+      final m = unlinked(mac, listens: false);
+      final offer = await p.createLinkOffer();
+      expect(await m.joinWithCode('hello'), JoinOutcome.invalid);
+      mac.clock += LinkCode.lifetime.inMilliseconds + 1000 * 1000;
+      expect(await m.joinWithCode(offer.code), JoinOutcome.expired);
+      mac.clock = 1000;
+
+      // The Mac starts its own group first, then scans the phone's code.
+      await m.createLinkOffer();
+      expect(await m.joinWithCode(offer.code), JoinOutcome.otherGroup);
+      expect(await m.joinWithCode(offer.code, replaceGroup: true),
+          JoinOutcome.linked);
+      // Scanning a code of the group it's already in is fine.
+      expect(await m.joinWithCode(offer.code), JoinOutcome.linked);
     });
   });
 }

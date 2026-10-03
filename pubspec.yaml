@@ -37,6 +37,8 @@ dependencies:
   background_downloader: 9.5.9
   cryptography: ^2.9.0
   bonsoir: 7.1.5
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.4.2
   flutter_secure_storage: ^10.3.4
 
 dev_dependencies:

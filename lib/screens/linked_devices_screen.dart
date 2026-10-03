@@ -3,12 +3,18 @@ import 'package:flutter/material.dart';
 import '../services/sync/sync_controller.dart';
 import '../sync/sync_view.dart';
 import '../theme/app_theme.dart';
+import 'link_device_sheet.dart';
+import 'link_flow.dart';
+import 'scan_code_screen.dart';
 
 /// Settings -> Linked devices: this device's name, and every other device
-/// whose records have reached this one. Linking a new device (the network
-/// part) is not here yet.
+/// whose records have reached this one, and the ways to link another:
+/// show a code, scan one (phones), or paste one.
 class LinkedDevicesScreen extends StatefulWidget {
-  const LinkedDevicesScreen({super.key});
+  /// Passed to the "Link a device" sheet; null means "is this a Mac".
+  final bool? pollForScanner;
+
+  const LinkedDevicesScreen({super.key, this.pollForScanner});
 
   @override
   State<LinkedDevicesScreen> createState() => _LinkedDevicesScreenState();
@@ -64,6 +70,9 @@ class _LinkedDevicesScreenState extends State<LinkedDevicesScreen> {
     setState(() => _savedName = text);
   }
 
+  static final ButtonStyle _actionStyle = ButtonStyle(
+      minimumSize: WidgetStateProperty.all(const Size(0, Dim.tapMin)));
+
   static String _platformLabel(String platform) => switch (platform) {
         'macos' => 'macOS',
         'ios' => 'iOS',
@@ -78,6 +87,7 @@ class _LinkedDevicesScreenState extends State<LinkedDevicesScreen> {
     final c = context.colors;
     final view = SyncScope.viewOf(context);
     final others = view?.otherDeviceIds() ?? const <String>[];
+    final canScan = SyncScope.maybeOf(context)?.canScan ?? false;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -116,6 +126,38 @@ class _LinkedDevicesScreenState extends State<LinkedDevicesScreen> {
                   child: const Text('Save name'),
                 ),
               ),
+            const SizedBox(height: Sp.sectionGap),
+            Semantics(
+              header: true,
+              child: Text('Link another device',
+                  style: AppType.titleSm.copyWith(color: c.textSecondary)),
+            ),
+            const SizedBox(height: Sp.x3),
+            FilledButton.icon(
+              style: _actionStyle,
+              onPressed: () => showLinkDeviceSheet(context,
+                  pollForScanner: widget.pollForScanner),
+              icon: const Icon(Icons.qr_code_2_rounded),
+              label: const Text('Link a device'),
+            ),
+            if (canScan) ...[
+              const SizedBox(height: Sp.x2),
+              OutlinedButton.icon(
+                style: _actionStyle,
+                onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<bool>(
+                        builder: (_) => const ScanCodeScreen())),
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Scan a code'),
+              ),
+            ],
+            const SizedBox(height: Sp.x2),
+            OutlinedButton.icon(
+              style: _actionStyle,
+              onPressed: () => showPasteCodeDialog(context),
+              icon: const Icon(Icons.content_paste_rounded),
+              label: const Text('Paste a code'),
+            ),
             const SizedBox(height: Sp.sectionGap),
             Semantics(
               header: true,

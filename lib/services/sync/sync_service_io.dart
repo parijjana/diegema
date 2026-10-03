@@ -13,6 +13,7 @@ import '../../sync/sync_record.dart';
 import '../../sync/sync_store.dart';
 import '../../sync/sync_view.dart';
 import 'portable_keys_io.dart';
+import 'sync_controller.dart';
 
 /// This device's sync id and name, kept in shared_preferences. The id is
 /// random, made once, and never shown.
@@ -73,14 +74,16 @@ String defaultDeviceName() {
 /// The app's side of linked-device sync: keeps this device's records in
 /// step with its library, and holds the [view] the UI reads. The network
 /// transport drives [peer].
-class SyncService {
+class SyncService implements SyncController {
   final AppDatabase db;
   final SyncStore store;
   final DeviceIdentityStore identity;
   final int Function() _now;
 
-  /// Rebuilt after every publish and every sync that changed something.
-  final ValueNotifier<SyncView?> view = ValueNotifier(null);
+  final ValueNotifier<SyncView?> _view = ValueNotifier(null);
+
+  @override
+  ValueListenable<SyncView?> get view => _view;
 
   Hlc? _clock;
   String? _deviceId;
@@ -101,6 +104,7 @@ class SyncService {
   /// Fills missing portable keys, publishes what changed in the library
   /// (books, positions, finished, this device's name) and rebuilds [view].
   /// Call on launch, on pause, and before every sync.
+  @override
   Future<void> refresh() async {
     await fillPortableKeys(db);
     final keys = await db.portableKeys();
@@ -152,6 +156,13 @@ class SyncService {
     ]);
   }
 
+  @override
+  Future<Map<String, String>> portableKeys() => db.portableKeys();
+
+  @override
+  Future<String> deviceName() => identity.deviceName();
+
+  @override
   Future<void> setDeviceName(String name) async {
     await identity.setDeviceName(name);
     await _publishDevice(_now());
@@ -159,7 +170,7 @@ class SyncService {
   }
 
   Future<void> _rebuildView() async =>
-      view.value = SyncView(await deviceId(), await store.all());
+      _view.value = SyncView(await deviceId(), await store.all());
 
   /// One side of an exchange with a linked device.
   Future<SyncPeer> peer() async {

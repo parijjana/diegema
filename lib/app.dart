@@ -12,6 +12,7 @@ import 'main.dart';
 import 'screens/library_screen.dart' show LibraryScanner;
 import 'services/artwork_enrichment_service.dart';
 import 'services/audio_playback_service.dart';
+import 'services/sync/sync_controller.dart';
 import 'services/download_manager.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
@@ -62,6 +63,10 @@ class AudiobookApp extends StatefulWidget {
   /// is then unavailable.
   final DownloadManager? downloads;
 
+  /// Linked-device sync; null on the web, in the demo and in tests that
+  /// don't supply one (the sync UI then doesn't appear).
+  final SyncController? sync;
+
   /// Injectable UI preference store, so widget tests never need the
   /// `shared_preferences` platform channel.
   final UiPreferences preferences;
@@ -92,6 +97,7 @@ class AudiobookApp extends StatefulWidget {
     this.audioService,
     this.ambience,
     this.downloads,
+    this.sync,
     this.preferences = const UiPreferences(),
     this.libraryScanner,
     this.deepLink = DemoDeepLink.none,
@@ -246,9 +252,12 @@ class _AudiobookAppState extends State<AudiobookApp>
   Widget _withAmbience(Widget app) {
     final ambience = widget.ambience;
     final downloads = widget.downloads;
+    final sync = widget.sync;
+    final withSync =
+        sync == null ? app : SyncScope(controller: sync, child: app);
     final withDownloads = downloads == null
-        ? app
-        : DownloadsScope(manager: downloads, child: app);
+        ? withSync
+        : DownloadsScope(manager: downloads, child: withSync);
     return ambience == null
         ? withDownloads
         : AmbienceScope(service: ambience, child: withDownloads);

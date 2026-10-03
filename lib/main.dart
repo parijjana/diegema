@@ -22,10 +22,15 @@ import 'services/ambience_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/diegema_audio_handler.dart';
 import 'services/download_manager.dart';
+import 'services/sync/sync_controller.dart';
 import 'services/folder_access.dart';
 import 'services/demo_seed.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
+
+/// Kept alive for the app's lifetime; see the sync setup in [main].
+// ignore: unused_element
+AppLifecycleListener? _syncLifecycle;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,6 +83,7 @@ Future<void> main() async {
   AudioPlaybackService? audioService;
   AmbienceService? ambience;
   DownloadManager? downloads;
+  SyncController? sync;
   if (!kIsWeb) {
     // Before anything scans or plays from a library folder: on macOS/iOS
     // the sandbox forgets picked folders between launches.
@@ -96,6 +102,19 @@ Future<void> main() async {
     if (!kDemoMode) {
       downloads = createDownloadManager(nativeDb);
       unawaited(downloads?.start());
+    }
+    // Linked-device sync: publish what changed in the library at launch and
+    // whenever the app goes to the background or comes back. Not awaited:
+    // working out a local book's key reads its files.
+    if (!kDemoMode) {
+      final s = sync = createSyncController(nativeDb);
+      if (s != null) {
+        unawaited(s.refresh());
+        _syncLifecycle = AppLifecycleListener(
+          onPause: () => unawaited(s.refresh()),
+          onResume: () => unawaited(s.refresh()),
+        );
+      }
     }
     audioService =
         AudioPlaybackService(db: nativeDb, preferences: const UiPreferences());
@@ -118,6 +137,7 @@ Future<void> main() async {
     audioService: audioService,
     ambience: ambience,
     downloads: downloads,
+    sync: sync,
     deepLink: deepLink,
     // `?theme=` overrides the stored choice when present, and only then —
     // absent a deep link this stays null so the persisted preference (or

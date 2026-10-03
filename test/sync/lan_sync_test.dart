@@ -220,6 +220,24 @@ void main() {
     await phone.lan.dispose();
   });
 
+  test('a stop during a start\'s await means no watch', () async {
+    final net = FakeNetwork();
+    final phone =
+        await Device('phone').start(net, listens: true, groupKey: groupKey);
+    final mac =
+        await Device('mac').start(net, listens: false, groupKey: groupKey);
+    final seen = <PeerResult>[];
+    mac.lan.exchanges.listen(seen.add);
+    final starting = mac.lan.startWatching();
+    await mac.lan.stopWatching(); // before the tag lookup finishes
+    await starting;
+    await phone.lan.startListening();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(seen, isEmpty);
+    await phone.lan.dispose();
+    await mac.lan.dispose();
+  });
+
   test('dispose ends the exchanges stream', () async {
     final mac = await Device('mac')
         .start(FakeNetwork(), listens: false, groupKey: groupKey);

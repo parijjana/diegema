@@ -90,6 +90,10 @@ class LanSync {
   StreamSubscription<PeerAddress>? _watch;
   Timer? _watchRetry;
 
+  /// Between [startWatching] and [stopWatching]; a start still waiting on
+  /// the group tag when a stop comes in must not go on to watch.
+  bool _watchWanted = false;
+
   /// How long a watch that failed (discovery couldn't start) waits before
   /// trying again.
   final Duration watchRetry;
@@ -158,10 +162,11 @@ class LanSync {
   /// [stopWatching].
   Future<void> startWatching() async {
     if (listens || _watch != null) return;
+    _watchWanted = true;
     _watchRetry?.cancel();
     _watchRetry = null;
     final tag = await group.tag();
-    if (tag == null || _watch != null) return;
+    if (tag == null || _watch != null || !_watchWanted) return;
     late final StreamSubscription<PeerAddress> sub;
     sub = _watch = discovery.watch(tag: tag).listen(
       (p) {
@@ -179,6 +184,7 @@ class LanSync {
   }
 
   Future<void> stopWatching() async {
+    _watchWanted = false;
     _watchRetry?.cancel();
     _watchRetry = null;
     await _watch?.cancel();

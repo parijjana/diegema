@@ -1490,6 +1490,7 @@ class _PlaybackErrorNote extends StatefulWidget {
 
 class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
   bool _filesUnreadable = false;
+  bool _needsAccess = false;
   String? _failed;
 
   /// The re-download's phase last time the queue notified, to catch the
@@ -1516,10 +1517,26 @@ class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
 
   Future<void> _checkFiles() async {
     final book = widget.service.currentBookNotifier.value;
-    if (book == null || !canRedownload(book)) return;
+    if (book == null) return;
     final ok = await downloadedChapterReadable(
         book, widget.service.chapterIndexNotifier.value);
-    if (mounted && !ok) setState(() => _filesUnreadable = true);
+    if (ok) return;
+    // After a reinstall on Android the files are still there; only the
+    // permission is gone. Ask for it before offering a whole new download.
+    final needsAccess = await needsAudioReadAccess();
+    if (!mounted) return;
+    if (needsAccess) {
+      setState(() => _needsAccess = true);
+    } else if (canRedownload(book)) {
+      setState(() => _filesUnreadable = true);
+    }
+  }
+
+  Future<void> _allowAccess() async {
+    if (!await requestAudioReadAccess() || !mounted) return;
+    setState(() => _needsAccess = false);
+    await widget.service.retryCurrentChapter();
+    await _checkFiles();
   }
 
   /// Through the app-wide queue, so it carries on if the app is
@@ -1574,11 +1591,18 @@ class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
                   (download?.phase == DownloadPhase.failed
                       ? download!.error
                       : null) ??
-                  (_filesUnreadable
-                      ? "This book's downloaded files can't be read"
-                      : "Couldn't play this chapter"),
+                  (_needsAccess
+                      ? 'Diegema needs permission to read your audiobooks'
+                      : _filesUnreadable
+                          ? "This book's downloaded files can't be read"
+                          : "Couldn't play this chapter"),
               style: AppType.label.copyWith(color: c.danger)),
-          if (_filesUnreadable && download != null && download.isActive)
+          if (_needsAccess)
+            TextButton(
+              onPressed: _allowAccess,
+              child: const Text('Allow access'),
+            )
+          else if (_filesUnreadable && download != null && download.isActive)
             Text(downloadLabel(downloads!, download),
                 style: AppType.label.copyWith(color: c.text))
           else if (_filesUnreadable && downloads != null)

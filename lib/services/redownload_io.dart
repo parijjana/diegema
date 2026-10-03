@@ -2,6 +2,7 @@ import 'dart:io';
 
 import '../core/utils/book_identity.dart';
 import '../domain/models/audiobook.dart';
+import 'storage_access_io.dart';
 
 /// Whether [book]'s chapter [index] can be opened, for a downloaded copy.
 /// Streams and non-downloaded books always count as readable. A file can
@@ -28,6 +29,14 @@ bool canRedownload(UnifiedAudiobook book) =>
     book.isDownloaded &&
     book.origin == BookIdentity.originLibrivox &&
     !book.id.startsWith(BookIdentity.localIdPrefix);
+
+/// Whether unreadable files may just need the audio permission back
+/// (Android after a reinstall) rather than a fresh download.
+Future<bool> needsAudioReadAccess() async => !await hasAudioReadAccess();
+
+/// Asks for the audio permission (or opens settings once Android has stopped
+/// asking). True when it is granted.
+Future<bool> requestAudioReadAccess() => requestAudioReadAccessOrOpenSettings();
 
 // Re-downloading itself goes through the queue: see
 // `DownloadManager.redownload` and `DownloadJob.redownload`.

@@ -75,7 +75,7 @@ class DetailPrimaryButton extends StatelessWidget {
   }
 }
 
-enum BookAction { markFinished, reset, showFolder, remove }
+enum BookAction { markFinished, reset, showFolder, hide, remove }
 
 /// The "..." menu: everything that is not the one primary action.
 class BookActionsMenu extends StatelessWidget {
@@ -86,6 +86,9 @@ class BookActionsMenu extends StatelessWidget {
   final VoidCallback? onShowFolder;
   final String showFolderLabel;
 
+  /// Null hides "Hide from library".
+  final VoidCallback? onHide;
+
   /// Null hides "Remove from library...".
   final VoidCallback? onRemove;
 
@@ -95,6 +98,7 @@ class BookActionsMenu extends StatelessWidget {
     required this.onReset,
     this.onShowFolder,
     this.showFolderLabel = 'Show folder',
+    this.onHide,
     this.onRemove,
   });
 
@@ -129,6 +133,8 @@ class BookActionsMenu extends StatelessWidget {
             onReset();
           case BookAction.showFolder:
             onShowFolder?.call();
+          case BookAction.hide:
+            onHide?.call();
           case BookAction.remove:
             onRemove?.call();
         }
@@ -140,6 +146,9 @@ class BookActionsMenu extends StatelessWidget {
         if (onShowFolder != null)
           item(BookAction.showFolder, Icons.folder_open_rounded,
               showFolderLabel),
+        if (onHide != null)
+          item(BookAction.hide, Icons.visibility_off_outlined,
+              'Hide from library'),
         if (onRemove != null) ...[
           const PopupMenuDivider(),
           item(BookAction.remove, Icons.delete_outline_rounded,

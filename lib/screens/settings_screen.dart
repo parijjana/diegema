@@ -11,6 +11,7 @@ import '../services/download_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/library_folders_section.dart';
 import 'downloads_screen.dart';
+import 'hidden_books_screen.dart';
 
 /// The settings panel — Phase 1 of `settings_panel_plan.md`.
 ///
@@ -189,6 +190,17 @@ class SettingsScreen extends StatelessWidget {
               _Section(
                 title: 'Library folders',
                 children: [LibraryFoldersSection(db: db!)],
+              ),
+            if (db != null)
+              _Section(
+                title: 'Library',
+                children: [
+                  _LinkRow(
+                    label: 'Hidden books',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => HiddenBooksScreen(db: db!))),
+                  ),
+                ],
               ),
             _Section(
               title: 'About',

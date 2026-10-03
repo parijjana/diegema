@@ -77,4 +77,41 @@ void main() {
     expect(v.devicePlatform('pc'), 'windows');
     expect(v.devicePlatform('mac'), isNull);
   });
+
+  group('forgotten devices', () {
+    final ghostBooks = [
+      r(SyncKind.device, 'ghost', 'ghost', 5, {'name': 'Old phone'}),
+      r(SyncKind.catalogue, 'lv:emma', 'ghost', 5,
+          {'title': 'Emma', 'author': 'Austen', 'origin': 'librivox'}),
+      r(SyncKind.position, 'lv:emma', 'ghost', 6, {'chapter': 1, 'seconds': 2}),
+    ];
+
+    test('are hidden everywhere once forgotten', () {
+      final before = SyncView('me', ghostBooks);
+      expect(before.otherDeviceIds(), ['ghost']);
+      final after = SyncView(
+          'me', [...ghostBooks, r(SyncKind.forget, 'ghost', 'mac', 10)]);
+      expect(after.otherDeviceIds(), ['mac']);
+      expect(after.remoteOnly({}), isEmpty);
+      expect(after.deviceName('ghost'), isNot('Old phone'));
+    });
+
+    test('come back when they sync something newer', () {
+      final view = SyncView('me', [
+        ...ghostBooks,
+        r(SyncKind.forget, 'ghost', 'mac', 10),
+        r(SyncKind.position, 'lv:emma', 'ghost', 11,
+            {'chapter': 2, 'seconds': 0}),
+      ]);
+      expect(view.otherDeviceIds(), containsAll(['ghost', 'mac']));
+    });
+
+    test('a device someone forgot still sees itself', () {
+      final view = SyncView('ghost', [
+        ...ghostBooks,
+        r(SyncKind.forget, 'ghost', 'mac', 10),
+      ]);
+      expect(view.otherDeviceIds(), ['mac']);
+    });
+  });
 }

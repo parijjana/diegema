@@ -56,4 +56,16 @@ void main() {
     expect((await drift.get('position|lv:emma|mac'))!.payload,
         {'chapter': 3, 'ms': 1200});
   });
+
+  test('keepOnly drops other devices\' records, both stores', () async {
+    await both([
+      rec(SyncKind.position, 'lv:emma', const Hlc(11, 0, 'mac')),
+      rec(SyncKind.position, 'lv:emma', const Hlc(9, 4, 'phone')),
+      rec(SyncKind.device, 'phone', const Hlc(9, 5, 'phone')),
+    ]);
+    await drift.keepOnly('phone');
+    await memory.keepOnly('phone');
+    expect(enc(await drift.all()), enc(await memory.all()));
+    expect({for (final r in await drift.all()) r.deviceId}, {'phone'});
+  });
 }

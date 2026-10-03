@@ -54,7 +54,35 @@ class SyncView {
   final List<SyncRecord> _records;
 
   SyncView(this.deviceId, Iterable<SyncRecord> records)
-      : _records = List.unmodifiable(records);
+      : _records = List.unmodifiable(_withoutForgotten(deviceId, records));
+
+  /// Drops every record of a device someone removed, unless the device has
+  /// synced something newer since (it is still linked and came back).
+  static List<SyncRecord> _withoutForgotten(
+      String self, Iterable<SyncRecord> records) {
+    final all = records.toList();
+    final forgotAt = <String, SyncRecord>{};
+    for (final r in all) {
+      if (r.kind != SyncKind.forget || r.deleted || r.key == self) continue;
+      final seen = forgotAt[r.key];
+      if (seen == null || r.hlc > seen.hlc) forgotAt[r.key] = r;
+    }
+    if (forgotAt.isEmpty) return all;
+    final hidden = <String>{
+      for (final e in forgotAt.entries)
+        if (!all.any((r) =>
+            r.deviceId == e.key &&
+            r.kind != SyncKind.forget &&
+            r.hlc > e.value.hlc))
+          e.key,
+    };
+    return [
+      for (final r in all)
+        if (!hidden.contains(r.deviceId) &&
+            !(r.kind == SyncKind.device && hidden.contains(r.key)))
+          r,
+    ];
+  }
 
   Iterable<SyncRecord> _others(SyncKind kind, [String? key]) =>
       _records.where((r) =>

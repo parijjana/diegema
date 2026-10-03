@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:diegema/services/sync/sync_controller.dart';
 import 'package:diegema/sync/hlc.dart';
@@ -75,10 +77,22 @@ class FakeSyncController implements SyncController {
 
   int syncNowCalls = 0;
 
+  /// Devices a [syncNow] reaches; it also records a [lastSync].
+  int syncReached = 0;
+
+  /// The time [syncNow] stamps its result with (null: now).
+  DateTime Function()? syncClock;
+
+  /// When set, [syncNow] waits for it (a test holds the spinner up).
+  Completer<void>? syncGate;
+
   @override
   Future<int> syncNow() async {
     syncNowCalls++;
-    return 0;
+    await syncGate?.future;
+    lastSyncNotifier.value =
+        LastSync((syncClock ?? DateTime.now)(), syncReached);
+    return syncReached;
   }
 
   @override
@@ -103,6 +117,37 @@ class FakeSyncController implements SyncController {
       linked = true;
     }
     return outcome;
+  }
+
+  SyncStatus syncStatus = SyncStatus.unlinked;
+  final ValueNotifier<LastSync?> lastSyncNotifier = ValueNotifier(null);
+  final forgotten = <String>[];
+  int unlinkCalls = 0;
+  int resetCalls = 0;
+
+  @override
+  Future<SyncStatus> status() async =>
+      linked && syncStatus == SyncStatus.unlinked
+          ? SyncStatus.linked
+          : syncStatus;
+
+  @override
+  ValueListenable<LastSync?> get lastSync => lastSyncNotifier;
+
+  @override
+  Future<void> forgetDevice(String deviceId) async => forgotten.add(deviceId);
+
+  @override
+  Future<void> unlink() async {
+    unlinkCalls++;
+    linked = false;
+    syncStatus = SyncStatus.unlinked;
+  }
+
+  @override
+  Future<void> resetKeys() async {
+    resetCalls++;
+    syncStatus = SyncStatus.unlinked;
   }
 
   @override

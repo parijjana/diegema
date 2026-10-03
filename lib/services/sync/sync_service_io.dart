@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -98,13 +99,22 @@ class SyncService implements SyncController {
   final PeerDiscovery? discovery;
   final bool listens;
 
+  /// How long "Sync now" on a listening device waits for a Mac to dial in.
+  final Duration callerWindow;
+
   /// This device's LAN IPv4 addresses, for link codes; injected by tests.
   final Future<List<String>> Function() localAddresses;
 
   Hlc? _clock;
   String? _deviceId;
   Future<SyncGroup?>? _group;
+  bool _keysUnreadable = false;
   LanSync? _lan;
+  final ValueNotifier<LastSync?> _lastSync = ValueNotifier(null);
+  int? _lastInbound;
+
+  @override
+  ValueListenable<LastSync?> get lastSync => _lastSync;
 
   /// Store writes that move the clock (publishing, and each step of an
   /// exchange) run one at a time, so a refresh can't overwrite a clock an
@@ -125,6 +135,7 @@ class SyncService implements SyncController {
     this.discovery,
     this.listens = false,
     Future<List<String>> Function()? localAddresses,
+    this.callerWindow = const Duration(seconds: 6),
   })  : localAddresses = localAddresses ?? _lanIPv4Addresses,
         store = store ?? DriftSyncStore(db),
         _now = now ?? (() => DateTime.now().millisecondsSinceEpoch);
@@ -143,9 +154,11 @@ class SyncService implements SyncController {
           _deviceId = await identity.resetDeviceId();
           _clock = null;
         }
+        _keysUnreadable = false;
         return g;
       } catch (e) {
         debugPrint('sync: keys unavailable, sync off for now: $e');
+        _keysUnreadable = true;
         _group = null;
         return null;
       }
@@ -161,13 +174,24 @@ class SyncService implements SyncController {
     final g = await group();
     final d = discovery;
     if (g == null || d == null) return null;
-    return _lan ??= LanSync(
+    final existing = _lan;
+    if (existing != null) return existing;
+    final lan = _lan = LanSync(
       group: g,
       discovery: d,
       peer: peer,
       listens: listens,
+      callerWindow: callerWindow,
       log: (m) => debugPrint('sync: $m'),
     );
+    // Devices that dialled in, and devices a Mac dialled on seeing them,
+    // count as syncs too.
+    lan.exchanges.where((r) => r.ok).listen((_) {
+      _lastInbound = _now();
+      _lastSync.value =
+          LastSync(DateTime.fromMillisecondsSinceEpoch(_now()), 1);
+    });
+    return lan;
   }
 
   /// App opened or brought forward: publish, listen (not on a Mac), sync.
@@ -177,8 +201,8 @@ class SyncService implements SyncController {
         await refresh();
         final lan = await _lanSync();
         if (lan == null) return;
-        await lan.startListening();
-        await lan.syncNow();
+        await _online(lan);
+        await _run(lan);
       });
 
   /// App going to the background: publish and push it to whoever is near.
@@ -187,7 +211,8 @@ class SyncService implements SyncController {
   @override
   Future<void> background() => _logged('background', () async {
         await refresh();
-        await (await _lanSync())?.syncNow();
+        final lan = await _lanSync();
+        if (lan != null) await _run(lan);
       });
 
   @override
@@ -198,7 +223,7 @@ class SyncService implements SyncController {
     final lan = await _lanSync();
     if (lan == null) return 0;
     await refresh();
-    return (await lan.syncNow()).results.where((r) => r.ok).length;
+    return _run(lan, waitForCallers: true);
   }
 
   @override
@@ -211,7 +236,7 @@ class SyncService implements SyncController {
     if (g == null || lan == null) throw StateError('sync is unavailable');
     if (!g.linked) await g.create();
     await refresh();
-    await lan.startListening();
+    await _online(lan);
     final expires =
         DateTime.fromMillisecondsSinceEpoch(_now()).add(LinkCode.lifetime);
     final code = LinkCode(
@@ -241,11 +266,11 @@ class SyncService implements SyncController {
     }
     if (!same) {
       // A listener advertises the old group's tag; start again on the new.
-      await lan.stopListening();
+      await _offline(lan);
       await g.join(code.groupKey);
     }
     await refresh();
-    await lan.startListening();
+    await _online(lan);
     final port = code.port;
     if (port != null) {
       for (final a in code.addresses) {
@@ -254,8 +279,88 @@ class SyncService implements SyncController {
         }
       }
     }
-    final reached = (await lan.syncNow()).results.any((r) => r.ok);
-    return reached ? JoinOutcome.linked : JoinOutcome.linkedNotSynced;
+    final reached = await _run(lan);
+    return reached > 0 ? JoinOutcome.linked : JoinOutcome.linkedNotSynced;
+  }
+
+  /// Listening (phones, PCs) or watching (a Mac) for the group's devices.
+  Future<void> _online(LanSync lan) async {
+    await lan.startListening();
+    await lan.startWatching();
+  }
+
+  Future<void> _offline(LanSync? lan) async {
+    await lan?.stopListening();
+    await lan?.stopWatching();
+  }
+
+  /// Syncs with whoever is near and records it as [lastSync]. Devices are
+  /// counted once however many ways they were reached.
+  Future<int> _run(LanSync lan, {bool waitForCallers = false}) async {
+    final run = await lan.syncNow(waitForCallers: waitForCallers);
+    final reached = {
+      for (final r in run.results)
+        if (r.ok) r.peer.host,
+    }.length;
+    // A run that reached nobody doesn't hide a sync a device dialled in for
+    // moments ago (a Mac reaching this phone as its app opened).
+    final inbound = _lastInbound;
+    if (reached == 0 && inbound != null && _now() - inbound < 30000) {
+      return reached;
+    }
+    _lastSync.value =
+        LastSync(DateTime.fromMillisecondsSinceEpoch(_now()), reached);
+    return reached;
+  }
+
+  @override
+  Future<SyncStatus> status() async {
+    final g = await group();
+    if (g == null) {
+      return _keysUnreadable ? SyncStatus.keysUnreadable : SyncStatus.unlinked;
+    }
+    return g.linked ? SyncStatus.linked : SyncStatus.unlinked;
+  }
+
+  @override
+  Future<void> forgetDevice(String id) async {
+    if (id == await deviceId()) return;
+    await _serial(() async {
+      _clock = (await _clockNow()).tick(_now());
+      await store
+          .putAll([SyncRecord(kind: SyncKind.forget, key: id, hlc: _clock!)]);
+      await _rebuildView();
+    });
+    // Announce again so a watching Mac picks the removal up at once.
+    final lan = await _lanSync();
+    if (lan != null) unawaited(_run(lan, waitForCallers: true));
+  }
+
+  @override
+  Future<void> unlink() async {
+    final g = await group();
+    if (g == null || !g.linked) return;
+    await _offline(_lan);
+    await g.leave();
+    // Other devices' books and positions go too; this device's own records
+    // stay, so linking again later picks up where it was.
+    await _serial(() async {
+      await store.keepOnly(await deviceId());
+      await _rebuildView();
+    });
+  }
+
+  @override
+  Future<void> resetKeys() async {
+    final s = secrets;
+    if (s == null) return;
+    await _offline(_lan);
+    _lan = null;
+    await SyncGroup.wipe(s);
+    _group = null;
+    _keysUnreadable = false;
+    await group();
+    await refresh();
   }
 
   Future<void> _logged(String what, Future<void> Function() f) async {

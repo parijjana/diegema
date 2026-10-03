@@ -35,6 +35,7 @@ class Device {
       bindAddress: InternetAddress.loopbackIPv4,
       browseWindow: Duration.zero,
       timeout: const Duration(seconds: 5),
+      callerWindow: const Duration(milliseconds: 300),
       instance: 'dg-$id',
     );
     return this;
@@ -155,6 +156,56 @@ void main() {
     net.services['dg-gone'] = (port, tag);
     final run = await mac.lan.syncNow();
     expect(run.results.single.ok, isFalse);
+  });
+
+  test('a watching Mac dials a phone the moment it appears, once', () async {
+    final net = FakeNetwork();
+    final phone =
+        await Device('phone').start(net, listens: true, groupKey: groupKey);
+    final mac =
+        await Device('mac').start(net, listens: false, groupKey: groupKey);
+    await phone.position('lv:emma', 10, 1);
+    final seen = <PeerResult>[];
+    mac.lan.exchanges.listen(seen.add);
+    await mac.lan.startWatching();
+    await mac.lan.startWatching(); // idempotent
+    await phone.lan.startListening();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(seen.single.ok, isTrue);
+    expect(await mac.slots(), await phone.slots());
+    // Announced again in the same burst: not dialled twice.
+    await phone.lan.stopListening();
+    await phone.lan.startListening();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(seen, hasLength(1));
+    await mac.lan.stopWatching();
+    await phone.lan.stopListening();
+  });
+
+  test('Sync now with waitForCallers counts a Mac that dials in', () async {
+    final net = FakeNetwork();
+    final phone =
+        await Device('phone').start(net, listens: true, groupKey: groupKey);
+    final mac =
+        await Device('mac').start(net, listens: false, groupKey: groupKey);
+    await phone.lan.startListening();
+    await mac.lan.startWatching();
+    await Future<void>.delayed(
+        const Duration(milliseconds: 2100)); // past the burst guard
+    await mac.position('lv:odyssey', 20, 5);
+    final run = await phone.lan.syncNow(waitForCallers: true);
+    expect(run.results.where((r) => r.ok), hasLength(1));
+    expect(await phone.slots(), contains('position|lv:odyssey|mac'));
+    // Each re-announcement is a new service name: macOS doesn't report a
+    // service that stops and starts again under the same one.
+    final before = phone.lan.instance;
+    await phone.lan.syncNow(waitForCallers: true);
+    expect(phone.lan.instance, isNot(before));
+    expect(net.services.keys, isNot(contains(before)));
+    // Without waiting for callers, a phone alone finds nobody.
+    expect((await phone.lan.syncNow()).results, isEmpty);
+    await mac.lan.stopWatching();
+    await phone.lan.stopListening();
   });
 
   group('SyncGroup', () {

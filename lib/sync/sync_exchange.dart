@@ -30,9 +30,12 @@ class SyncMessage {
               for (final e in v.entries)
                 e.key as String: Hlc.decode(e.value as String),
             },
+      // A kind this version doesn't know (a newer device's) is skipped, not
+      // fatal; the newer device keeps it and resends it after an update.
       records: [
         for (final r in (json['records'] as List? ?? const []))
-          SyncRecord.fromJson((r as Map).cast<String, Object?>()),
+          if (SyncKind.values.any((k) => k.name == (r as Map)['kind']))
+            SyncRecord.fromJson((r as Map).cast<String, Object?>()),
       ],
     );
   }

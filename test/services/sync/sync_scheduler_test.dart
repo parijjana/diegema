@@ -14,8 +14,7 @@ void main() {
   void run(void Function(FakeAsync clock) body) => fakeAsync((clock) {
         syncs = 0;
         playback = ValueNotifier(PlaybackState.idle);
-        scheduler = SyncScheduler(
-            sync: () async => syncs++, playback: playback)
+        scheduler = SyncScheduler(sync: () async => syncs++, playback: playback)
           ..start();
         body(clock);
         scheduler.dispose();
@@ -47,6 +46,19 @@ void main() {
         expect(syncs, 1, reason: '$end');
       });
     }
+  });
+
+  test('a chapter ending and the next one loading slowly does not sync', () {
+    run((clock) {
+      playback.value = PlaybackState.playing;
+      playback.value = PlaybackState.completed;
+      clock.elapse(const Duration(seconds: 1));
+      playback.value = PlaybackState.loading;
+      clock.elapse(const Duration(seconds: 20));
+      playback.value = PlaybackState.playing;
+      clock.elapse(const Duration(seconds: 10));
+      expect(syncs, 0);
+    });
   });
 
   test('a quick pause and resume does not sync', () {

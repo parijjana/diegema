@@ -189,4 +189,22 @@ void main() {
       expect((await fast.slot(SyncKind.position, 'k', 'slow'))!.hlc, later.hlc);
     });
   });
+
+  test('a record kind from a newer version is skipped, not fatal', () {
+    final m = SyncMessage.fromJson({
+      'records': [
+        {
+          'kind': 'position',
+          'key': 'lv:emma',
+          'hlc': const Hlc(1, 0, 'a').encode()
+        },
+        {
+          'kind': 'somethingNew',
+          'key': 'x',
+          'hlc': const Hlc(2, 0, 'a').encode()
+        },
+      ],
+    });
+    expect(m.records.map((r) => r.kind), [SyncKind.position]);
+  });
 }

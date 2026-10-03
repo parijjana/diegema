@@ -21,6 +21,9 @@ abstract class SyncStore {
   Future<List<SyncRecord>> newerThan(VersionVector vector);
 
   Future<List<SyncRecord>> all();
+
+  /// Deletes every record not written by [deviceId] (leaving a group).
+  Future<void> keepOnly(String deviceId);
 }
 
 /// Applies [incoming]: a record replaces the one in its slot only when its
@@ -70,4 +73,8 @@ class InMemorySyncStore implements SyncStore {
 
   @override
   Future<List<SyncRecord>> all() async => _slots.values.toList();
+
+  @override
+  Future<void> keepOnly(String deviceId) async =>
+      _slots.removeWhere((_, r) => r.deviceId != deviceId);
 }

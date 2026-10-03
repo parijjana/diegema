@@ -812,6 +812,18 @@ class AppDatabase extends _$AppDatabase {
 
   /// Removes a book row and its chapters. Progress and bookmarks are left
   /// alone; callers only delete rows that have none.
+  /// Book id → portable key, for books whose key is known (schema v4).
+  Future<Map<String, String>> portableKeys() async {
+    final rows = await (select(audiobooks)
+          ..where((t) => t.portableKey.isNotNull()))
+        .get();
+    return {for (final r in rows) r.id: r.portableKey!};
+  }
+
+  Future<void> setPortableKey(String audiobookId, String key) =>
+      (update(audiobooks)..where((t) => t.id.equals(audiobookId)))
+          .write(AudiobooksCompanion(portableKey: Value(key)));
+
   Future<void> deleteAudiobook(String id) async {
     await transaction(() async {
       await (delete(chapters)..where((c) => c.audiobookId.equals(id))).go();

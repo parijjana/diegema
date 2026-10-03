@@ -75,16 +75,15 @@ class _ScanCodeScreenState extends State<ScanCodeScreen> {
               controller: _camera,
               onDetect: _onDetect,
               errorBuilder: (context, error) => _CameraProblem(
-                denied: error.errorCode ==
-                    MobileScannerErrorCode.permissionDenied,
+                denied:
+                    error.errorCode == MobileScannerErrorCode.permissionDenied,
               ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(Sp.x4),
             child: Text(
-              _message ??
-                  'Point the camera at the code on your other device.',
+              _message ?? 'Point the camera at the code on your other device.',
               textAlign: TextAlign.center,
               style: AppType.bodyLg
                   .copyWith(color: _message == null ? c.text : c.danger),

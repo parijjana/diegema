@@ -39,7 +39,8 @@ void main() {
         ],
       );
 
-  test('a missing downloaded file is unreadable; streams and imports are not '
+  test(
+      'a missing downloaded file is unreadable; streams and imports are not '
       'offered a re-download', () async {
     expect(await downloadedChapterReadable(gone(), 0), isFalse);
     expect(canRedownload(gone()), isTrue);

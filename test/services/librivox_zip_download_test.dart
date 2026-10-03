@@ -181,10 +181,12 @@ void main() {
           zip, Directory(p.join(downloads, bookFolderName('Emma', 'emma_x'))));
 
       expect(files.map(p.basename), ['01.mp3', '02.mp3']);
-      expect(filesUnder(downloads)..sort(), [
-        p.join('Emma [emma_x]', '01.mp3'),
-        p.join('Emma [emma_x]', '02.mp3'),
-      ]..sort());
+      expect(
+          filesUnder(downloads)..sort(),
+          [
+            p.join('Emma [emma_x]', '01.mp3'),
+            p.join('Emma [emma_x]', '02.mp3'),
+          ]..sort());
       expect(zip.existsSync(), isTrue);
       expect(File(p.join(root.path, 'escape.mp3')).existsSync(), isFalse);
     });

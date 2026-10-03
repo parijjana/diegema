@@ -219,5 +219,28 @@ void main() {
       expect(allBooks, isEmpty);
       await migratedDb.close();
     });
+
+    test(
+        'upgrade from v3 to v4 keeps books and adds an empty sync table and '
+        'a null portable key', () async {
+      final v3Schema = await verifier.schemaAt(3);
+      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      v3Schema.rawDatabase.execute(
+        "INSERT INTO audiobooks (id, title, author, description, source, "
+        "origin, cover_url, user_cover_path, is_downloaded, is_pinned, "
+        "pin_order, hidden_from_continue, created_at) VALUES "
+        "('emma_librivox', 'Emma', 'Jane Austen', '', 'LibriVox', "
+        "'librivox', NULL, NULL, 1, 0, NULL, 0, $now)",
+      );
+
+      final migratedDb = AppDatabase(v3Schema.newConnection());
+      await verifier.migrateAndValidate(migratedDb, 4);
+
+      expect((await migratedDb.getAudiobook('emma_librivox'))!.title, 'Emma');
+      final row = await (migratedDb.select(migratedDb.audiobooks)).getSingle();
+      expect(row.portableKey, isNull);
+      expect(await migratedDb.select(migratedDb.syncRecords).get(), isEmpty);
+      await migratedDb.close();
+    });
   });
 }

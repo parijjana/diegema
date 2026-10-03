@@ -49,6 +49,12 @@ class Audiobooks extends Table {
   BoolColumn get hiddenFromContinue =>
       boolean().withDefault(const Constant(false))();
 
+  /// Key shared across devices (schema v4): `lv:<archive id>` for LibriVox
+  /// books, `ck:<content hash>` for local ones (see
+  /// `services/portable_key_io.dart`). Null until worked out — a local
+  /// book's needs its files read.
+  TextColumn get portableKey => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
@@ -112,6 +118,27 @@ class Bookmarks extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// The latest sync record per (kind, key, device) slot — see
+/// `lib/sync/`. Holds this device's own records and every linked device's.
+@DataClassName('SyncRecordRow')
+@TableIndex(name: 'sync_records_device_hlc', columns: {#deviceId, #hlc})
+class SyncRecords extends Table {
+  TextColumn get slot => text()();
+  TextColumn get kind => text()();
+  TextColumn get key => text()();
+  TextColumn get deviceId => text()();
+
+  /// `Hlc.encode()`: sorts as text in stamp order.
+  TextColumn get hlc => text()();
+
+  /// JSON object.
+  TextColumn get payload => text().withDefault(const Constant('{}'))();
+  BoolColumn get deleted => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {slot};
+}
+
 /// Thrown by [AppDatabase.pinBook] when the caller tries to pin a 6th
 /// book. The UI is expected to catch this and show a message — pinning
 /// never silently evicts an existing pin (ui_redesign_plan.md: "reject
@@ -135,6 +162,7 @@ enum PinResult { pinned, alreadyPinned, limitExceeded, notFound }
     Chapters,
     PlaybackProgress,
     Bookmarks,
+    SyncRecords,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -163,7 +191,7 @@ class AppDatabase extends _$AppDatabase {
   /// content whose chapter durations were never probed.
   static const double continueListeningMaxProgressFraction = 0.95;
 
-  static const int _schemaVersion = 3;
+  static const int _schemaVersion = 4;
 
   @override
   int get schemaVersion => _schemaVersion;
@@ -206,6 +234,13 @@ class AppDatabase extends _$AppDatabase {
             // file", exactly as it did before this column existed.
             await m.addColumn(chapters, chapters.startMs);
             await m.addColumn(chapters, chapters.endMs);
+          }
+          if (from < 4 && to >= 4) {
+            // Linked-device sync (SYNC_DESIGN.md). Keys are filled in after
+            // open: a local book's needs its files read.
+            await m.addColumn(audiobooks, audiobooks.portableKey);
+            await m.createTable(syncRecords);
+            await m.createIndex(syncRecordsDeviceHlc);
           }
         },
         beforeOpen: (details) async {

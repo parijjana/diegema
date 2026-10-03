@@ -58,6 +58,12 @@ class FakeSyncController implements SyncController {
   }
 
   @override
+  Future<void> foreground() => refresh();
+
+  @override
+  Future<void> background() => refresh();
+
+  @override
   Future<Map<String, String>> portableKeys() async => Map.of(keys);
 
   @override

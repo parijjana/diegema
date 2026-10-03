@@ -103,16 +103,17 @@ Future<void> main() async {
       downloads = createDownloadManager(nativeDb);
       unawaited(downloads?.start());
     }
-    // Linked-device sync: publish what changed in the library at launch and
-    // whenever the app goes to the background or comes back. Not awaited:
+    // Linked-device sync: publish what changed in the library and sync with
+    // linked devices on this network at launch and whenever the app goes to
+    // the background or comes back. Not awaited:
     // working out a local book's key reads its files.
     if (!kDemoMode) {
       final s = sync = createSyncController(nativeDb);
       if (s != null) {
-        unawaited(s.refresh());
+        unawaited(s.foreground());
         _syncLifecycle = AppLifecycleListener(
-          onPause: () => unawaited(s.refresh()),
-          onResume: () => unawaited(s.refresh()),
+          onPause: () => unawaited(s.background()),
+          onResume: () => unawaited(s.foreground()),
         );
       }
     }

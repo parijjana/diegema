@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -192,7 +193,7 @@ void main() {
       final (i, r, tap) = await tapped();
       tap.mutate = (f) => f..[0] ^= 1;
       await i.send([1, 2, 3]);
-      expect(r.receive(), throwsA(isA<HandshakeException>()));
+      expect(r.receive(), throwsA(isA<SessionBroken>()));
     });
 
     test('a replayed frame does not open', () async {
@@ -200,7 +201,61 @@ void main() {
       await i.send([1, 2, 3]);
       expect(await r.receive(), [1, 2, 3]);
       tap.replayLast();
-      expect(r.receive(), throwsA(isA<HandshakeException>()));
+      expect(r.receive(), throwsA(isA<SessionBroken>()));
+    });
+
+    test('un-awaited sends arrive in order', () async {
+      final (i, r, _) = await tapped();
+      final sends = [
+        for (var n = 0; n < 20; n++) i.send([n])
+      ];
+      await Future.wait(sends);
+      for (var n = 0; n < 20; n++) {
+        expect(await r.receive(), [n]);
+      }
+    });
+  });
+
+  group('framing', () {
+    Uint8List framed(List<int> body) => Uint8List.fromList([
+          ...(ByteData(4)..setUint32(0, body.length)).buffer.asUint8List(),
+          ...body,
+        ]);
+
+    test('split across chunks, several per chunk, and big', () async {
+      final input = StreamController<List<int>>();
+      final ch = LengthPrefixedChannel(
+          input.stream, StreamController<List<int>>().sink);
+      final big = List<int>.generate(300000, (n) => n & 0xff);
+      final bytes = [
+        ...framed([1]),
+        ...framed([2, 2]),
+        ...framed(big),
+        ...framed([])
+      ];
+      // One byte, then a few, then 7 KB chunks.
+      input.add(bytes.sublist(0, 1));
+      input.add(bytes.sublist(1, 9));
+      for (var o = 9; o < bytes.length; o += 7000) {
+        input.add(bytes.sublist(
+            o, o + 7000 > bytes.length ? bytes.length : o + 7000));
+      }
+      expect(await ch.read(), [1]);
+      expect(await ch.read(), [2, 2]);
+      expect(await ch.read(), big);
+      expect(await ch.read(), isEmpty);
+      await input.close();
+      expect(ch.read(), throwsA(isA<ChannelClosed>()));
+    });
+
+    test('an oversize length fails without waiting for the bytes', () async {
+      // ignore: close_sinks
+      final input = StreamController<List<int>>();
+      final ch = LengthPrefixedChannel(
+          input.stream, StreamController<List<int>>().sink,
+          maxFrame: 1000);
+      input.add((ByteData(4)..setUint32(0, 1001)).buffer.asUint8List());
+      expect(ch.read(), throwsA(isA<FrameTooLarge>()));
     });
   });
 

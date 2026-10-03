@@ -4,6 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:diegema/database/app_database_io.dart';
 import 'package:diegema/domain/models/audiobook.dart';
 import 'package:diegema/services/sync/sync_service_io.dart';
+import 'package:diegema/sync/sync_group.dart';
+
+import '../../helpers/fake_discovery.dart';
 
 UnifiedAudiobook emma() => UnifiedAudiobook(
       id: 'emma_librivox',
@@ -123,5 +126,50 @@ void main() {
     await mac.sync.refresh();
     expect((await mac.sync.store.all()).length, before);
     expect(await mac.sync.store.vector(), vector);
+  });
+
+  group('over the network', () {
+    test('a device whose sync keys are new gets a new id, once', () async {
+      final prefs = {'sync.device_id.v1': 'restored-from-old-phone'};
+      final secrets = InMemorySecretStore();
+      final db = AppDatabase(NativeDatabase.memory());
+      final first = SyncService(db,
+          identity: DeviceIdentityStore(overrides: prefs), secrets: secrets);
+      final id = await first.deviceId();
+      expect(id, isNot('restored-from-old-phone'));
+      final again = SyncService(db,
+          identity: DeviceIdentityStore(overrides: prefs), secrets: secrets);
+      expect(await again.deviceId(), id);
+      await db.close();
+    });
+
+    test('foreground on a Mac pulls a listening phone\'s books', () async {
+      final net = FakeNetwork();
+      final groupKey = List<int>.generate(32, (i) => i);
+      Future<SyncService> linked(Device d, {required bool listens}) async {
+        final secrets = InMemorySecretStore();
+        await (await SyncGroup.load(secrets)).join(groupKey);
+        return SyncService(d.db,
+            identity: DeviceIdentityStore(overrides: {
+              'sync.device_id.v1': d == mac ? 'mac' : 'phone',
+              'sync.device_name.v1': d == mac ? 'MacBook' : 'Pixel',
+            }),
+            now: () => d.clock,
+            secrets: secrets,
+            discovery: FakeDiscovery(net),
+            listens: listens);
+      }
+
+      await phone.db.saveAudiobook(emma());
+      final phoneSync = await linked(phone, listens: true);
+      final macSync = await linked(mac, listens: false);
+      await phoneSync.foreground();
+      expect(net.services, hasLength(1), reason: 'only the phone advertises');
+      await macSync.foreground();
+      final remote = macSync.view.value!.remoteOnly({});
+      expect(remote.map((b) => b.title), ['Emma']);
+      expect(phoneSync.view.value!.otherDeviceIds(), hasLength(1));
+      await phoneSync.background();
+    });
   });
 }

@@ -66,6 +66,18 @@ class HandshakeException implements Exception {
       'HandshakeException(${failure.name}${detail == null ? '' : ': $detail'})';
 }
 
+/// An established session received a frame that doesn't open; the session
+/// is closed and should be dropped (the next sync starts a new one).
+class SessionBroken implements Exception {
+  const SessionBroken();
+  @override
+  String toString() => 'SessionBroken';
+}
+
+class _Unopened implements Exception {
+  const _Unopened();
+}
+
 /// A device's long-term identity key (Ed25519). The 32-byte seed is what
 /// gets stored in the platform keystore.
 class DeviceIdentity {
@@ -166,13 +178,30 @@ class SecureSession {
     this.code,
   );
 
-  Future<void> send(List<int> message) async {
-    _channel.write(await _seal(_sendKey, _sendCounter++, message));
+  Future<void> _sending = Future.value();
+
+  /// Sends are queued, so frames leave in counter order even when callers
+  /// don't await each one.
+  Future<void> send(List<int> message) {
+    final counter = _sendCounter++;
+    final sent = _sending.then((_) async {
+      _channel.write(await _seal(_sendKey, counter, message));
+    });
+    _sending = sent.catchError((Object _) {});
+    return sent;
   }
 
+  /// The next message. Throws [SessionBroken] when a frame doesn't open
+  /// (altered, replayed, reordered or dropped traffic) and [ChannelClosed]
+  /// when the other side has gone.
   Future<Uint8List> receive() async {
     final frame = await _channel.read();
-    return _open(_receiveKey, _receiveCounter++, frame);
+    try {
+      return await _open(_receiveKey, _receiveCounter++, frame);
+    } on _Unopened {
+      await _channel.close();
+      throw const SessionBroken();
+    }
   }
 
   Future<void> close() => _channel.close();
@@ -197,10 +226,12 @@ class SecureSession {
       if (e is ChannelClosed) {
         throw const HandshakeException(HandshakeFailure.closed);
       }
-      if (e is FormatException || e is TypeError) {
-        throw HandshakeException(HandshakeFailure.protocol, '$e');
+      if (e is _Unopened) {
+        throw const HandshakeException(HandshakeFailure.wrongKey);
       }
-      rethrow;
+      // Whatever else a malformed message caused (bad JSON, wrong types,
+      // bad lengths) is the peer not speaking the protocol.
+      throw HandshakeException(HandshakeFailure.protocol, '$e');
     }
   }
 }
@@ -220,9 +251,7 @@ Future<Uint8List> _seal(SecretKey key, int counter, List<int> clear) async {
 }
 
 Future<Uint8List> _open(SecretKey key, int counter, Uint8List frame) async {
-  if (frame.length < 16) {
-    throw const HandshakeException(HandshakeFailure.wrongKey, 'short frame');
-  }
+  if (frame.length < 16) throw const _Unopened();
   final box = SecretBox(
     frame.sublist(0, frame.length - 16),
     nonce: _nonce(counter),
@@ -231,7 +260,7 @@ Future<Uint8List> _open(SecretKey key, int counter, Uint8List frame) async {
   try {
     return Uint8List.fromList(await _aead.decrypt(box, secretKey: key));
   } on SecretBoxAuthenticationError {
-    throw const HandshakeException(HandshakeFailure.wrongKey);
+    throw const _Unopened();
   }
 }
 

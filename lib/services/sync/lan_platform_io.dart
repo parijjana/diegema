@@ -124,14 +124,8 @@ class BonsoirPeerDiscovery implements PeerDiscovery {
               e.service.resolve(d.serviceResolver);
             }
           case BonsoirDiscoveryServiceResolvedEvent():
-            final s = e.service;
-            if (s.attributes['g'] != tag || s.port <= 0) return;
-            // Resolution also returns IPv6 (link-local and global); IPv4 is
-            // what every platform here connects over reliably.
-            final v4 = s.hostAddresses.where((a) => !a.contains(':'));
-            final host = v4.isNotEmpty ? v4.first : s.hostname;
-            if (host == null) return;
-            found[s.name] = PeerAddress(s.name, host, s.port);
+            final p = _address(e.service, tag);
+            if (p != null) found[p.instance] = p;
           default:
         }
       });
@@ -147,4 +141,52 @@ class BonsoirPeerDiscovery implements PeerDiscovery {
     }
     return found.values.toList();
   }
+
+  @override
+  Stream<PeerAddress> watch({required String tag}) {
+    late final StreamController<PeerAddress> out;
+    BonsoirDiscovery? d;
+    StreamSubscription<BonsoirDiscoveryEvent>? sub;
+    out = StreamController<PeerAddress>(
+      onListen: () async {
+        try {
+          final disc = d = BonsoirDiscovery(type: diegemaServiceType);
+          await disc.initialize();
+          sub = disc.eventStream?.listen((e) {
+            switch (e) {
+              case BonsoirDiscoveryServiceFoundEvent():
+                if (e.service.attributes['g'] == tag) {
+                  e.service.resolve(disc.serviceResolver);
+                }
+              case BonsoirDiscoveryServiceResolvedEvent():
+                final p = _address(e.service, tag);
+                if (p != null && !out.isClosed) out.add(p);
+              default:
+            }
+          });
+          await disc.start();
+        } catch (e) {
+          debugPrint('sync: watch failed: $e');
+        }
+      },
+      onCancel: () async {
+        await sub?.cancel();
+        try {
+          await d?.stop();
+        } catch (_) {}
+        await out.close();
+      },
+    );
+    return out.stream;
+  }
+}
+
+/// Resolution also returns IPv6 (link-local and global); IPv4 is what every
+/// platform here connects over reliably.
+PeerAddress? _address(BonsoirService s, String tag) {
+  if (s.attributes['g'] != tag || s.port <= 0) return null;
+  final v4 = s.hostAddresses.where((a) => !a.contains(':'));
+  final host = v4.isNotEmpty ? v4.first : s.hostname;
+  if (host == null) return null;
+  return PeerAddress(s.name, host, s.port);
 }

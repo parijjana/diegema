@@ -99,6 +99,9 @@ class SyncService implements SyncController {
   final PeerDiscovery? discovery;
   final bool listens;
 
+  /// How long "Sync now" on a listening device waits for a Mac to dial in.
+  final Duration callerWindow;
+
   /// This device's LAN IPv4 addresses, for link codes; injected by tests.
   final Future<List<String>> Function() localAddresses;
 
@@ -131,6 +134,7 @@ class SyncService implements SyncController {
     this.discovery,
     this.listens = false,
     Future<List<String>> Function()? localAddresses,
+    this.callerWindow = const Duration(seconds: 6),
   })  : localAddresses = localAddresses ?? _lanIPv4Addresses,
         store = store ?? DriftSyncStore(db),
         _now = now ?? (() => DateTime.now().millisecondsSinceEpoch);
@@ -169,13 +173,21 @@ class SyncService implements SyncController {
     final g = await group();
     final d = discovery;
     if (g == null || d == null) return null;
-    return _lan ??= LanSync(
+    final existing = _lan;
+    if (existing != null) return existing;
+    final lan = _lan = LanSync(
       group: g,
       discovery: d,
       peer: peer,
       listens: listens,
+      callerWindow: callerWindow,
       log: (m) => debugPrint('sync: $m'),
     );
+    // Devices that dialled in, and devices a Mac dialled on seeing them,
+    // count as syncs too.
+    lan.exchanges.where((r) => r.ok).listen((_) => _lastSync.value =
+        LastSync(DateTime.fromMillisecondsSinceEpoch(_now()), 1));
+    return lan;
   }
 
   /// App opened or brought forward: publish, listen (not on a Mac), sync.
@@ -185,7 +197,7 @@ class SyncService implements SyncController {
         await refresh();
         final lan = await _lanSync();
         if (lan == null) return;
-        await lan.startListening();
+        await _online(lan);
         await _run(lan);
       });
 
@@ -207,7 +219,7 @@ class SyncService implements SyncController {
     final lan = await _lanSync();
     if (lan == null) return 0;
     await refresh();
-    return _run(lan);
+    return _run(lan, waitForCallers: true);
   }
 
   @override
@@ -220,7 +232,7 @@ class SyncService implements SyncController {
     if (g == null || lan == null) throw StateError('sync is unavailable');
     if (!g.linked) await g.create();
     await refresh();
-    await lan.startListening();
+    await _online(lan);
     final expires =
         DateTime.fromMillisecondsSinceEpoch(_now()).add(LinkCode.lifetime);
     final code = LinkCode(
@@ -250,11 +262,11 @@ class SyncService implements SyncController {
     }
     if (!same) {
       // A listener advertises the old group's tag; start again on the new.
-      await lan.stopListening();
+      await _offline(lan);
       await g.join(code.groupKey);
     }
     await refresh();
-    await lan.startListening();
+    await _online(lan);
     final port = code.port;
     if (port != null) {
       for (final a in code.addresses) {
@@ -267,9 +279,25 @@ class SyncService implements SyncController {
     return reached > 0 ? JoinOutcome.linked : JoinOutcome.linkedNotSynced;
   }
 
-  /// Syncs with whoever is near and records it as [lastSync].
-  Future<int> _run(LanSync lan) async {
-    final reached = (await lan.syncNow()).results.where((r) => r.ok).length;
+  /// Listening (phones, PCs) or watching (a Mac) for the group's devices.
+  Future<void> _online(LanSync lan) async {
+    await lan.startListening();
+    await lan.startWatching();
+  }
+
+  Future<void> _offline(LanSync? lan) async {
+    await lan?.stopListening();
+    await lan?.stopWatching();
+  }
+
+  /// Syncs with whoever is near and records it as [lastSync]. Devices are
+  /// counted once however many ways they were reached.
+  Future<int> _run(LanSync lan, {bool waitForCallers = false}) async {
+    final run = await lan.syncNow(waitForCallers: waitForCallers);
+    final reached = {
+      for (final r in run.results)
+        if (r.ok) r.peer.host,
+    }.length;
     _lastSync.value =
         LastSync(DateTime.fromMillisecondsSinceEpoch(_now()), reached);
     return reached;
@@ -301,7 +329,7 @@ class SyncService implements SyncController {
   Future<void> unlink() async {
     final g = await group();
     if (g == null || !g.linked) return;
-    await _lan?.stopListening();
+    await _offline(_lan);
     await g.leave();
     // Other devices' books and positions go too; this device's own records
     // stay, so linking again later picks up where it was.
@@ -315,7 +343,7 @@ class SyncService implements SyncController {
   Future<void> resetKeys() async {
     final s = secrets;
     if (s == null) return;
-    await _lan?.stopListening();
+    await _offline(_lan);
     _lan = null;
     await SyncGroup.wipe(s);
     _group = null;

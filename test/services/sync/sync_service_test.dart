@@ -188,7 +188,8 @@ void main() {
         secrets: InMemorySecretStore(),
         discovery: FakeDiscovery(net),
         listens: listens,
-        localAddresses: () async => ['127.0.0.1']);
+        localAddresses: () async => ['127.0.0.1'],
+        callerWindow: const Duration(milliseconds: 300));
 
     test('phone shows, Mac scans: linked and synced at once', () async {
       await phone.db.saveAudiobook(emma());
@@ -250,7 +251,8 @@ void main() {
             secrets: secrets,
             discovery: FakeDiscovery(net),
             listens: listens,
-            localAddresses: () async => ['127.0.0.1']);
+            localAddresses: () async => ['127.0.0.1'],
+            callerWindow: const Duration(milliseconds: 300));
 
     Future<(SyncService, SyncService)> pair() async {
       await phone.db.saveAudiobook(emma());
@@ -300,7 +302,7 @@ void main() {
       expect(m.view.value!.otherDeviceIds(), isEmpty);
       expect(m.view.value!.remoteOnly({}), isEmpty);
       expect(await m.syncNow(), 0);
-      expect(await p.syncNow(), 0, reason: 'phone listens; nobody dials');
+      expect(await p.syncNow(), 0, reason: 'the Mac stopped watching');
     });
 
     test('unreadable keys: status says so, reset gives a new unlinked device',
@@ -314,6 +316,41 @@ void main() {
       expect(await s.status(), SyncStatus.unlinked);
       expect(await s.deviceId(), isNot(oldId));
     });
+  });
+
+  test('Sync now on the phone reaches a Mac that only watches', () async {
+    final net = FakeNetwork();
+    final groupKey = List<int>.generate(32, (i) => i + 1);
+    Future<SyncService> make(Device d, {required bool listens}) async {
+      final secrets = InMemorySecretStore();
+      await (await SyncGroup.load(secrets)).join(groupKey);
+      return SyncService(d.db,
+          identity: DeviceIdentityStore(overrides: {
+            'sync.device_id.v1': d == mac ? 'mac' : 'phone',
+            'sync.device_name.v1': d == mac ? 'MacBook' : 'Pixel',
+          }),
+          now: () => d.clock,
+          secrets: secrets,
+          discovery: FakeDiscovery(net),
+          listens: listens,
+          callerWindow: const Duration(milliseconds: 300));
+    }
+
+    final m = await make(mac, listens: false);
+    await m.foreground(); // watching from now on
+    final p = await make(phone, listens: true);
+    await phone.db.saveAudiobook(emma());
+    // Opening the phone app: the Mac sees it appear and dials it.
+    await p.foreground();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(m.view.value!.remoteOnly({}).map((b) => b.title), ['Emma']);
+    expect(m.lastSync.value?.reached, 1);
+    expect(p.lastSync.value?.reached, 1, reason: 'an inbound sync counts');
+
+    // The phone's own Sync now: it announces itself again and the Mac,
+    // which can't be dialled, dials in.
+    await Future<void>.delayed(const Duration(milliseconds: 2100));
+    expect(await p.syncNow(), 1);
   });
 }
 

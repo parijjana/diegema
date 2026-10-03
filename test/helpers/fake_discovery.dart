@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:diegema/sync/lan_sync.dart';
 
 /// mDNS stand-in: one shared registry, everything on loopback.
 class FakeNetwork {
   final Map<String, (int, String)> services = {};
+  // Lives as long as the test's network.
+  // ignore: close_sinks
+  final _appeared = StreamController<(String, int, String)>.broadcast();
 }
 
 class FakeDiscovery implements PeerDiscovery {
@@ -17,7 +22,13 @@ class FakeDiscovery implements PeerDiscovery {
       required String tag}) async {
     _mine = instance;
     net.services[instance] = (port, tag);
+    net._appeared.add((instance, port, tag));
   }
+
+  @override
+  Stream<PeerAddress> watch({required String tag}) => net._appeared.stream
+      .where((s) => s.$3 == tag)
+      .map((s) => PeerAddress(s.$1, '127.0.0.1', s.$2));
 
   @override
   Future<void> stopAdvertising() async => net.services.remove(_mine);

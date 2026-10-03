@@ -88,6 +88,11 @@ class LanSync {
   ServerSocket? _server;
   Future<void>? _starting;
   StreamSubscription<PeerAddress>? _watch;
+  Timer? _watchRetry;
+
+  /// How long a watch that failed (discovery couldn't start) waits before
+  /// trying again.
+  final Duration watchRetry;
   final Map<String, DateTime> _dialledAt = {};
   final _exchanges = StreamController<PeerResult>.broadcast();
 
@@ -112,6 +117,7 @@ class LanSync {
     this.timeout = const Duration(seconds: 20),
     this.callerWindow = const Duration(seconds: 6),
     this.log,
+    this.watchRetry = const Duration(seconds: 30),
     String? instance,
   })  : bindAddress = bindAddress ?? InternetAddress.anyIPv4,
         _instance = instance ?? _newInstance() {
@@ -148,33 +154,58 @@ class LanSync {
 
   /// A device that doesn't listen (a Mac) watches for its group's devices
   /// and dials each one as it appears.
+  /// If discovery fails, it logs and tries again after [watchRetry] until
+  /// [stopWatching].
   Future<void> startWatching() async {
     if (listens || _watch != null) return;
+    _watchRetry?.cancel();
+    _watchRetry = null;
     final tag = await group.tag();
-    if (tag == null) return;
-    _watch = discovery.watch(tag: tag).listen((p) {
-      if (!_mine.contains(p.instance)) unawaited(_dialSeen(p));
-    });
+    if (tag == null || _watch != null) return;
+    late final StreamSubscription<PeerAddress> sub;
+    sub = _watch = discovery.watch(tag: tag).listen(
+      (p) {
+        if (!_mine.contains(p.instance)) unawaited(_dialSeen(p));
+      },
+      onError: (Object e) {
+        log?.call('watch failed: $e');
+        unawaited(sub.cancel());
+        if (!identical(_watch, sub)) return;
+        _watch = null;
+        _watchRetry = Timer(watchRetry, () => unawaited(startWatching()));
+      },
+      cancelOnError: false,
+    );
   }
 
   Future<void> stopWatching() async {
+    _watchRetry?.cancel();
+    _watchRetry = null;
     await _watch?.cancel();
     _watch = null;
+  }
+
+  /// Stops listening and watching and ends [exchanges]; this instance is
+  /// not used again.
+  Future<void> dispose() async {
+    await stopWatching();
+    await stopListening();
+    await _exchanges.close();
   }
 
   /// One device is seen several times in a burst (one sighting per address);
   /// dial it once per burst. Short, so a "Sync now" re-announcement soon
   /// after is still answered.
   Future<void> _dialSeen(PeerAddress p) async {
+    const burst = Duration(seconds: 2);
     final now = DateTime.now();
-    final last = _dialledAt[p.instance];
-    if (last != null && now.difference(last) < const Duration(seconds: 2)) {
-      return;
-    }
+    // Every re-announcement is a new name, so forget bursts that are over.
+    _dialledAt.removeWhere((_, at) => now.difference(at) >= burst);
+    if (_dialledAt.containsKey(p.instance)) return;
     _dialledAt[p.instance] = now;
     final result = await syncWith(p);
     log?.call('saw ${p.instance}: $result');
-    _exchanges.add(result);
+    if (!_exchanges.isClosed) _exchanges.add(result);
   }
 
   /// Stops and starts the advertisement, so devices watching (a Mac) see
@@ -208,9 +239,11 @@ class LanSync {
         final counts =
             await syncAsResponder(session, await peer()).timeout(timeout);
         log?.call('served ${socket.remoteAddress.address} $counts');
-        _exchanges.add(PeerResult(
-            PeerAddress('inbound', socket.remoteAddress.address, 0),
-            counts: counts));
+        if (!_exchanges.isClosed) {
+          _exchanges.add(PeerResult(
+              PeerAddress('inbound', socket.remoteAddress.address, 0),
+              counts: counts));
+        }
       } catch (e) {
         log?.call('serve failed ${socket.remoteAddress.address}: $e');
       } finally {

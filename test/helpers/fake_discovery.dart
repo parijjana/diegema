@@ -13,6 +13,9 @@ class FakeNetwork {
 class FakeDiscovery implements PeerDiscovery {
   final FakeNetwork net;
   String? _mine;
+
+  /// How many of the next [watch] calls fail, as discovery that can't start.
+  int failWatches = 0;
   FakeDiscovery(this.net);
 
   @override
@@ -26,9 +29,15 @@ class FakeDiscovery implements PeerDiscovery {
   }
 
   @override
-  Stream<PeerAddress> watch({required String tag}) => net._appeared.stream
-      .where((s) => s.$3 == tag)
-      .map((s) => PeerAddress(s.$1, '127.0.0.1', s.$2));
+  Stream<PeerAddress> watch({required String tag}) {
+    if (failWatches > 0) {
+      failWatches--;
+      return Stream.error(StateError('discovery failed to start'));
+    }
+    return net._appeared.stream
+        .where((s) => s.$3 == tag)
+        .map((s) => PeerAddress(s.$1, '127.0.0.1', s.$2));
+  }
 
   @override
   Future<void> stopAdvertising() async => net.services.remove(_mine);

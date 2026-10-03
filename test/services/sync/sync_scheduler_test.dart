@@ -61,6 +61,20 @@ void main() {
     });
   });
 
+  test('pausing while the next chapter loads still syncs', () {
+    run((clock) {
+      playback.value = PlaybackState.playing;
+      playback.value = PlaybackState.completed;
+      playback.value = PlaybackState.loading;
+      playback.value = PlaybackState.paused;
+      clock.elapse(const Duration(seconds: 5));
+      expect(syncs, 1);
+      playback.value = PlaybackState.idle;
+      clock.elapse(const Duration(seconds: 10));
+      expect(syncs, 1, reason: 'one stop, one sync');
+    });
+  });
+
   test('a quick pause and resume does not sync', () {
     run((clock) {
       playback.value = PlaybackState.playing;

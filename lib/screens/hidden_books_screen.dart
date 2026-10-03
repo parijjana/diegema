@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/hidden_books_store.dart';
+import '../services/sync/sync_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
 
@@ -73,6 +74,13 @@ class _HiddenBooksScreenState extends State<HiddenBooksScreen> {
             ? Sp.gutterDesktop
             : Sp.gutterPhone;
         if (_loading) return const SizedBox.shrink();
+        // Books hidden while only on another device are hidden by portable
+        // key; the synced listing still knows their titles.
+        final view = SyncScope.viewOf(context);
+        final remoteTitles = {
+          if (view != null)
+            for (final b in view.remoteOnly(const {})) b.key: b.title,
+        };
         if (_ids.isEmpty) {
           return Center(
             child: Padding(
@@ -100,6 +108,7 @@ class _HiddenBooksScreenState extends State<HiddenBooksScreen> {
                 child: _HiddenRow(
                   id: id,
                   book: _books[id],
+                  remoteTitle: remoteTitles[id],
                   onUnhide: () => _unhide(id),
                 ),
               ),
@@ -113,10 +122,14 @@ class _HiddenBooksScreenState extends State<HiddenBooksScreen> {
 class _HiddenRow extends StatelessWidget {
   final String id;
   final UnifiedAudiobook? book;
+  final String? remoteTitle;
   final VoidCallback onUnhide;
 
   const _HiddenRow(
-      {required this.id, required this.book, required this.onUnhide});
+      {required this.id,
+      required this.book,
+      required this.onUnhide,
+      this.remoteTitle});
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +158,7 @@ class _HiddenRow extends StatelessWidget {
             child: b == null
                 // No longer in the database: show the raw id, dimmed. Unhide
                 // still works, it just removes the id from the set.
-                ? Text(id,
+                ? Text(remoteTitle ?? id,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: AppType.body.copyWith(color: c.textMuted))

@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'secure/secure_session.dart';
+import 'secure/auth_session.dart';
 import 'sync_exchange.dart';
 
 /// How many records moved each way in one exchange.
@@ -14,10 +14,10 @@ class ExchangeCounts {
 
 const _type = 'sync/1';
 
-Future<void> _send(SecureSession s, SyncMessage m) =>
+Future<void> _send(AuthSession s, SyncMessage m) =>
     s.send(utf8.encode(jsonEncode({'t': _type, ...m.toJson()})));
 
-Future<SyncMessage> _receive(SecureSession s) async {
+Future<SyncMessage> _receive(AuthSession s) async {
   final json = jsonDecode(utf8.decode(await s.receive()));
   if (json is! Map<String, Object?> || json['t'] != _type) {
     throw const FormatException('not a sync/1 message');
@@ -29,7 +29,7 @@ Future<SyncMessage> _receive(SecureSession s) async {
 /// the device that connected. A fourth, empty message from the responder
 /// says it has applied everything, so a finished call means both sides
 /// hold the same records.
-Future<ExchangeCounts> syncAsInitiator(SecureSession s, SyncPeer peer) async {
+Future<ExchangeCounts> syncAsInitiator(AuthSession s, SyncPeer peer) async {
   await _send(s, await peer.hello());
   final answer = await _receive(s);
   final last = await peer.complete(answer);
@@ -39,7 +39,7 @@ Future<ExchangeCounts> syncAsInitiator(SecureSession s, SyncPeer peer) async {
 }
 
 /// The same exchange as the device that accepted the connection.
-Future<ExchangeCounts> syncAsResponder(SecureSession s, SyncPeer peer) async {
+Future<ExchangeCounts> syncAsResponder(AuthSession s, SyncPeer peer) async {
   final hello = await _receive(s);
   final answer = await peer.answer(hello);
   await _send(s, answer);

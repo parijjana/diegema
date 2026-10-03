@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:diegema/sync/hlc.dart';
 import 'package:diegema/sync/lan_sync.dart';
-import 'package:diegema/sync/secure/secure_session.dart';
+import 'package:diegema/sync/secure/auth_session.dart';
 import 'package:diegema/sync/sync_exchange.dart';
 import 'package:diegema/sync/sync_group.dart';
 import 'package:diegema/sync/sync_record.dart';
@@ -158,14 +158,17 @@ void main() {
   });
 
   group('SyncGroup', () {
-    test('keeps its device key and group key across loads', () async {
+    test('keeps its group key across loads; fresh only the first time',
+        () async {
       final secrets = InMemorySecretStore();
       final first = await SyncGroup.load(secrets);
+      expect(first.fresh, isTrue);
       expect(first.linked, isFalse);
       expect(await first.tag(), isNull);
+      expect(() => first.sessionConfig(), throwsStateError);
       await first.create();
       final again = await SyncGroup.load(secrets);
-      expect(again.identity.publicKey, first.identity.publicKey);
+      expect(again.fresh, isFalse);
       expect(again.key, first.key);
       expect(await again.tag(), matches(RegExp(r'^[0-9a-f]{16}$')));
       await again.leave();
@@ -178,16 +181,58 @@ void main() {
       await a.join(groupKey);
       await b.join(groupKey);
       expect(await a.tag(), await b.tag());
-      expect(a.identity.publicKey, isNot(b.identity.publicKey));
-    });
-
-    test('a lost store means a new identity, unlinked', () async {
-      final a = await SyncGroup.load(InMemorySecretStore());
-      final b = await SyncGroup.load(InMemorySecretStore());
-      expect(a.identity.publicKey, isNot(b.identity.publicKey));
-      expect(() => b.sessionConfig(), throwsStateError);
+      await b.join(List<int>.filled(32, 1));
+      expect(await a.tag(), isNot(await b.tag()));
       expect(secureRandomBytes(4), hasLength(4));
     });
+  });
+
+  test('two listening devices dialling each other at once both finish',
+      () async {
+    // The old network-wide lock deadlocked here until the 20 s timeout.
+    final net = FakeNetwork();
+    final a = await Device('a').start(net, listens: true, groupKey: groupKey);
+    final b = await Device('b').start(net, listens: true, groupKey: groupKey);
+    await a.position('lv:emma', 10, 1);
+    await b.position('lv:odyssey', 11, 2);
+    await a.lan.startListening();
+    await b.lan.startListening();
+    final runs = await Future.wait([a.lan.syncNow(), b.lan.syncNow()])
+        .timeout(const Duration(seconds: 3));
+    expect(runs.every((r) => r.results.single.ok), isTrue,
+        reason: '${runs.map((r) => r.results)}');
+    expect(await a.slots(), await b.slots());
+    await a.lan.stopListening();
+    await b.lan.stopListening();
+  });
+
+  test('a stranger holding a connection open doesn\'t block a sync', () async {
+    final net = FakeNetwork();
+    final phone =
+        await Device('phone').start(net, listens: true, groupKey: groupKey);
+    final mac =
+        await Device('mac').start(net, listens: false, groupKey: groupKey);
+    await phone.lan.startListening();
+    final port = net.services['dg-phone']!.$1;
+    final idle = await Socket.connect('127.0.0.1', port);
+    final run = await mac.lan.syncNow().timeout(const Duration(seconds: 3));
+    expect(run.results.single.ok, isTrue);
+    idle.destroy();
+    await phone.lan.stopListening();
+  });
+
+  test('concurrent startListening binds once', () async {
+    final net = FakeNetwork();
+    final phone =
+        await Device('phone').start(net, listens: true, groupKey: groupKey);
+    await Future.wait([
+      phone.lan.startListening(),
+      phone.lan.startListening(),
+      phone.lan.startListening(),
+    ]);
+    expect(net.services, hasLength(1));
+    await phone.lan.stopListening();
+    expect(net.services, isEmpty);
   });
 }
 

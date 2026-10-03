@@ -14,25 +14,15 @@ import '../../sync/sync_group.dart';
 const diegemaServiceType = '_diegema._tcp';
 
 /// The platform keystore (Android Keystore, iOS Keychain, Windows DPAPI).
-/// A value that can no longer be decrypted (keystore reset) reads as
-/// missing, which leaves the device unlinked rather than stuck.
+/// Read errors propagate: the service turns sync off for that run instead
+/// of mistaking a passing keystore failure for an empty store.
 class KeystoreSecretStore implements SecretStore {
   final FlutterSecureStorage _storage;
   KeystoreSecretStore([FlutterSecureStorage? storage])
       : _storage = storage ?? const FlutterSecureStorage();
 
   @override
-  Future<String?> read(String key) async {
-    try {
-      return await _storage.read(key: key);
-    } catch (e) {
-      debugPrint('sync: keystore read $key failed, treating as missing: $e');
-      try {
-        await _storage.delete(key: key);
-      } catch (_) {}
-      return null;
-    }
-  }
+  Future<String?> read(String key) => _storage.read(key: key);
 
   @override
   Future<void> write(String key, String value) =>

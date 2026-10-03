@@ -72,5 +72,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_diegema._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Diegema finds your other linked devices on this Wi-Fi to keep your place in each book in step.</string>
 </dict>
 </plist>

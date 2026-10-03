@@ -41,7 +41,13 @@ class SyncGroup {
   final DeviceIdentity identity;
   Uint8List? _key;
 
-  SyncGroup._(this._store, this.identity, this._key);
+  /// The store had no device key, so this is a new identity: a fresh
+  /// install, or a backup restored onto this or another phone (backups
+  /// carry preferences, never the keystore). The caller gives the device a
+  /// new sync id too, so two phones never write under one id.
+  final bool fresh;
+
+  SyncGroup._(this._store, this.identity, this._key, {this.fresh = false});
 
   static Future<SyncGroup> load(SecretStore store,
       {List<int> Function(int)? randomBytes}) async {
@@ -56,8 +62,8 @@ class SyncGroup {
       identity = await DeviceIdentity.fromSeed(base64.decode(seed));
     }
     final key = await store.read(_groupKey);
-    return SyncGroup._(
-        store, identity, key == null ? null : base64.decode(key));
+    return SyncGroup._(store, identity, key == null ? null : base64.decode(key),
+        fresh: seed == null);
   }
 
   bool get linked => _key != null;

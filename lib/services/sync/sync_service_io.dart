@@ -7,8 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/app_database_io.dart';
 import '../../database/drift_sync_store.dart';
 import '../../sync/hlc.dart';
+import '../../sync/lan_sync.dart';
 import '../../sync/local_publisher.dart';
 import '../../sync/sync_exchange.dart';
+import '../../sync/sync_group.dart';
 import '../../sync/sync_record.dart';
 import '../../sync/sync_store.dart';
 import '../../sync/sync_view.dart';
@@ -40,9 +42,12 @@ class DeviceIdentityStore {
     await (await SharedPreferences.getInstance()).setString(key, value);
   }
 
-  Future<String> deviceId() async {
-    final existing = await _get(_idKey);
-    if (existing != null) return existing;
+  Future<String> deviceId() async =>
+      await _get(_idKey) ?? await resetDeviceId();
+
+  /// A new random id, for a device whose sync keys are new (see
+  /// [SyncGroup.fresh]).
+  Future<String> resetDeviceId() async {
     final rnd = Random.secure();
     final id = List.generate(16, (_) => rnd.nextInt(256))
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
@@ -85,18 +90,86 @@ class SyncService implements SyncController {
   @override
   ValueListenable<SyncView?> get view => _view;
 
+  /// Sync keys and the network; without them (tests, the CLI) the service
+  /// keeps its records but never talks to another device.
+  final SecretStore? secrets;
+  final PeerDiscovery? discovery;
+  final bool listens;
+
   Hlc? _clock;
   String? _deviceId;
+  SyncGroup? _group;
+  LanSync? _lan;
 
   SyncService(
     this.db, {
     SyncStore? store,
     this.identity = const DeviceIdentityStore(),
     int Function()? now,
+    this.secrets,
+    this.discovery,
+    this.listens = false,
   })  : store = store ?? DriftSyncStore(db),
         _now = now ?? (() => DateTime.now().millisecondsSinceEpoch);
 
-  Future<String> deviceId() async => _deviceId ??= await identity.deviceId();
+  /// This device's sync keys. Loaded before the device id is first used: a
+  /// device whose keys are new gets a new id too.
+  Future<SyncGroup?> group() async {
+    final s = secrets;
+    if (s == null) return null;
+    if (_group != null) return _group;
+    final g = await SyncGroup.load(s);
+    if (g.fresh) {
+      _deviceId = await identity.resetDeviceId();
+      _clock = null;
+    }
+    return _group = g;
+  }
+
+  Future<String> deviceId() async {
+    await group();
+    return _deviceId ??= await identity.deviceId();
+  }
+
+  Future<LanSync?> _lanSync() async {
+    final g = await group();
+    final d = discovery;
+    if (g == null || d == null) return null;
+    return _lan ??= LanSync(
+      group: g,
+      discovery: d,
+      peer: peer,
+      listens: listens,
+      log: (m) => debugPrint('sync: $m'),
+    );
+  }
+
+  /// Finds this group's devices on the network and syncs with each.
+  Future<SyncRun> syncNow() async {
+    final lan = await _lanSync();
+    if (lan == null) return SyncRun.none;
+    await refresh();
+    return lan.syncNow();
+  }
+
+  /// App opened or brought forward: publish, listen (not on a Mac), sync.
+  @override
+  Future<void> foreground() async {
+    await refresh();
+    final lan = await _lanSync();
+    if (lan == null) return;
+    await lan.startListening();
+    await lan.syncNow();
+  }
+
+  /// App going to the background: publish and push it to whoever is near.
+  /// Keeps listening while the process lives (playback keeps it alive on
+  /// Android); background scheduling is S7.
+  @override
+  Future<void> background() async {
+    await refresh();
+    await (await _lanSync())?.syncNow();
+  }
 
   Future<Hlc> _clockNow() async =>
       _clock ??= await resumeClock(store, await deviceId());

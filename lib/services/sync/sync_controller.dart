@@ -16,6 +16,13 @@ abstract class SyncController {
   /// Publishes what changed in the library and rebuilds [view].
   Future<void> refresh();
 
+  /// App opened or resumed: publish, start listening, sync with devices on
+  /// this network.
+  Future<void> foreground();
+
+  /// App paused: publish and sync once more.
+  Future<void> background();
+
   /// Book id → portable key, for this device's books.
   Future<Map<String, String>> portableKeys();
 

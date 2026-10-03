@@ -93,6 +93,9 @@ class LanSync {
 
   bool get listening => _server != null;
 
+  /// The port this device listens on, while it does.
+  int? get port => _server?.port;
+
   /// Concurrent calls share one start.
   Future<void> startListening() {
     if (!listens || _server != null) return Future.value();
@@ -159,13 +162,15 @@ class LanSync {
     }.values;
     final results = <PeerResult>[];
     for (final p in peers) {
-      results.add(await _syncWith(p));
+      results.add(await syncWith(p));
     }
     log?.call('sync run: ${results.join('; ')}');
     return SyncRun(results);
   }
 
-  Future<PeerResult> _syncWith(PeerAddress p) async {
+  /// One exchange with [p], dialled directly (a link code's address, or a
+  /// device found by [syncNow]).
+  Future<PeerResult> syncWith(PeerAddress p) async {
     FrameChannel? channel;
     try {
       // Closed through the channel.

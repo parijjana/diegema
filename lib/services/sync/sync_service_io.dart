@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -8,6 +9,7 @@ import '../../database/app_database_io.dart';
 import '../../database/drift_sync_store.dart';
 import '../../sync/hlc.dart';
 import '../../sync/lan_sync.dart';
+import '../../sync/link_code.dart';
 import '../../sync/local_publisher.dart';
 import '../../sync/sync_exchange.dart';
 import '../../sync/sync_group.dart';
@@ -96,6 +98,9 @@ class SyncService implements SyncController {
   final PeerDiscovery? discovery;
   final bool listens;
 
+  /// This device's LAN IPv4 addresses, for link codes; injected by tests.
+  final Future<List<String>> Function() localAddresses;
+
   Hlc? _clock;
   String? _deviceId;
   Future<SyncGroup?>? _group;
@@ -119,7 +124,9 @@ class SyncService implements SyncController {
     this.secrets,
     this.discovery,
     this.listens = false,
-  })  : store = store ?? DriftSyncStore(db),
+    Future<List<String>> Function()? localAddresses,
+  })  : localAddresses = localAddresses ?? _lanIPv4Addresses,
+        store = store ?? DriftSyncStore(db),
         _now = now ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   /// This device's sync keys. Loaded before the device id is first used: a
@@ -163,14 +170,6 @@ class SyncService implements SyncController {
     );
   }
 
-  /// Finds this group's devices on the network and syncs with each.
-  Future<SyncRun> syncNow() async {
-    final lan = await _lanSync();
-    if (lan == null) return SyncRun.none;
-    await refresh();
-    return lan.syncNow();
-  }
-
   /// App opened or brought forward: publish, listen (not on a Mac), sync.
   /// Never throws: called unawaited from app lifecycle callbacks.
   @override
@@ -190,6 +189,74 @@ class SyncService implements SyncController {
         await refresh();
         await (await _lanSync())?.syncNow();
       });
+
+  @override
+  Future<bool> isLinked() async => (await group())?.linked ?? false;
+
+  @override
+  Future<int> syncNow() async {
+    final lan = await _lanSync();
+    if (lan == null) return 0;
+    await refresh();
+    return (await lan.syncNow()).results.where((r) => r.ok).length;
+  }
+
+  @override
+  bool get canScan => Platform.isAndroid || Platform.isIOS;
+
+  @override
+  Future<LinkOffer> createLinkOffer() async {
+    final g = await group();
+    final lan = await _lanSync();
+    if (g == null || lan == null) throw StateError('sync is unavailable');
+    if (!g.linked) await g.create();
+    await refresh();
+    await lan.startListening();
+    final expires =
+        DateTime.fromMillisecondsSinceEpoch(_now()).add(LinkCode.lifetime);
+    final code = LinkCode(
+      groupKey: g.key!,
+      addresses: lan.port == null ? const [] : await localAddresses(),
+      port: lan.port,
+      name: await identity.deviceName(),
+      expiresAtMillis: expires.millisecondsSinceEpoch,
+    );
+    return LinkOffer(code.encode(), expires);
+  }
+
+  @override
+  Future<JoinOutcome> joinWithCode(String text,
+      {bool replaceGroup = false}) async {
+    final code = LinkCode.decode(text);
+    if (code == null) return JoinOutcome.invalid;
+    if (code.expiredAt(_now())) return JoinOutcome.expired;
+    final g = await group();
+    final lan = await _lanSync();
+    if (g == null || lan == null) throw StateError('sync is unavailable');
+    final current = g.key;
+    final same = current != null &&
+        base64.encode(current) == base64.encode(code.groupKey);
+    if (current != null && !same && !replaceGroup) {
+      return JoinOutcome.otherGroup;
+    }
+    if (!same) {
+      // A listener advertises the old group's tag; start again on the new.
+      await lan.stopListening();
+      await g.join(code.groupKey);
+    }
+    await refresh();
+    await lan.startListening();
+    final port = code.port;
+    if (port != null) {
+      for (final a in code.addresses) {
+        if ((await lan.syncWith(PeerAddress('link', a, port))).ok) {
+          return JoinOutcome.linked;
+        }
+      }
+    }
+    final reached = (await lan.syncNow()).results.any((r) => r.ok);
+    return reached ? JoinOutcome.linked : JoinOutcome.linkedNotSynced;
+  }
 
   Future<void> _logged(String what, Future<void> Function() f) async {
     try {
@@ -319,4 +386,19 @@ class _SerialPeer extends SyncPeer {
 
   @override
   Future<void> finish(SyncMessage last) => _serial(() => super.finish(last));
+}
+
+/// Private-network IPv4 addresses (no loopback, no link-local).
+Future<List<String>> _lanIPv4Addresses() async {
+  try {
+    final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4, includeLoopback: false);
+    return [
+      for (final i in interfaces)
+        for (final a in i.addresses)
+          if (!a.isLinkLocal) a.address,
+    ];
+  } catch (_) {
+    return const [];
+  }
 }

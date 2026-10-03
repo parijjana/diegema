@@ -23,6 +23,25 @@ abstract class SyncController {
   /// App paused: publish and sync once more.
   Future<void> background();
 
+  /// Whether this device is in a sync group.
+  Future<bool> isLinked();
+
+  /// Syncs with this group's devices on the network now; how many it
+  /// reached. Also what a Mac showing a link code calls while it waits: it
+  /// never listens, so it dials whoever has just scanned.
+  Future<int> syncNow();
+
+  /// A code for "Link a device", creating the group if there is none.
+  /// Starts listening (not on a Mac).
+  Future<LinkOffer> createLinkOffer();
+
+  /// Joins the group in a scanned or pasted code and syncs with the device
+  /// that showed it.
+  Future<JoinOutcome> joinWithCode(String code, {bool replaceGroup = false});
+
+  /// Whether this device can scan a code with its camera (phones).
+  bool get canScan;
+
   /// Book id → portable key, for this device's books.
   Future<Map<String, String>> portableKeys();
 
@@ -32,6 +51,32 @@ abstract class SyncController {
 
   Future<String> deviceName();
   Future<void> setDeviceName(String name);
+}
+
+class LinkOffer {
+  /// The text the QR encodes; also shown for copying and pasting.
+  final String code;
+  final DateTime expiresAt;
+  const LinkOffer(this.code, this.expiresAt);
+}
+
+enum JoinOutcome {
+  /// Joined, and the first sync with the showing device worked.
+  linked,
+
+  /// Joined, but the showing device wasn't reached yet (it's a Mac that
+  /// will dial this one, or not on this Wi-Fi); syncs when they meet.
+  linkedNotSynced,
+
+  /// Not a Diegema link code.
+  invalid,
+
+  /// The code's five minutes are up; show a new one.
+  expired,
+
+  /// This device is already in another group; ask, then call again with
+  /// replaceGroup.
+  otherGroup,
 }
 
 SyncController? createSyncController(AppDatabase db) =>

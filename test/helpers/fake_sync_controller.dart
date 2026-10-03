@@ -57,6 +57,37 @@ class FakeSyncController implements SyncController {
     _view.value = SyncView(deviceId, _records);
   }
 
+  bool linked = false;
+  String? lastJoinCode;
+  JoinOutcome joinOutcome = JoinOutcome.linked;
+
+  @override
+  Future<bool> isLinked() async => linked;
+
+  @override
+  Future<int> syncNow() async => 0;
+
+  @override
+  bool canScan = false;
+
+  @override
+  Future<LinkOffer> createLinkOffer() async {
+    linked = true;
+    return LinkOffer(
+        'DIEGEMALINK1.fake', DateTime.now().add(const Duration(minutes: 5)));
+  }
+
+  @override
+  Future<JoinOutcome> joinWithCode(String code,
+      {bool replaceGroup = false}) async {
+    lastJoinCode = code;
+    if (joinOutcome == JoinOutcome.linked ||
+        joinOutcome == JoinOutcome.linkedNotSynced) {
+      linked = true;
+    }
+    return joinOutcome;
+  }
+
   @override
   Future<void> foreground() => refresh();
 

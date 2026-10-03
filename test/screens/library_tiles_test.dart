@@ -144,6 +144,16 @@ void main() {
         find.bySemanticsLabel(
             'View details for Started Book, 50% complete, by Author started'),
         findsNWidgets(2));
+    // The labelled node itself carries tap and long-press (the InkWell's
+    // actions merge into it), so a screen reader activates the tile it
+    // announced.
+    expect(
+        tester.getSemantics(find
+            .bySemanticsLabel(
+                'View details for Started Book, 50% complete, by Author started')
+            .first),
+        isSemantics(
+            isButton: true, hasTapAction: true, hasLongPressAction: true));
     handle.dispose();
   });
 

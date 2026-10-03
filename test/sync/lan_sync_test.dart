@@ -175,6 +175,13 @@ void main() {
       expect((await SyncGroup.load(secrets)).linked, isFalse);
     });
 
+    test('a read that fails leaves no marker behind', () async {
+      final secrets = _FailOnce('sync.group_key.v1');
+      await expectLater(SyncGroup.load(secrets), throwsA(isA<StateError>()));
+      expect(secrets.values, isEmpty);
+      expect((await SyncGroup.load(secrets)).fresh, isTrue);
+    });
+
     test('the tag depends only on the group key', () async {
       final a = await SyncGroup.load(InMemorySecretStore());
       final b = await SyncGroup.load(InMemorySecretStore());
@@ -246,4 +253,19 @@ class _AnyTag extends FakeDiscovery {
         for (final e in net.services.entries)
           PeerAddress(e.key, '127.0.0.1', e.value.$1),
       ];
+}
+
+/// Throws on the first read of [key], then behaves.
+class _FailOnce extends InMemorySecretStore {
+  final String key;
+  bool _failed = false;
+  _FailOnce(this.key);
+  @override
+  Future<String?> read(String k) async {
+    if (k == key && !_failed) {
+      _failed = true;
+      throw StateError('keystore unavailable');
+    }
+    return super.read(k);
+  }
 }

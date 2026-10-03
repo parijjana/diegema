@@ -172,22 +172,31 @@ class SyncService implements SyncController {
   }
 
   /// App opened or brought forward: publish, listen (not on a Mac), sync.
+  /// Never throws: called unawaited from app lifecycle callbacks.
   @override
-  Future<void> foreground() async {
-    await refresh();
-    final lan = await _lanSync();
-    if (lan == null) return;
-    await lan.startListening();
-    await lan.syncNow();
-  }
+  Future<void> foreground() => _logged('foreground', () async {
+        await refresh();
+        final lan = await _lanSync();
+        if (lan == null) return;
+        await lan.startListening();
+        await lan.syncNow();
+      });
 
   /// App going to the background: publish and push it to whoever is near.
   /// Keeps listening while the process lives (playback keeps it alive on
   /// Android); background scheduling is S7.
   @override
-  Future<void> background() async {
-    await refresh();
-    await (await _lanSync())?.syncNow();
+  Future<void> background() => _logged('background', () async {
+        await refresh();
+        await (await _lanSync())?.syncNow();
+      });
+
+  Future<void> _logged(String what, Future<void> Function() f) async {
+    try {
+      await f();
+    } catch (e, st) {
+      debugPrint('sync: $what failed: $e\n$st');
+    }
   }
 
   Future<Hlc> _clockNow() async =>

@@ -196,6 +196,12 @@ void main() {
     final run = await phone.lan.syncNow(waitForCallers: true);
     expect(run.results.where((r) => r.ok), hasLength(1));
     expect(await phone.slots(), contains('position|lv:odyssey|mac'));
+    // Each re-announcement is a new service name: macOS doesn't report a
+    // service that stops and starts again under the same one.
+    final before = phone.lan.instance;
+    await phone.lan.syncNow(waitForCallers: true);
+    expect(phone.lan.instance, isNot(before));
+    expect(net.services.keys, isNot(contains(before)));
     // Without waiting for callers, a phone alone finds nobody.
     expect((await phone.lan.syncNow()).results, isEmpty);
     await mac.lan.stopWatching();

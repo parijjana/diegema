@@ -346,6 +346,9 @@ void main() {
     expect(m.view.value!.remoteOnly({}).map((b) => b.title), ['Emma']);
     expect(m.lastSync.value?.reached, 1);
     expect(p.lastSync.value?.reached, 1, reason: 'an inbound sync counts');
+    // A run that reaches nobody moments later doesn't hide that sync.
+    await p.background();
+    expect(p.lastSync.value?.reached, 1);
 
     // The phone's own Sync now: it announces itself again and the Mac,
     // which can't be dialled, dials in.

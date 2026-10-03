@@ -9,10 +9,12 @@ import '../domain/models/audiobook.dart';
 import '../database/app_database.dart';
 import '../services/audio_playback_service.dart';
 import '../services/book_removal.dart';
+import '../services/hidden_books_store.dart';
 import '../theme/app_theme.dart';
 import 'app_book_cover.dart';
 import 'book_detail_pane.dart' show EmptyChaptersNote;
 import 'book_detail_parts.dart';
+import 'hide_book_action.dart';
 
 /// The Library-screen counterpart of Discover's `BookDetailPane`: the same
 /// family of layout (see `book_detail_parts.dart`) - one primary action,
@@ -46,6 +48,9 @@ class LibraryBookDetailOverlay extends StatefulWidget {
   /// width; this widget's own constraints are capped by the dialog.
   final bool wide;
 
+  /// Where "Hide from library" records the hidden id (per device).
+  final HiddenBooksStore hiddenStore;
+
   const LibraryBookDetailOverlay({
     super.key,
     required this.book,
@@ -55,6 +60,7 @@ class LibraryBookDetailOverlay extends StatefulWidget {
     this.documentsPath,
     this.onProgressChanged,
     this.wide = false,
+    this.hiddenStore = const HiddenBooksStore(),
   });
 
   @override
@@ -111,6 +117,13 @@ class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
           : 'Removed "${book.title}" from your library'),
     ));
     widget.onRemoved?.call();
+  }
+
+  Future<void> _hide(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    await hideBookWithUndo(messenger, widget.hiddenStore, book.id);
   }
 
   Future<void> _markFinished(BuildContext context) async {
@@ -228,6 +241,7 @@ class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
           ? () => openFolder(folder)
           : null,
       showFolderLabel: folderLabel ?? 'Show folder',
+      onHide: () => _hide(context),
       onRemove: widget.db == null ? null : () => _remove(context),
     );
   }

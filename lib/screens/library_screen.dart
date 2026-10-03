@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
+import '../services/hidden_books_store.dart';
 import '../services/local_library_scanner.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
+import '../widgets/hide_book_action.dart';
 import '../widgets/library_book_detail_overlay.dart';
 import '../widgets/local_audiobook_importer.dart';
 
@@ -30,12 +32,16 @@ class LibraryScreen extends StatefulWidget {
   /// Defaults to the platform [scanDownloadedLibrary].
   final LibraryScanner? scanLibrary;
 
+  /// Per-device list of books hidden from this screen. Injectable for tests.
+  final HiddenBooksStore hiddenStore;
+
   const LibraryScreen({
     super.key,
     required this.db,
     required this.audioService,
     required this.onGoToDiscover,
     this.scanLibrary,
+    this.hiddenStore = const HiddenBooksStore(),
   });
 
   @override
@@ -43,7 +49,14 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  List<UnifiedAudiobook> _books = [];
+  List<UnifiedAudiobook> _allBooks = [];
+  List<UnifiedAudiobook> _allInProgress = [];
+
+  /// Ids the user hid on this device; both lists below leave them out.
+  Set<String> _hidden = {};
+
+  List<UnifiedAudiobook> get _books =>
+      _allBooks.where((b) => !_hidden.contains(b.id)).toList();
 
   /// Books with saved progress, most-recent first — the same rule
   /// `AppDatabase.getContinueListening` applies for Now Playing's idle
@@ -51,7 +64,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   /// list intentionally overlaps `_books`: a book in progress belongs in
   /// both sections, since "in progress" is meant to be found here even
   /// once the player has replaced Now Playing's idle state.
-  List<UnifiedAudiobook> _inProgress = [];
+  List<UnifiedAudiobook> get _inProgress =>
+      _allInProgress.where((b) => !_hidden.contains(b.id)).toList();
 
   /// Fraction complete (0.0-1.0) per in-progress book id, keyed off
   /// [PlaybackProgress] (`chapterIndex` + `positionSeconds`) against the
@@ -75,11 +89,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   void initState() {
     super.initState();
+    HiddenBooksStore.changes.addListener(_onHiddenChanged);
     _load();
+  }
+
+  /// Hiding/unhiding only changes what is shown, so no rescan: re-read the
+  /// set and rebuild.
+  Future<void> _onHiddenChanged() async {
+    final hidden = await widget.hiddenStore.read();
+    if (!mounted) return;
+    setState(() => _hidden = hidden);
   }
 
   @override
   void dispose() {
+    HiddenBooksStore.changes.removeListener(_onHiddenChanged);
     _openOverlayNavigator?.maybePop();
     super.dispose();
   }
@@ -91,6 +115,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     });
     try {
       await (widget.scanLibrary ?? scanDownloadedLibrary)(widget.db);
+      final hidden = await widget.hiddenStore.read();
       final books = await widget.db.getAllAudiobooks();
       final inProgress = await widget.db.getContinueListening();
       final progressById = <String, double?>{};
@@ -99,8 +124,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
       }
       if (!mounted) return;
       setState(() {
-        _books = books;
-        _inProgress = inProgress;
+        _hidden = hidden;
+        _allBooks = books;
+        _allInProgress = inProgress;
         _progressById
           ..clear()
           ..addAll(progressById);
@@ -167,6 +193,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               db: widget.db,
               onRemoved: _load,
               onProgressChanged: _load,
+              hiddenStore: widget.hiddenStore,
               wide: true,
             ),
           ),
@@ -186,6 +213,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             db: widget.db,
             onRemoved: _load,
             onProgressChanged: _load,
+            hiddenStore: widget.hiddenStore,
           ),
         ),
       );
@@ -195,6 +223,35 @@ class _LibraryScreenState extends State<LibraryScreen> {
         _openOverlayNavigator = null;
       }
     });
+  }
+
+  /// Long-press on a tile: a small sheet with "Hide from library".
+  Future<void> _showTileMenu(BuildContext context, UnifiedAudiobook book) {
+    final messenger = ScaffoldMessenger.of(context);
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final c = sheetContext.colors;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                minTileHeight: Dim.tapComfy,
+                leading: Icon(Icons.visibility_off_outlined, color: c.text),
+                title: Text('Hide from library',
+                    style: AppType.body.copyWith(color: c.text)),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  hideBookWithUndo(messenger, widget.hiddenStore, book.id);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -222,9 +279,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
         } else if (_books.isEmpty) {
           body = AppStateView.empty(
             icon: Icons.collections_bookmark_rounded,
-            headline: 'Your library is empty',
-            body: 'Import audiobooks you already have, or download something '
-                'free from Discover.',
+            headline: _allBooks.isNotEmpty
+                ? 'All your books are hidden'
+                : 'Your library is empty',
+            body: _allBooks.isNotEmpty
+                ? 'Unhide them in Settings, under Hidden books.'
+                : 'Import audiobooks you already have, or download '
+                    'something free from Discover.',
             action: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 320),
               child: Column(
@@ -266,6 +327,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     progress: _progressById[book.id],
                     compact: !wide,
                     onTap: () => _openDetail(context, book, wide: wide),
+                    onLongPress: () => _showTileMenu(context, book),
                   ),
                 ),
               ),
@@ -281,6 +343,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   inProgress: _inProgress.any((b) => b.id == book.id),
                   progress: _progressById[book.id],
                   onTap: () => _openDetail(context, book, wide: wide),
+                  onLongPress: () => _showTileMenu(context, book),
                 ),
               ),
             ),
@@ -547,6 +610,7 @@ class _InProgressRow extends StatelessWidget {
   /// (see `_LibraryScreenState._fractionComplete`).
   final double? progress;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   /// Phone gets a tighter card (per the approved mockup: a 64x64 cover
   /// rather than the 56x56 one wide keeps).
@@ -556,6 +620,7 @@ class _InProgressRow extends StatelessWidget {
     required this.book,
     required this.progress,
     required this.onTap,
+    this.onLongPress,
     this.compact = false,
   });
 
@@ -573,6 +638,7 @@ class _InProgressRow extends StatelessWidget {
       borderRadius: R.md,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: R.md,
         child: Semantics(
           button: true,
@@ -662,10 +728,12 @@ class _BookRow extends StatelessWidget {
   /// shows its progress so the two entries read as the same book.
   final bool inProgress;
   final double? progress;
+  final VoidCallback? onLongPress;
 
   const _BookRow({
     required this.book,
     required this.onTap,
+    this.onLongPress,
     this.inProgress = false,
     this.progress,
   });
@@ -683,6 +751,7 @@ class _BookRow extends StatelessWidget {
       borderRadius: R.md,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: R.md,
         child: Semantics(
           button: true,

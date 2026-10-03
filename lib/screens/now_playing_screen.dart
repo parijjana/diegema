@@ -8,6 +8,7 @@ import '../core/player_controls_style.dart';
 import '../core/ui_preferences.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
+import '../services/hidden_books_store.dart';
 import '../services/audio_playback_service.dart';
 import '../services/download_manager.dart';
 import '../services/redownload.dart';
@@ -173,7 +174,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     if (!mounted) return;
     setState(() => _loadError = null);
     try {
-      final continueListening = await widget.db.getContinueListening(limit: 5);
+      // Books hidden from the Library stay out of this shortlist too.
+      final hidden = await const HiddenBooksStore().read();
+      final continueListening =
+          (await widget.db.getContinueListening(limit: 5 + hidden.length))
+              .where((b) => !hidden.contains(b.id))
+              .take(5)
+              .toList();
       final pinned = await widget.db.getPinnedBooks();
       final visible = await widget.preferences.getPinnedRowVisible();
       if (!mounted) return;

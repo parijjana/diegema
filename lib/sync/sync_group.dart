@@ -50,11 +50,13 @@ class SyncGroup {
   static Future<SyncGroup> load(SecretStore store,
       {List<int> Function(int)? randomBytes}) async {
     final install = await store.read(_installKey);
+    final key = await store.read(_groupKey);
+    // Marked only after every read succeeded: a read that throws must not
+    // leave a marker that hides a restored install next time.
     if (install == null) {
       await store.write(
           _installKey, base64.encode((randomBytes ?? secureRandomBytes)(16)));
     }
-    final key = await store.read(_groupKey);
     return SyncGroup._(store, key == null ? null : base64.decode(key),
         fresh: install == null);
   }

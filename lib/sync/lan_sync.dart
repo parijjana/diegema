@@ -56,6 +56,11 @@ class LanSync {
   final bool listens;
   final InternetAddress bindAddress;
   final Duration browseWindow;
+
+  /// For the handshake alone: short, so idle sockets free their slot fast.
+  final Duration handshakeTimeout;
+
+  /// For the exchange after it.
   final Duration timeout;
   final void Function(String)? log;
 
@@ -78,6 +83,7 @@ class LanSync {
     required this.listens,
     InternetAddress? bindAddress,
     this.browseWindow = const Duration(seconds: 4),
+    this.handshakeTimeout = const Duration(seconds: 5),
     this.timeout = const Duration(seconds: 20),
     this.log,
     String? instance,
@@ -86,6 +92,9 @@ class LanSync {
             'dg-${secureRandomBytes(4).map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
 
   bool get listening => _server != null;
+
+  /// The port this device listens on, while it does.
+  int? get port => _server?.port;
 
   /// Concurrent calls share one start.
   Future<void> startListening() {
@@ -124,7 +133,7 @@ class LanSync {
       try {
         final session =
             await AuthSession.respond(channel, group.sessionConfig())
-                .timeout(timeout);
+                .timeout(handshakeTimeout);
         final counts =
             await syncAsResponder(session, await peer()).timeout(timeout);
         log?.call('served ${socket.remoteAddress.address} $counts');
@@ -153,13 +162,15 @@ class LanSync {
     }.values;
     final results = <PeerResult>[];
     for (final p in peers) {
-      results.add(await _syncWith(p));
+      results.add(await syncWith(p));
     }
     log?.call('sync run: ${results.join('; ')}');
     return SyncRun(results);
   }
 
-  Future<PeerResult> _syncWith(PeerAddress p) async {
+  /// One exchange with [p], dialled directly (a link code's address, or a
+  /// device found by [syncNow]).
+  Future<PeerResult> syncWith(PeerAddress p) async {
     FrameChannel? channel;
     try {
       // Closed through the channel.
@@ -168,7 +179,7 @@ class LanSync {
           timeout: const Duration(seconds: 5));
       channel = LengthPrefixedChannel(socket, socket);
       final session = await AuthSession.initiate(channel, group.sessionConfig())
-          .timeout(timeout);
+          .timeout(handshakeTimeout);
       final counts =
           await syncAsInitiator(session, await peer()).timeout(timeout);
       return PeerResult(p, counts: counts);

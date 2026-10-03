@@ -61,17 +61,32 @@ class FakeSyncController implements SyncController {
   String? lastJoinCode;
   JoinOutcome joinOutcome = JoinOutcome.linked;
 
+  /// Every `joinWithCode` call: the code and whether it replaced the group.
+  final List<(String, bool)> joins = [];
+
+  /// What a join with `replaceGroup: true` returns.
+  JoinOutcome replaceOutcome = JoinOutcome.linked;
+
+  /// Makes `createLinkOffer` throw.
+  bool offerFails = false;
+
   @override
   Future<bool> isLinked() async => linked;
 
+  int syncNowCalls = 0;
+
   @override
-  Future<int> syncNow() async => 0;
+  Future<int> syncNow() async {
+    syncNowCalls++;
+    return 0;
+  }
 
   @override
   bool canScan = false;
 
   @override
   Future<LinkOffer> createLinkOffer() async {
+    if (offerFails) throw StateError('no network');
     linked = true;
     return LinkOffer(
         'DIEGEMALINK1.fake', DateTime.now().add(const Duration(minutes: 5)));
@@ -81,11 +96,13 @@ class FakeSyncController implements SyncController {
   Future<JoinOutcome> joinWithCode(String code,
       {bool replaceGroup = false}) async {
     lastJoinCode = code;
-    if (joinOutcome == JoinOutcome.linked ||
-        joinOutcome == JoinOutcome.linkedNotSynced) {
+    joins.add((code, replaceGroup));
+    final outcome = replaceGroup ? replaceOutcome : joinOutcome;
+    if (outcome == JoinOutcome.linked ||
+        outcome == JoinOutcome.linkedNotSynced) {
       linked = true;
     }
-    return joinOutcome;
+    return outcome;
   }
 
   @override

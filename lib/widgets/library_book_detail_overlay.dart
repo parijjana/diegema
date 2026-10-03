@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'package:path/path.dart' as p;
+
+import '../core/utils/book_identity.dart';
+import '../core/utils/book_progress.dart';
 import '../core/utils/duration_format.dart';
 import '../domain/models/audiobook.dart';
 import '../database/app_database.dart';
@@ -8,24 +12,23 @@ import '../services/book_removal.dart';
 import '../theme/app_theme.dart';
 import 'app_book_cover.dart';
 import 'book_detail_pane.dart' show EmptyChaptersNote;
-import 'book_description_view.dart';
+import 'book_detail_parts.dart';
 
-/// The Library-screen counterpart of Discover's `BookDetailPane`.
+/// The Library-screen counterpart of Discover's `BookDetailPane`: the same
+/// family of layout (see `book_detail_parts.dart`) - one primary action,
+/// progress first, secondary actions behind the "..." menu, chapters as a
+/// compact list - for a [UnifiedAudiobook] already in the local library.
 ///
-/// `BookDetailPane` is built around `LibriVoxBook` — it resolves cover art
-/// over the network, offers a ZIP download, and gates chapters on
-/// `demoPlayable`. None of that applies to a [UnifiedAudiobook] already
-/// sitting in the local library (art is already local-or-known, there is
-/// nothing left to download, nothing is demo-gated), and bending
-/// `BookDetailPane` to accept either type would mean threading optional
-/// fields through a widget that is not its own. So this is a small,
-/// separate overlay that matches the *look* (same card, same type scale)
-/// rather than a forced reuse.
-class LibraryBookDetailOverlay extends StatelessWidget {
+/// `BookDetailPane` is built around `LibriVoxBook` (network cover art, ZIP
+/// download, demo gating); none of that applies here, so the two stay
+/// separate widgets that share parts rather than one widget with optional
+/// fields for both.
+class LibraryBookDetailOverlay extends StatefulWidget {
   final UnifiedAudiobook book;
   final AudioPlaybackService audioService;
 
-  /// When set, the overlay offers "Remove from library".
+  /// When set, the overlay offers "Remove from library" and reads the saved
+  /// progress.
   final AppDatabase? db;
 
   /// Called after the book has been removed (the library list should reload).
@@ -34,6 +37,15 @@ class LibraryBookDetailOverlay extends StatelessWidget {
   /// Overrides the documents directory the removal plan/removal use (tests).
   final String? documentsPath;
 
+  /// Called after "Mark as finished" or "Reset progress" changed the saved
+  /// progress, so the list behind the overlay can refresh.
+  final VoidCallback? onProgressChanged;
+
+  /// Two-column dialog layout (wide screens) instead of the phone sheet
+  /// with a sticky footer. Supplied by the caller, which knows the screen
+  /// width; this widget's own constraints are capped by the dialog.
+  final bool wide;
+
   const LibraryBookDetailOverlay({
     super.key,
     required this.book,
@@ -41,169 +53,381 @@ class LibraryBookDetailOverlay extends StatelessWidget {
     this.db,
     this.onRemoved,
     this.documentsPath,
+    this.onProgressChanged,
+    this.wide = false,
   });
 
+  @override
+  State<LibraryBookDetailOverlay> createState() =>
+      _LibraryBookDetailOverlayState();
+}
+
+class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
+  BookProgress? _progress;
+
+  UnifiedAudiobook get book => widget.book;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProgress();
+  }
+
+  Future<void> _loadProgress() async {
+    final db = widget.db;
+    if (db == null) return;
+    BookProgress? progress;
+    try {
+      final saved = await db.getProgress(book.id);
+      progress = BookProgress.from(
+        book.chapters,
+        savedChapterIndex: saved?.chapterIndex,
+        savedPositionSeconds: saved?.positionSeconds,
+      );
+    } catch (_) {}
+    if (mounted) setState(() => _progress = progress);
+  }
+
   Future<void> _remove(BuildContext context) async {
-    final database = db;
+    final database = widget.db;
     if (database == null) return;
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    final plan = await planBookRemoval(book, documentsPath: documentsPath);
+    final plan =
+        await planBookRemoval(book, documentsPath: widget.documentsPath);
     if (!context.mounted) return;
     final ok =
         await showRemoveBookDialog(context, title: book.title, plan: plan);
     if (!ok) return;
     // Stop first, and before any rows go: a playing book would otherwise
     // write its progress straight back.
-    await audioService.stopIfCurrent(book.id);
+    await widget.audioService.stopIfCurrent(book.id);
     final freed =
-        await removeBook(database, book, documentsPath: documentsPath);
+        await removeBook(database, book, documentsPath: widget.documentsPath);
     navigator.pop();
     messenger.showSnackBar(SnackBar(
       content: Text(freed > 0
           ? 'Removed "${book.title}" - freed ${formatBytes(freed)}'
           : 'Removed "${book.title}" from your library'),
     ));
-    onRemoved?.call();
+    widget.onRemoved?.call();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
+  Future<void> _markFinished(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await widget.audioService.markFinished(book);
+    widget.onProgressChanged?.call();
+    await _loadProgress();
+    messenger.showSnackBar(
+      SnackBar(content: Text('Marked "${book.title}" as finished')),
+    );
+  }
 
-    return ListView(
-      padding: const EdgeInsets.only(bottom: Sp.x5),
+  Future<void> _resetProgress(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset progress?'),
+        content: Text('"${book.title}" will start from the beginning next '
+            'time. The book and your bookmarks stay.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Reset')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await widget.audioService.resetProgress(book);
+    widget.onProgressChanged?.call();
+    await _loadProgress();
+    messenger.showSnackBar(
+      SnackBar(content: Text('Reset progress for "${book.title}"')),
+    );
+  }
+
+  void _play() {
+    // The only thing in the overlay that starts playback from the saved
+    // position; `loadBook` restores it (a finished book starts over).
+    widget.audioService.loadBook(book);
+    Navigator.of(context).pop();
+  }
+
+  List<BookMeta> _meta(ParsedAbout about, {required bool wide}) {
+    final narrator =
+        book.narrators.isNotEmpty ? book.narrators.join(', ') : about.readBy;
+    final total =
+        book.chapters.fold<int>(0, (sum, c) => sum + c.durationSeconds);
+    final runtime = formatRuntime(total);
+    final chapters = book.chapters.length;
+    String? format = about.formats;
+    if (format == null) {
+      for (final ch in book.chapters) {
+        if (ch.isStream || ch.audioPathOrUrl.contains('://')) continue;
+        final ext = p.extension(ch.audioPathOrUrl).replaceFirst('.', '');
+        if (ext.isNotEmpty) format = ext.toUpperCase();
+        break;
+      }
+    }
+    final folder = bookFolderPath(book);
+    final folderLabel = showFolderLabelForPlatform();
+    final librivox = book.origin == BookIdentity.originLibrivox;
+    return [
+      if (narrator != null && narrator.isNotEmpty)
+        BookMeta(
+            icon: Icons.headphones_rounded, label: 'Read by', value: narrator),
+      if (runtime != null || (wide && chapters > 0))
+        BookMeta(
+          icon: Icons.schedule_rounded,
+          label: 'Length',
+          value: wide
+              ? [
+                  if (runtime != null) runtime,
+                  if (chapters > 0)
+                    '$chapters ${chapters == 1 ? 'chapter' : 'chapters'}',
+                ].join(' · ')
+              : runtime!,
+        ),
+      if (format != null)
+        BookMeta(
+            icon: Icons.insert_drive_file_outlined,
+            label: 'File',
+            value: format),
+      if (book.isDownloaded)
+        BookMeta(
+          icon: Icons.check_rounded,
+          label: 'Source',
+          value: wide && librivox ? 'LibriVox, downloaded' : 'Downloaded',
+          positive: true,
+        )
+      else if (wide && librivox)
+        const BookMeta(
+            icon: Icons.public_rounded, label: 'Source', value: 'LibriVox'),
+      if (wide && folder != null)
+        BookMeta(
+          icon: Icons.folder_outlined,
+          label: 'Folder',
+          value: folder,
+          actionLabel: folderLabel,
+          onAction: folderLabel == null ? null : () => openFolder(folder),
+        ),
+    ];
+  }
+
+  Widget _menu(BuildContext context) {
+    final folder = bookFolderPath(book);
+    final folderLabel = showFolderLabelForPlatform();
+    return BookActionsMenu(
+      onMarkFinished: () => _markFinished(context),
+      onReset: () => _resetProgress(context),
+      onShowFolder: folder != null && folderLabel != null
+          ? () => openFolder(folder)
+          : null,
+      showFolderLabel: folderLabel ?? 'Show folder',
+      onRemove: widget.db == null ? null : () => _remove(context),
+    );
+  }
+
+  Widget _chapters() {
+    final progress = _progress;
+    final total =
+        book.chapters.fold<int>(0, (sum, c) => sum + c.durationSeconds);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppBookCover(
-              bookId: book.id,
-              title: book.title,
-              coverUrl: book.coverArtUrlOrPath,
-              width: 110,
-              height: 110,
-            ),
-            const SizedBox(width: Sp.x4),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    book.title,
-                    style: AppType.serif(AppType.titleMd)
-                        .copyWith(color: c.text, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: Sp.x1),
-                  Text(
-                    book.author,
-                    style: AppType.bodyLg.copyWith(color: c.accentFill),
-                  ),
-                  if (book.narrators.isNotEmpty) ...[
-                    const SizedBox(height: Sp.x1),
-                    Text(
-                      'Narrated by: ${book.narrators.join(', ')}',
-                      style: AppType.caption.copyWith(color: c.textMuted),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: Sp.x5),
-        // The explicit action tapping a row used to trigger implicitly.
-        // Reachable without disturbing whatever the mini-player is already
-        // doing — this is the only thing in the overlay that can start
-        // playback.
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: () {
-              audioService.loadBook(book);
-              Navigator.of(context).pop();
-            },
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('Play'),
-          ),
-        ),
-        if (db != null) ...[
-          const SizedBox(height: Sp.x2),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _remove(context),
-              icon: const Icon(Icons.delete_outline_rounded),
-              label: const Text('Remove from library'),
-            ),
-          ),
-        ],
-        const SizedBox(height: Sp.x5),
-        if (book.description.trim().isNotEmpty) ...[
-          BookDescriptionView(description: book.description, compact: true),
-          const SizedBox(height: Sp.x5),
-        ],
-        Text('Chapters (${book.chapters.length})',
-            style: AppType.titleSm.copyWith(color: c.text)),
-        const SizedBox(height: Sp.x2),
+        ChaptersHeader(count: book.chapters.length, totalSeconds: total),
+        const SizedBox(height: Sp.x1),
         if (book.chapters.isEmpty) const EmptyChaptersNote(),
-        for (final entry in book.chapters.asMap().entries)
-          _ChapterTile(
-            title: entry.value.title,
-            runtime: formatRuntime(entry.value.durationSeconds),
+        for (var i = 0; i < book.chapters.length; i++)
+          ChapterListRow(
+            index: i,
+            title: book.chapters[i].title,
+            durationSeconds: book.chapters[i].durationSeconds,
+            wide: widget.wide,
+            state: progress == null
+                ? ChapterRowState.normal
+                : (progress.finished || i < progress.chapterIndex)
+                    ? ChapterRowState.finished
+                    : i == progress.chapterIndex
+                        ? ChapterRowState.current
+                        : ChapterRowState.normal,
+            positionSeconds: progress?.positionSeconds ?? 0,
             onTap: () {
-              audioService.loadBook(book, initialChapterIndex: entry.key);
+              widget.audioService.loadBook(book, initialChapterIndex: i);
               Navigator.of(context).pop();
             },
           ),
       ],
     );
   }
-}
 
-class _ChapterTile extends StatelessWidget {
-  final String title;
-  final String? runtime;
-  final VoidCallback onTap;
-
-  const _ChapterTile(
-      {required this.title, required this.runtime, required this.onTap});
+  Widget _titleBlock(BuildContext context, {required bool wide}) {
+    final c = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          book.title,
+          style: AppType.serif(wide ? AppType.titleLg : AppType.titleMd)
+              .copyWith(color: c.text, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: Sp.x1),
+        Text(
+          book.author,
+          style: (wide ? AppType.bodyLg : AppType.body)
+              .copyWith(color: c.accentText, fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Container(
-      margin: const EdgeInsets.only(bottom: Sp.x2),
-      decoration: BoxDecoration(
-        borderRadius: R.sm,
-        border: Border.all(color: c.border),
-      ),
-      // The background used to live on the outer `Container`'s
-      // `BoxDecoration`, which sits between `ListTile` and the nearest
-      // `Material` ancestor — `ListTile` paints its own background and
-      // ink splashes on that ancestor, so the opaque `DecoratedBox` was
-      // silently hiding both (Flutter asserts on this once the tile is
-      // actually built, which nothing previously exercised). Moving the
-      // fill onto its own `Material` gives `ListTile` a paintable surface
-      // right above it and keeps the border/radius on the `Container`.
-      child: Material(
-        color: c.surface,
-        borderRadius: R.sm,
-        child: ListTile(
-          dense: true,
-          shape: const RoundedRectangleBorder(borderRadius: R.sm),
-          leading: Icon(Icons.play_circle_fill_rounded, color: c.accentFill),
-          title: Text(title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppType.bodyLg.copyWith(color: c.text)),
-          subtitle: runtime == null
-              ? null
-              : Text(runtime!,
-                  style: AppType.caption.copyWith(color: c.textMuted)),
-          onTap: onTap,
+    final progress = _progress;
+    final about = ParsedAbout.from(book.description);
+    final credit = [
+      if (about.credit != null) about.credit!,
+      if (book.origin == BookIdentity.originLibrivox)
+        'Public-domain recording from LibriVox',
+    ].join(' · ');
+    final creditText = credit.isEmpty
+        ? null
+        : Text(credit, style: AppType.caption.copyWith(color: c.textMuted));
+    final primary = DetailPrimaryButton(
+      icon: Icons.play_arrow_rounded,
+      label: primaryActionLabel(progress),
+      onPressed: _play,
+    );
+
+    if (widget.wide) {
+      return ClipRRect(
+        borderRadius: R.lg,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 300,
+              decoration: BoxDecoration(
+                color: c.bg,
+                border: Border(right: BorderSide(color: c.border)),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(Sp.x6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppBookCover(
+                      bookId: book.id,
+                      title: book.title,
+                      coverUrl: book.coverArtUrlOrPath,
+                      width: 252,
+                      height: 252,
+                    ),
+                    const SizedBox(height: Sp.x5),
+                    if (progress != null) ...[
+                      BookProgressSummary(progress: progress, stacked: true),
+                      const SizedBox(height: Sp.x5),
+                    ],
+                    primary,
+                    const SizedBox(height: Sp.x5),
+                    BookMetaList(items: _meta(about, wide: true)),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding:
+                        const EdgeInsets.fromLTRB(Sp.x8, Sp.x6, Sp.x4, Sp.x4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _titleBlock(context, wide: true)),
+                        const SizedBox(width: Sp.x2),
+                        _menu(context),
+                        IconButton(
+                          tooltip: 'Close',
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      padding:
+                          const EdgeInsets.fromLTRB(Sp.x8, 0, Sp.x8, Sp.x6),
+                      children: [
+                        if (about.text != null) ...[
+                          ExpandableAbout(text: about.text!),
+                          const SizedBox(height: Sp.x6),
+                        ],
+                        _chapters(),
+                        if (creditText != null) ...[
+                          const SizedBox(height: Sp.x5),
+                          creditText,
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ),
+      );
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x5),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppBookCover(
+                    bookId: book.id,
+                    title: book.title,
+                    coverUrl: book.coverArtUrlOrPath,
+                    width: 88,
+                    height: 88,
+                  ),
+                  const SizedBox(width: Sp.x4),
+                  Expanded(child: _titleBlock(context, wide: false)),
+                  _menu(context),
+                ],
+              ),
+              const SizedBox(height: Sp.x5),
+              if (progress != null) ...[
+                BookProgressSummary(progress: progress),
+                const SizedBox(height: Sp.x5),
+              ],
+              BookMetaRow(items: _meta(about, wide: false)),
+              if (about.text != null) ...[
+                const SizedBox(height: Sp.x5),
+                ExpandableAbout(text: about.text!),
+              ],
+              const SizedBox(height: Sp.x5),
+              _chapters(),
+              if (creditText != null) ...[
+                const SizedBox(height: Sp.x5),
+                creditText,
+              ],
+            ],
+          ),
+        ),
+        DetailStickyFooter(child: primary),
+      ],
     );
   }
 }

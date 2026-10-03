@@ -113,7 +113,9 @@ void main() {
         ),
       ),
     ));
-    await tester.tap(find.text('Remove from library'));
+    await tester.tap(find.byTooltip('More actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove from library…'));
     await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 200)));
     await tester.pumpAndSettle();

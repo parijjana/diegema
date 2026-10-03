@@ -7,6 +7,7 @@ import '../core/network/user_agent.dart';
 import '../core/utils/book_identity.dart';
 import '../domain/models/librivox_book.dart';
 import '../domain/models/audiobook.dart';
+import 'chapters_unavailable.dart';
 
 class LibriVoxStreamAndDownloader {
   final http.Client _client;
@@ -33,31 +34,38 @@ class LibriVoxStreamAndDownloader {
 
     if (book.urlRss.isNotEmpty) {
       try {
-        final response =
-            await _client.get(Uri.parse(book.urlRss), headers: _headers);
-        if (response.statusCode == 200) {
-          final rss = RssFeed.parse(response.body);
-          int index = 0;
-          for (final item in rss.items) {
-            final streamUrl = item.enclosure?.url;
-            if (streamUrl == null) continue;
-
-            final durationSecs = item.itunes?.duration?.inSeconds ?? 0;
-            final trackTitle = item.title ?? 'Section ${index + 1}';
-
-            chapters.add(
-              AudiobookChapter(
-                id: '${canonicalId}_stream_$index',
-                title: trackTitle,
-                audioPathOrUrl: streamUrl,
-                durationSeconds: durationSecs,
-                isStream: true,
-              ),
-            );
-            index++;
-          }
+        final response = await _client
+            .get(Uri.parse(book.urlRss), headers: _headers)
+            // LibriVox's feeds routinely take 12-17 s to answer.
+            .timeout(const Duration(seconds: 45));
+        if (response.statusCode != 200) {
+          throw ChaptersUnavailable('HTTP ${response.statusCode}');
         }
-      } catch (_) {}
+        final rss = RssFeed.parse(response.body);
+        int index = 0;
+        for (final item in rss.items) {
+          final streamUrl = item.enclosure?.url;
+          if (streamUrl == null) continue;
+
+          final durationSecs = item.itunes?.duration?.inSeconds ?? 0;
+          final trackTitle = item.title ?? 'Section ${index + 1}';
+
+          chapters.add(
+            AudiobookChapter(
+              id: '${canonicalId}_stream_$index',
+              title: trackTitle,
+              audioPathOrUrl: streamUrl,
+              durationSeconds: durationSecs,
+              isStream: true,
+            ),
+          );
+          index++;
+        }
+      } on ChaptersUnavailable {
+        rethrow;
+      } catch (e) {
+        throw ChaptersUnavailable('$e');
+      }
     }
 
     return UnifiedAudiobook(
@@ -77,8 +85,10 @@ class LibriVoxStreamAndDownloader {
   static const Duration _stallTimeout = Duration(seconds: 60);
   static const Duration _connectTimeout = Duration(seconds: 30);
 
-  /// Downloads [book]'s ZIP into `<saveDirectoryPath>/<title>/` and extracts
-  /// it there, returning the extracted `.mp3` paths in name order.
+  /// Downloads [book]'s ZIP to a temp folder and extracts its `.mp3`s into
+  /// `<saveDirectoryPath>/<title> [<id>]/`, returning their paths in name
+  /// order. Nothing else is extracted: Android's shared Audiobooks folder
+  /// accepts only audio, and nothing but the audio is ever used.
   ///
   /// Built for books of hundreds of MB on a phone: the ZIP streams straight
   /// to disk and is extracted one entry at a time, so memory stays flat.
@@ -91,42 +101,27 @@ class LibriVoxStreamAndDownloader {
     required String saveDirectoryPath,
     void Function(double progress)? onProgress,
   }) async {
-    // Title for people browsing the folder, archive.org id so two editions
-    // with the same title never share (and overwrite, or on removal delete)
-    // one folder.
-    final sanitizeName =
-        book.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
     final identifier = BookIdentity.archiveIdentifierFor(
-            librivoxApiId: book.id, urlIarchive: book.urlIarchive)
-        .replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
-    final bookDir =
-        Directory(p.join(saveDirectoryPath, '$sanitizeName [$identifier]'));
-    await bookDir.create(recursive: true);
+        librivoxApiId: book.id, urlIarchive: book.urlIarchive);
+    final bookDir = Directory(
+        p.join(saveDirectoryPath, bookFolderName(book.title, identifier)));
 
-    final zipFile = File(p.join(bookDir.path, 'package.zip'));
-    final written = <File>[];
+    final tempDir = await Directory.systemTemp.createTemp('diegema-zip');
+    final zipFile = File(p.join(tempDir.path, 'package.zip'));
     try {
       await _downloadTo(zipFile, Uri.parse(book.urlZipFile), onProgress);
-      final extractedMp3s = await _extractInto(zipFile, bookDir, written);
-      // A corrupt or truncated ZIP decodes as an empty archive, not an
-      // error; a "download" with no audio must not become a book.
-      if (extractedMp3s.isEmpty) {
-        throw const FormatException('The download held no audio files');
-      }
-      extractedMp3s.sort();
-      return extractedMp3s;
-    } catch (_) {
-      for (final file in written) {
-        await _deleteQuietly(file);
-      }
-      rethrow;
+      return await extractAudioFromZip(zipFile, bookDir);
     } finally {
-      await _deleteQuietly(zipFile);
+      try {
+        await tempDir.delete(recursive: true);
+      } on FileSystemException {
+        // Best effort: the OS clears its temp folder eventually.
+      }
     }
   }
 
-  Future<void> _downloadTo(File target, Uri url,
-      void Function(double progress)? onProgress) async {
+  Future<void> _downloadTo(
+      File target, Uri url, void Function(double progress)? onProgress) async {
     final request = http.Request('GET', url)..headers.addAll(_headers);
     final response = await _client.send(request).timeout(_connectTimeout);
     if (response.statusCode != 200) {
@@ -156,41 +151,81 @@ class LibriVoxStreamAndDownloader {
           uri: url);
     }
   }
+}
 
-  /// Extracts [zip] into [dir] entry by entry. Every file written is added
-  /// to [written] as it is created, so the caller can clean up a failure.
-  Future<List<String>> _extractInto(
-      File zip, Directory dir, List<File> written) async {
-    final root = p.canonicalize(dir.path);
-    final input = InputFileStream(zip.path);
-    try {
-      final archive = ZipDecoder().decodeStream(input);
-      final mp3s = <String>[];
-      for (final entry in archive) {
-        if (!entry.isFile || entry.isSymbolicLink) continue;
-        final target = p.canonicalize(p.join(root, p.normalize(entry.name)));
-        if (!p.isWithin(root, target)) continue; // zip-slip
-        await Directory(p.dirname(target)).create(recursive: true);
-        final out = OutputFileStream(target);
-        written.add(File(target));
-        try {
-          entry.writeContent(out);
-        } finally {
-          await out.close();
-        }
-        if (target.toLowerCase().endsWith('.mp3')) mp3s.add(target);
-      }
-      return mp3s;
-    } finally {
-      await input.close();
+/// The folder a downloaded book's files go in, under the downloads root:
+/// its title for people browsing the folder, and its archive.org id so two
+/// editions with the same title never share (and overwrite, or on removal
+/// delete) one folder.
+String bookFolderName(String title, String identifier) {
+  final name = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+  final id = identifier.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+  return '$name [$id]';
+}
+
+/// Extracts [zip]'s `.mp3`s into [bookDir], returning their paths in name
+/// order. Nothing else is extracted: Android's shared Audiobooks folder
+/// accepts only audio, and nothing but the audio is ever used.
+///
+/// Extracts one entry at a time, so memory stays flat for books of
+/// hundreds of MB. An entry whose path would land outside the book folder
+/// (`../…`, absolute paths, symlinks) is skipped. On any failure — disk
+/// full, corrupt ZIP, a ZIP with no audio — every file this call extracted
+/// is deleted before the error is rethrown. The ZIP itself is the caller's.
+Future<List<String>> extractAudioFromZip(File zip, Directory bookDir) async {
+  await bookDir.create(recursive: true);
+  final written = <File>[];
+  try {
+    final mp3s = await _extractInto(zip, bookDir, written);
+    // A corrupt or truncated ZIP decodes as an empty archive, not an
+    // error; a "download" with no audio must not become a book.
+    if (mp3s.isEmpty) {
+      throw const FormatException('The download held no audio files');
     }
+    mp3s.sort();
+    return mp3s;
+  } catch (_) {
+    for (final file in written) {
+      await _deleteQuietly(file);
+    }
+    rethrow;
   }
+}
 
-  static Future<void> _deleteQuietly(File file) async {
-    try {
-      if (await file.exists()) await file.delete();
-    } on FileSystemException {
-      // Best effort: a leftover file is better than masking the real error.
+/// Extracts [zip] into [dir] entry by entry. Every file written is added
+/// to [written] as it is created, so the caller can clean up a failure.
+Future<List<String>> _extractInto(
+    File zip, Directory dir, List<File> written) async {
+  final root = p.canonicalize(dir.path);
+  final input = InputFileStream(zip.path);
+  try {
+    final archive = ZipDecoder().decodeStream(input);
+    final mp3s = <String>[];
+    for (final entry in archive) {
+      if (!entry.isFile || entry.isSymbolicLink) continue;
+      if (!entry.name.toLowerCase().endsWith('.mp3')) continue;
+      final target = p.canonicalize(p.join(root, p.normalize(entry.name)));
+      if (!p.isWithin(root, target)) continue; // zip-slip
+      await Directory(p.dirname(target)).create(recursive: true);
+      final out = OutputFileStream(target);
+      written.add(File(target));
+      try {
+        entry.writeContent(out);
+      } finally {
+        await out.close();
+      }
+      mp3s.add(target);
     }
+    return mp3s;
+  } finally {
+    await input.close();
+  }
+}
+
+Future<void> _deleteQuietly(File file) async {
+  try {
+    if (await file.exists()) await file.delete();
+  } on FileSystemException {
+    // Best effort: a leftover file is better than masking the real error.
   }
 }

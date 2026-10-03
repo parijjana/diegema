@@ -145,6 +145,65 @@ void main() {
     expect(find.byType(LibraryBookDetailOverlay), findsOneWidget);
   });
 
+  Future<void> openStartedBook(WidgetTester tester) async {
+    // Every reload re-runs the scan, so seed once or it would re-save the
+    // progress the test just changed.
+    var seeded = false;
+    await setSurface(tester, const Size(390, 844));
+    await tester.pumpWidget(wrap(scanLibrary: (db) async {
+      if (seeded) return;
+      seeded = true;
+      await seedBook(db,
+          id: 'started',
+          title: 'Started Book',
+          runtimeSeconds: 1000,
+          positionSeconds: 500);
+    }));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Started Book').first);
+    await pumpFrames(tester);
+  }
+
+  Future<void> openActionsMenu(WidgetTester tester) async {
+    await tester.tap(find.byTooltip('More actions'));
+    await pumpFrames(tester);
+  }
+
+  testWidgets('Mark as finished takes the book out of In progress',
+      (tester) async {
+    await openStartedBook(tester);
+
+    await openActionsMenu(tester);
+    await tester.tap(find.text('Mark as finished'));
+    await pumpFrames(tester);
+
+    expect(find.text('In progress'), findsNothing);
+    final saved = await db.getProgress('started');
+    expect(saved!.positionSeconds, AppDatabase.finishedPositionSeconds);
+  });
+
+  testWidgets('Reset progress asks first, and clears the position on confirm',
+      (tester) async {
+    await openStartedBook(tester);
+
+    await openActionsMenu(tester);
+    await tester.tap(find.text('Reset progress…'));
+    await pumpFrames(tester);
+    expect(find.text('Reset progress?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await pumpFrames(tester);
+    expect(await db.getProgress('started'), isNotNull);
+
+    await openActionsMenu(tester);
+    await tester.tap(find.text('Reset progress…'));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Reset'));
+    await pumpFrames(tester);
+
+    expect(await db.getProgress('started'), isNull);
+    expect(find.text('In progress'), findsNothing);
+  });
+
   testWidgets('cards use the accent for progress and chevrons', (tester) async {
     await setSurface(tester, const Size(390, 844));
     await tester.pumpWidget(wrap(scanLibrary: (db) async {

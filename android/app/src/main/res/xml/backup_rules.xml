@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and below. Back up the library database and preferences only:
+     downloads and covers are large and can be fetched again. The database
+     lives in app_flutter/ (path_provider's documents directory), which is in
+     the "root" domain, not "file". -->
+<full-backup-content>
+    <include domain="root" path="app_flutter/diegema.sqlite" />
+    <include domain="sharedpref" path="FlutterSharedPreferences.xml" />
+</full-backup-content>

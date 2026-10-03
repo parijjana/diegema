@@ -167,17 +167,17 @@ class _Header extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(Sp.x5, Sp.x5, Sp.x5, Sp.x2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
+      // A Wrap, not a Row: at large text scales the summary no longer fits
+      // beside the title, and it drops to its own line instead of overflowing.
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.end,
+        spacing: Sp.x3,
         children: [
-          Expanded(
-            child: Text(
-              'Up next',
-              style: AppType.serif(AppType.titleMd).copyWith(color: c.text),
-            ),
+          Text(
+            'Up next',
+            style: AppType.serif(AppType.titleMd).copyWith(color: c.text),
           ),
-          const SizedBox(width: Sp.x3),
           Text(summary,
               style: AppType.caption.copyWith(color: c.textSecondary)),
         ],

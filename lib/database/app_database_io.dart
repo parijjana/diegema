@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../core/utils/book_identity.dart';
 import '../domain/models/audiobook.dart' as domain;
+import '../core/utils/chapter_title.dart';
 
 part 'app_database_io.g.dart';
 
@@ -147,6 +149,13 @@ class AppDatabase extends _$AppDatabase {
   /// opened by accident or sampled for a few seconds.
   static const int continueListeningMinPositionSeconds = 30;
 
+  /// `PlaybackProgress.positionSeconds` value meaning "the listener marked
+  /// this book finished". A real position is never negative, so the existing
+  /// row carries the flag without a schema change, and [getContinueListening]
+  /// (`positionSeconds > continueListeningMinPositionSeconds`) already
+  /// excludes it.
+  static const int finishedPositionSeconds = -1;
+
   /// ...and stops counting once position reaches this fraction of the
   /// book's total known runtime — filters out books that are
   /// effectively finished. See [getContinueListening] for how this is
@@ -154,8 +163,10 @@ class AppDatabase extends _$AppDatabase {
   /// content whose chapter durations were never probed.
   static const double continueListeningMaxProgressFraction = 0.95;
 
+  static const int _schemaVersion = 3;
+
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => _schemaVersion;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -278,14 +289,61 @@ class AppDatabase extends _$AppDatabase {
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
-      final dbFolder = await getApplicationDocumentsDirectory();
-      final file = File(p.join(dbFolder.path, 'diegema.sqlite'));
+      final file = await _databaseFile();
+      await backupBeforeMigration(file);
       return NativeDatabase(file);
     });
   }
 
+  static Future<File> _databaseFile() async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    return File(p.join(dbFolder.path, 'diegema.sqlite'));
+  }
+
+  /// The schema version stored in [file], read from the SQLite header
+  /// (`user_version`, 4 bytes big-endian at offset 60) without opening it.
+  /// Null when there is no database yet or the file isn't one.
+  static Future<int?> storedSchemaVersion(File file) async {
+    if (!await file.exists()) return null;
+    final raf = await file.open();
+    try {
+      final header = await raf.read(64);
+      if (header.length < 64 ||
+          String.fromCharCodes(header.sublist(0, 15)) != 'SQLite format 3') {
+        return null;
+      }
+      return ByteData.sublistView(header).getUint32(60);
+    } finally {
+      await raf.close();
+    }
+  }
+
+  /// Whether the library on disk was written by a newer Diegema than this
+  /// one. Opening it would let this build "upgrade" a schema it doesn't
+  /// know, so `main` refuses and asks for an update instead.
+  static Future<bool> isLibraryFromNewerVersion() async {
+    try {
+      final stored = await storedSchemaVersion(await _databaseFile());
+      return stored != null && stored > _schemaVersion;
+    } catch (_) {
+      // Can't tell: open as usual rather than lock the user out.
+      return false;
+    }
+  }
+
+  /// Copies [file] to `<file>.v<N>.bak` before this build migrates it from
+  /// schema N, so a migration that goes wrong can be undone by hand.
+  static Future<void> backupBeforeMigration(File file) async {
+    final stored = await storedSchemaVersion(file);
+    if (stored == null || stored == 0 || stored >= _schemaVersion) return;
+    await file.copy('${file.path}.v$stored.bak');
+  }
+
   // --- Audiobook CRUD ---
-  Future<void> saveAudiobook(domain.UnifiedAudiobook book) async {
+  Future<void> saveAudiobook(domain.UnifiedAudiobook book) =>
+      transaction(() => _saveAudiobook(book));
+
+  Future<void> _saveAudiobook(domain.UnifiedAudiobook book) async {
     await into(audiobooks).insertOnConflictUpdate(
       AudiobooksCompanion.insert(
         id: book.id,
@@ -298,6 +356,17 @@ class AppDatabase extends _$AppDatabase {
         isDownloaded: Value(book.isDownloaded),
       ),
     );
+
+    // Drop chapters the new copy no longer has, or streaming then
+    // downloading a book (`<id>_stream_N` vs `<id>_local_N`) leaves both
+    // sets under one book. A save with no chapters keeps the old ones: that
+    // is a metadata-only save or a failed fetch, not a book with none.
+    if (book.chapters.isNotEmpty) {
+      final keep = book.chapters.map((c) => c.id).toList();
+      await (delete(chapters)
+            ..where((c) => c.audiobookId.equals(book.id) & c.id.isNotIn(keep)))
+          .go();
+    }
 
     // Save chapters
     for (int i = 0; i < book.chapters.length; i++) {
@@ -332,7 +401,9 @@ class AppDatabase extends _$AppDatabase {
         .map(
           (c) => domain.AudiobookChapter(
             id: c.id,
-            title: c.title,
+            // Older downloads stored file names as titles; every screen
+            // (Now Playing, mini player, lock screen) gets the readable one.
+            title: prettifyChapterTitle(c.title, index: c.chapterIndex),
             audioPathOrUrl: c.audioPathOrUrl,
             durationSeconds: c.durationSeconds,
             isStream: c.isStream,
@@ -386,6 +457,27 @@ class AppDatabase extends _$AppDatabase {
     return (select(playbackProgress)
           ..where((p) => p.audiobookId.equals(audiobookId)))
         .getSingleOrNull();
+  }
+
+  /// Marks [audiobookId] finished: its progress row is kept, pointing at
+  /// the last chapter, with [kFinishedPositionSeconds] as the position — see
+  /// [finishedPositionSeconds] for why this needs no schema change. The next real
+  /// [saveProgress] (i.e. the listener playing it again) replaces the marker.
+  Future<void> markFinished(String audiobookId,
+      {required int lastChapterIndex}) {
+    return saveProgress(
+      audiobookId: audiobookId,
+      chapterIndex: lastChapterIndex,
+      positionSeconds: finishedPositionSeconds,
+    );
+  }
+
+  /// Forgets the saved position for [audiobookId]; the book stays in the
+  /// library and starts from the beginning next time.
+  Future<void> resetProgress(String audiobookId) async {
+    await (delete(playbackProgress)
+          ..where((p) => p.audiobookId.equals(audiobookId)))
+        .go();
   }
 
   Future<PlaybackProgressData?> getMostRecentProgress() async {
@@ -722,9 +814,14 @@ class AppDatabase extends _$AppDatabase {
     final newRoot = p.normalize(to);
     if (oldRoot == newRoot) return 0;
 
-    String? moved(String? path) => path != null && p.isWithin(oldRoot, path)
-        ? p.join(newRoot, p.relative(path, from: oldRoot))
-        : null;
+    // `from` itself counts: moving one book folder passes that folder.
+    String? moved(String? path) => path == null
+        ? null
+        : p.equals(oldRoot, path)
+            ? newRoot
+            : p.isWithin(oldRoot, path)
+                ? p.join(newRoot, p.relative(path, from: oldRoot))
+                : null;
 
     var touched = 0;
     await transaction(() async {

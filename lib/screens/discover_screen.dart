@@ -213,18 +213,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         builder: (context) => Dialog(
           shape: const RoundedRectangleBorder(borderRadius: R.lg),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640, maxHeight: 760),
-            child: Padding(
-              padding: const EdgeInsets.all(Sp.x5),
-              child: BookDetailPane(
-                book: book,
-                artworkService: widget.artworkService,
-                downloader: widget.downloader,
-                audioService: widget.audioService,
-                db: widget.db,
-                libriVoxService: widget.libriVoxService,
-                wide: true,
-              ),
+            constraints: const BoxConstraints(
+                maxWidth: Dim.detailDialogMaxWidth, maxHeight: 680),
+            child: BookDetailPane(
+              book: book,
+              artworkService: widget.artworkService,
+              downloader: widget.downloader,
+              audioService: widget.audioService,
+              db: widget.db,
+              libriVoxService: widget.libriVoxService,
+              wide: true,
             ),
           ),
         ),
@@ -237,16 +235,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       showDragHandle: true,
       builder: (context) => FractionallySizedBox(
         heightFactor: 0.92,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x4),
-          child: BookDetailPane(
-            book: book,
-            artworkService: widget.artworkService,
-            downloader: widget.downloader,
-            audioService: widget.audioService,
-            db: widget.db,
-            libriVoxService: widget.libriVoxService,
-          ),
+        // The pane pads itself: its sticky footer runs edge to edge.
+        child: BookDetailPane(
+          book: book,
+          artworkService: widget.artworkService,
+          downloader: widget.downloader,
+          audioService: widget.audioService,
+          db: widget.db,
+          libriVoxService: widget.libriVoxService,
         ),
       ),
     );

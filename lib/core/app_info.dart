@@ -1,3 +1,5 @@
+import 'package:package_info_plus/package_info_plus.dart';
+
 /// Identity shown in the About section of the settings panel.
 ///
 /// ⚠️ **Diegema is a WORKING title, not the settled name.** The intent
@@ -12,10 +14,20 @@
 /// was not: *Fabula* and *Fabuly* are both existing audiobook apps.
 const String kAppName = 'Diegema';
 
-/// ⚠️ Must be kept in step with `version:` in `pubspec.yaml` by hand.
-///
-/// Reading the real thing needs `package_info_plus`, which is a platform
-/// channel and an extra dependency for one string on one rarely-opened
-/// screen — not worth it while the app has two scaffolded platforms. Revisit
-/// when there is a release process that could let these drift unnoticed.
-const String kAppVersion = '1.0.0';
+/// Shown until (or if) the real version cannot be read — in widget tests,
+/// where there is no platform channel, and on any platform where the lookup
+/// fails. Keep in step with `version:` in `pubspec.yaml`.
+const String kFallbackAppVersion = '1.0.0';
+
+Future<String>? _appVersion;
+
+/// The `version:` from `pubspec.yaml` as built into the app, read once via
+/// `package_info_plus`. Never throws: a failed lookup (no platform channel
+/// under `flutter test`) yields [kFallbackAppVersion].
+Future<String> loadAppVersion() => _appVersion ??= () async {
+      try {
+        return (await PackageInfo.fromPlatform()).version;
+      } catch (_) {
+        return kFallbackAppVersion;
+      }
+    }();

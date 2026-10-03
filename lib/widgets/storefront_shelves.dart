@@ -87,7 +87,7 @@ class SearchResultsGrid extends StatelessWidget {
           child: Text(
             'SEARCH RESULTS (${searchResults.length})'.toUpperCase(),
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
               color: theme.colorScheme.primary,

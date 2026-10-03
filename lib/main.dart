@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'app.dart';
 import 'core/demo_deeplink.dart';
+import 'core/error_handling.dart';
 import 'core/demo_mode.dart';
 import 'core/host_page_demo_notice.dart';
 import 'core/ui_preferences.dart';
@@ -10,6 +13,7 @@ import 'database/app_database.dart';
 import 'screens/app_shell.dart';
 import 'screens/library_screen.dart' show LibraryScanner;
 import 'services/app_paths.dart';
+import 'services/downloads_location.dart';
 import 'services/artwork_enrichment_service.dart';
 import 'services/demo_artwork_service.dart';
 import 'services/demo_downloader.dart';
@@ -17,6 +21,7 @@ import 'services/demo_librivox_service.dart';
 import 'services/ambience_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/diegema_audio_handler.dart';
+import 'services/download_manager.dart';
 import 'services/folder_access.dart';
 import 'services/demo_seed.dart';
 import 'services/librivox_downloader.dart';
@@ -24,6 +29,11 @@ import 'services/librivox_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installErrorHandlers();
+  if (!kIsWeb && await AppDatabase.isLibraryFromNewerVersion()) {
+    runApp(const NewerLibraryApp());
+    return;
+  }
   // The "this is a preview" notice now lives in the host HTML page
   // (`web/index.html`), outside the Flutter app entirely — see Task 1 of
   // the UI redesign and `core/host_page_demo_notice.dart`. It ships
@@ -67,15 +77,28 @@ Future<void> main() async {
   AppDatabase? nativeDb;
   AudioPlaybackService? audioService;
   AmbienceService? ambience;
+  DownloadManager? downloads;
   if (!kIsWeb) {
     // Before anything scans or plays from a library folder: on macOS/iOS
     // the sandbox forgets picked folders between launches.
     await openLibraryLocations();
+    await openDownloadsFolder();
     nativeDb = demoDb ?? AppDatabase();
     // Before playback restores the last book: iOS moves the app's folder
     // on every update, and the database stores absolute paths into it.
     await rebaseAppPathsIfMoved(nativeDb);
-    audioService = AudioPlaybackService(db: nativeDb);
+    // Same reason: downloads made before the user-visible folder existed
+    // move there once, and their stored paths with them.
+    await moveDownloadsToVisibleFolder(nativeDb);
+    // After the move above, so a download that finished while the app was
+    // dead is extracted into the folder downloads now live in. Not awaited:
+    // extracting a big book must not hold up the first frame.
+    if (!kDemoMode) {
+      downloads = createDownloadManager(nativeDb);
+      unawaited(downloads?.start());
+    }
+    audioService =
+        AudioPlaybackService(db: nativeDb, preferences: const UiPreferences());
     ambience = AmbienceService(book: audioService);
     try {
       await initDiegemaAudioService(audioService, ambience: ambience);
@@ -94,6 +117,7 @@ Future<void> main() async {
     runImportMigration: nativeDb != null,
     audioService: audioService,
     ambience: ambience,
+    downloads: downloads,
     deepLink: deepLink,
     // `?theme=` overrides the stored choice when present, and only then —
     // absent a deep link this stays null so the persisted preference (or

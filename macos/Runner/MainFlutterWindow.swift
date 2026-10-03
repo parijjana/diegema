@@ -78,6 +78,37 @@ final class FolderAccessChannel {
         // Deleted, or on a drive that isn't mounted: not an error to report.
         result(nil)
       }
+    case "pickDownloadsFolder":
+      // Downloads live in <picked>/Diegema; the sandbox only lets the app
+      // write there once the user has chosen the folder.
+      let home = URL(fileURLWithPath: String(cString: getpwuid(getuid()).pointee.pw_dir))
+      let audiobooks = home.appendingPathComponent("Audiobooks", isDirectory: true)
+      let panel = NSOpenPanel()
+      panel.canChooseDirectories = true
+      panel.canChooseFiles = false
+      panel.canCreateDirectories = true
+      panel.allowsMultipleSelection = false
+      panel.prompt = "Save Downloads Here"
+      panel.message = "Choose where Diegema saves downloaded audiobooks. "
+        + "A Diegema folder is made inside it (for example Audiobooks/Diegema)."
+      panel.directoryURL =
+        FileManager.default.fileExists(atPath: audiobooks.path) ? audiobooks : home
+      guard panel.runModal() == .OK, let picked = panel.url else { return result(nil) }
+      let root = picked.lastPathComponent == "Diegema"
+        ? picked : picked.appendingPathComponent("Diegema", isDirectory: true)
+      do {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let data = try root.bookmarkData(
+          options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+        let path = root.standardizedFileURL.path
+        if open[path] == nil, root.startAccessingSecurityScopedResource() {
+          open[path] = root
+        }
+        result(["path": path, "bookmark": data.base64EncodedString()])
+      } catch {
+        result(FlutterError(
+          code: "pick", message: error.localizedDescription, details: nil))
+      }
     case "close":
       if let path = args["path"] as? String, let url = open.removeValue(forKey: path) {
         url.stopAccessingSecurityScopedResource()

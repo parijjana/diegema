@@ -89,7 +89,7 @@ void main() {
   });
 
   testWidgets('empty: this device and "No other devices yet."', (tester) async {
-    await pumpSettings(tester, FakeSyncController());
+    await pumpSettings(tester, FakeSyncController()..linked = true);
     await openLinkedDevices(tester);
 
     expect(find.text('This device'), findsOneWidget);
@@ -101,7 +101,8 @@ void main() {
   });
 
   testWidgets('lists the other devices with name and platform', (tester) async {
-    await pumpSettings(tester, FakeSyncController(records: others));
+    await pumpSettings(
+        tester, (FakeSyncController(records: others)..linked = true));
     await openLinkedDevices(tester);
 
     expect(find.text('No other devices yet.'), findsNothing);
@@ -130,15 +131,19 @@ void main() {
   });
 
   testWidgets('no overflow at 2.0 text scale', (tester) async {
-    await pumpSettings(tester, FakeSyncController(records: others),
+    await pumpSettings(
+        tester, (FakeSyncController(records: others)..linked = true),
         textScale: 2.0);
     await openLinkedDevices(tester);
     await tester.enterText(find.byType(TextField), 'A much longer device name');
     await pumpFrames(tester);
-    expect(find.text('Other devices'), findsOneWidget);
-    expect(tester.takeException(), isNull);
     final tap = tester.getSize(find.widgetWithText(TextButton, 'Save name'));
     expect(tap.height, greaterThanOrEqualTo(48));
+    await tester.scrollUntilVisible(find.text('Other devices'), 100,
+        scrollable: find.byType(Scrollable).first);
+    await pumpFrames(tester);
+    expect(find.text('Other devices'), findsOneWidget);
+    expect(tester.takeException(), isNull);
     await unmount(tester);
   });
 
@@ -150,7 +155,7 @@ void main() {
     await store.hide('ck:x');
     await setSurface(tester, const Size(390, 844));
     await tester.pumpWidget(SyncScope(
-      controller: FakeSyncController(records: others),
+      controller: (FakeSyncController(records: others)..linked = true),
       child: MaterialApp(
         theme: AppTheme.light(),
         home: HiddenBooksScreen(db: db, store: store),

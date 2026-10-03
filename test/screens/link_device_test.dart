@@ -40,6 +40,9 @@ void main() {
   }
 
   Future<void> openSheet(WidgetTester tester) async {
+    await tester.scrollUntilVisible(find.text('Link a device'), 100,
+        scrollable: find.byType(Scrollable).first);
+    await pumpFrames(tester);
     await tester.tap(find.text('Link a device'));
     await pumpFrames(tester);
   }
@@ -194,6 +197,9 @@ void main() {
     });
 
     Future<void> paste(WidgetTester tester, String text) async {
+      await tester.scrollUntilVisible(find.text('Paste a code'), 100,
+          scrollable: find.byType(Scrollable).first);
+      await pumpFrames(tester);
       await tester.tap(find.text('Paste a code'));
       await pumpFrames(tester);
       await tester.enterText(find.byType(TextField).last, text);

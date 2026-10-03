@@ -16,7 +16,10 @@ class LinkedDevicesScreen extends StatefulWidget {
   /// Passed to the "Link a device" sheet; null means "is this a Mac".
   final bool? pollForScanner;
 
-  const LinkedDevicesScreen({super.key, this.pollForScanner});
+  /// The time source for "synced 3 min ago"; tests pass a fake one.
+  final DateTime Function()? now;
+
+  const LinkedDevicesScreen({super.key, this.pollForScanner, this.now});
 
   @override
   State<LinkedDevicesScreen> createState() => _LinkedDevicesScreenState();
@@ -130,11 +133,13 @@ class _LinkedDevicesScreenState extends State<LinkedDevicesScreen> {
   // --- Sync now ---
   bool _syncing = false;
   Timer? _ticker;
-  DateTime _now = DateTime.now();
+  late DateTime _now = _clock();
+
+  DateTime _clock() => (widget.now ?? DateTime.now)();
 
   void _startTicker() {
     _ticker ??= Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
+      if (mounted) setState(() => _now = _clock());
     });
   }
 
@@ -150,7 +155,7 @@ class _LinkedDevicesScreenState extends State<LinkedDevicesScreen> {
     if (!mounted) return;
     setState(() {
       _syncing = false;
-      _now = DateTime.now();
+      _now = _clock();
     });
   }
 

@@ -78,5 +78,7 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Diegema finds your other linked devices on this Wi-Fi to keep your place in each book in step.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Diegema uses the camera only to scan a code shown by your other device.</string>
 </dict>
 </plist>

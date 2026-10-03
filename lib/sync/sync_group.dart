@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 
-import 'secure/secure_session.dart';
+import 'secure/auth_session.dart';
 
 /// Where this device keeps its sync secrets: the platform keystore on
 /// phones and Windows, a file in the sandbox container on macOS (the
@@ -28,42 +28,35 @@ class InMemorySecretStore implements SecretStore {
   Future<void> delete(String key) async => values.remove(key);
 }
 
-/// This device's identity key and, once linked, the group key it shares
-/// with its other devices. The group key is what proves membership in a
-/// session (it salts the session keys); removing a device means rotating
-/// it. Losing the store (a reinstall restored from backup) leaves the
-/// device unlinked, to be linked again.
+/// The group key this device shares with its other devices, once linked.
+/// It is what proves membership in a session; removing a device means
+/// rotating it. Losing the store (a reinstall restored from backup) leaves
+/// the device unlinked, to be linked again.
 class SyncGroup {
-  static const _seedKey = 'sync.device_seed.v1';
+  static const _installKey = 'sync.install.v1';
   static const _groupKey = 'sync.group_key.v1';
 
   final SecretStore _store;
-  final DeviceIdentity identity;
   Uint8List? _key;
 
-  /// The store had no device key, so this is a new identity: a fresh
-  /// install, or a backup restored onto this or another phone (backups
-  /// carry preferences, never the keystore). The caller gives the device a
-  /// new sync id too, so two phones never write under one id.
+  /// The store was empty, so this is a new install as far as sync goes: a
+  /// fresh install, or a backup restored onto this or another phone
+  /// (backups carry preferences, never the keystore). The caller gives the
+  /// device a new sync id too, so two phones never write under one id.
   final bool fresh;
 
-  SyncGroup._(this._store, this.identity, this._key, {this.fresh = false});
+  SyncGroup._(this._store, this._key, {this.fresh = false});
 
   static Future<SyncGroup> load(SecretStore store,
       {List<int> Function(int)? randomBytes}) async {
-    final random = randomBytes ?? secureRandomBytes;
-    final seed = await store.read(_seedKey);
-    DeviceIdentity identity;
-    if (seed == null) {
-      final (id, newSeed) = await DeviceIdentity.generate(randomBytes: random);
-      await store.write(_seedKey, base64.encode(newSeed));
-      identity = id;
-    } else {
-      identity = await DeviceIdentity.fromSeed(base64.decode(seed));
+    final install = await store.read(_installKey);
+    if (install == null) {
+      await store.write(
+          _installKey, base64.encode((randomBytes ?? secureRandomBytes)(16)));
     }
     final key = await store.read(_groupKey);
-    return SyncGroup._(store, identity, key == null ? null : base64.decode(key),
-        fresh: seed == null);
+    return SyncGroup._(store, key == null ? null : base64.decode(key),
+        fresh: install == null);
   }
 
   bool get linked => _key != null;
@@ -107,12 +100,6 @@ class SyncGroup {
   SessionConfig sessionConfig() {
     final k = _key;
     if (k == null) throw StateError('not linked');
-    return SessionConfig(
-      mode: SessionMode.group,
-      identity: identity,
-      preSharedKey: k,
-      // The group key already proved membership.
-      acceptPeer: (_) async => true,
-    );
+    return SessionConfig(groupKey: k);
   }
 }

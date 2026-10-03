@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'secure/frame_channel.dart';
-import 'secure/secure_session.dart';
+import 'secure/auth_session.dart';
 import 'sync_exchange.dart';
 import 'sync_group.dart';
 import 'sync_over_session.dart';
@@ -62,8 +62,13 @@ class LanSync {
   /// Random per run, so a device skips its own advertisement.
   final String instance;
 
+  /// Connections being served at once; more are dropped, so a stranger
+  /// opening sockets can't pile up work.
+  static const maxServing = 4;
+
   ServerSocket? _server;
-  Future<void> _lock = Future.value();
+  Future<void>? _starting;
+  int _serving = 0;
   Future<SyncRun>? _running;
 
   LanSync({
@@ -82,16 +87,13 @@ class LanSync {
 
   bool get listening => _server != null;
 
-  /// One exchange at a time, whichever side started it, so two merges never
-  /// interleave on the store.
-  Future<T> _exclusive<T>(Future<T> Function() f) {
-    final run = _lock.then((_) => f());
-    _lock = run.then((_) {}, onError: (Object _) {});
-    return run;
+  /// Concurrent calls share one start.
+  Future<void> startListening() {
+    if (!listens || _server != null) return Future.value();
+    return _starting ??= _start().whenComplete(() => _starting = null);
   }
 
-  Future<void> startListening() async {
-    if (!listens || _server != null) return;
+  Future<void> _start() async {
     final tag = await group.tag();
     if (tag == null) return;
     final server = _server = await ServerSocket.bind(bindAddress, 0);
@@ -108,12 +110,20 @@ class LanSync {
     await server.close();
   }
 
+  /// Exchanges are not serialised here: the [SyncPeer] steps are short
+  /// store operations, merging is idempotent, and holding a lock across a
+  /// network round trip deadlocks two devices that dial each other at once.
   void _serve(Socket socket) {
-    unawaited(_exclusive(() async {
+    if (_serving >= maxServing) {
+      socket.destroy();
+      return;
+    }
+    _serving++;
+    unawaited(() async {
       final channel = LengthPrefixedChannel(socket, socket);
       try {
         final session =
-            await SecureSession.respond(channel, group.sessionConfig())
+            await AuthSession.respond(channel, group.sessionConfig())
                 .timeout(timeout);
         final counts =
             await syncAsResponder(session, await peer()).timeout(timeout);
@@ -121,9 +131,10 @@ class LanSync {
       } catch (e) {
         log?.call('serve failed ${socket.remoteAddress.address}: $e');
       } finally {
+        _serving--;
         await channel.close();
       }
-    }));
+    }());
   }
 
   /// Finds the group's devices on this network and syncs with each. A call
@@ -142,7 +153,7 @@ class LanSync {
     }.values;
     final results = <PeerResult>[];
     for (final p in peers) {
-      results.add(await _exclusive(() => _syncWith(p)));
+      results.add(await _syncWith(p));
     }
     log?.call('sync run: ${results.join('; ')}');
     return SyncRun(results);
@@ -156,9 +167,8 @@ class LanSync {
       final socket = await Socket.connect(p.host, p.port,
           timeout: const Duration(seconds: 5));
       channel = LengthPrefixedChannel(socket, socket);
-      final session =
-          await SecureSession.initiate(channel, group.sessionConfig())
-              .timeout(timeout);
+      final session = await AuthSession.initiate(channel, group.sessionConfig())
+          .timeout(timeout);
       final counts =
           await syncAsInitiator(session, await peer()).timeout(timeout);
       return PeerResult(p, counts: counts);

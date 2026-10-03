@@ -98,8 +98,18 @@ class SyncService implements SyncController {
 
   Hlc? _clock;
   String? _deviceId;
-  SyncGroup? _group;
+  Future<SyncGroup?>? _group;
   LanSync? _lan;
+
+  /// Store writes that move the clock (publishing, and each step of an
+  /// exchange) run one at a time, so a refresh can't overwrite a clock an
+  /// incoming sync just advanced. Never held across the network.
+  Future<void> _lock = Future.value();
+  Future<T> _serial<T>(Future<T> Function() f) {
+    final run = _lock.then((_) => f());
+    _lock = run.then((_) {}, onError: (Object _) {});
+    return run;
+  }
 
   SyncService(
     this.db, {
@@ -114,16 +124,25 @@ class SyncService implements SyncController {
 
   /// This device's sync keys. Loaded before the device id is first used: a
   /// device whose keys are new gets a new id too.
-  Future<SyncGroup?> group() async {
+  /// A keystore that fails to read turns sync off for this run (and is
+  /// retried next time) rather than unlinking the device.
+  Future<SyncGroup?> group() {
     final s = secrets;
-    if (s == null) return null;
-    if (_group != null) return _group;
-    final g = await SyncGroup.load(s);
-    if (g.fresh) {
-      _deviceId = await identity.resetDeviceId();
-      _clock = null;
-    }
-    return _group = g;
+    if (s == null) return Future.value();
+    return _group ??= () async {
+      try {
+        final g = await SyncGroup.load(s);
+        if (g.fresh) {
+          _deviceId = await identity.resetDeviceId();
+          _clock = null;
+        }
+        return g;
+      } catch (e) {
+        debugPrint('sync: keys unavailable, sync off for now: $e');
+        _group = null;
+        return null;
+      }
+    }();
   }
 
   Future<String> deviceId() async {
@@ -179,7 +198,12 @@ class SyncService implements SyncController {
   /// Call on launch, on pause, and before every sync.
   @override
   Future<void> refresh() async {
+    // Outside the lock: working out a local book's key reads its files.
     await fillPortableKeys(db);
+    await _serial(_publish);
+  }
+
+  Future<void> _publish() async {
     final keys = await db.portableKeys();
     final books = <LocalBook>[];
     for (final book in await db.getAllAudiobooks()) {
@@ -244,8 +268,10 @@ class SyncService implements SyncController {
   @override
   Future<void> setDeviceName(String name) async {
     await identity.setDeviceName(name);
-    await _publishDevice(_now());
-    await _rebuildView();
+    await _serial(() async {
+      await _publishDevice(_now());
+      await _rebuildView();
+    });
   }
 
   Future<void> _rebuildView() async =>
@@ -255,7 +281,7 @@ class SyncService implements SyncController {
   Future<SyncPeer> peer() async {
     final clock = await _clockNow();
     _clock = clock;
-    return SyncPeer(store, onChanged: (changed) async {
+    return _SerialPeer(store, _serial, onChanged: (changed) async {
       var c = _clock!;
       for (final r in changed) {
         c = c.receive(r.hlc, _now());
@@ -264,4 +290,24 @@ class SyncService implements SyncController {
       await _rebuildView();
     });
   }
+}
+
+/// A [SyncPeer] whose steps take the service's store lock.
+class _SerialPeer extends SyncPeer {
+  final Future<T> Function<T>(Future<T> Function()) _serial;
+  _SerialPeer(super.store, this._serial, {super.onChanged});
+
+  @override
+  Future<SyncMessage> hello() => _serial(super.hello);
+
+  @override
+  Future<SyncMessage> answer(SyncMessage hello) =>
+      _serial(() => super.answer(hello));
+
+  @override
+  Future<SyncMessage> complete(SyncMessage answer) =>
+      _serial(() => super.complete(answer));
+
+  @override
+  Future<void> finish(SyncMessage last) => _serial(() => super.finish(last));
 }

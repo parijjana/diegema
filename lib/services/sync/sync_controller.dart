@@ -3,8 +3,8 @@ import 'package:flutter/widgets.dart';
 
 import '../../database/app_database.dart';
 import '../../sync/sync_view.dart';
-import 'sync_controller_web.dart'
-    if (dart.library.io) 'sync_controller_io.dart' as platform;
+import 'sync_controller_web.dart' if (dart.library.io) 'sync_controller_io.dart'
+    as platform;
 
 /// What the UI uses of linked-device sync. Implemented by `SyncService` on
 /// native platforms; absent (null) on the web and in widget tests that
@@ -18,6 +18,10 @@ abstract class SyncController {
 
   /// Book id → portable key, for this device's books.
   Future<Map<String, String>> portableKeys();
+
+  /// Gives the book [bookId] the portable [key] (links it to the same book
+  /// on another device), then refreshes.
+  Future<void> linkBook(String bookId, String key);
 
   Future<String> deviceName();
   Future<void> setDeviceName(String name);

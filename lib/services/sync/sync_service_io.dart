@@ -160,6 +160,12 @@ class SyncService implements SyncController {
   Future<Map<String, String>> portableKeys() => db.portableKeys();
 
   @override
+  Future<void> linkBook(String bookId, String key) async {
+    await db.setPortableKey(bookId, key);
+    await refresh();
+  }
+
+  @override
   Future<String> deviceName() => identity.deviceName();
 
   @override

@@ -69,8 +69,17 @@ class LanSync {
   final Duration timeout;
   final void Function(String)? log;
 
-  /// Random per run, so a device skips its own advertisement.
-  final String instance;
+  /// The name this device advertises under: random, and new on every
+  /// re-announcement (macOS doesn't report a service that stops and starts
+  /// again under the same name, so a watching Mac would miss it).
+  String get instance => _instance;
+  String _instance;
+
+  /// Every name this device has advertised under, to skip its own.
+  final Set<String> _mine = {};
+
+  static String _newInstance() =>
+      'dg-${secureRandomBytes(4).map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
 
   /// Connections being served at once; more are dropped, so a stranger
   /// opening sockets can't pile up work.
@@ -105,8 +114,9 @@ class LanSync {
     this.log,
     String? instance,
   })  : bindAddress = bindAddress ?? InternetAddress.anyIPv4,
-        instance = instance ??
-            'dg-${secureRandomBytes(4).map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
+        _instance = instance ?? _newInstance() {
+    _mine.add(_instance);
+  }
 
   bool get listening => _server != null;
 
@@ -143,7 +153,7 @@ class LanSync {
     final tag = await group.tag();
     if (tag == null) return;
     _watch = discovery.watch(tag: tag).listen((p) {
-      if (p.instance != instance) unawaited(_dialSeen(p));
+      if (!_mine.contains(p.instance)) unawaited(_dialSeen(p));
     });
   }
 
@@ -174,7 +184,10 @@ class LanSync {
     final tag = await group.tag();
     if (server == null || tag == null) return;
     await discovery.stopAdvertising();
+    _instance = _newInstance();
+    _mine.add(_instance);
     await discovery.advertise(instance: instance, port: server.port, tag: tag);
+    log?.call('announced again as $instance');
   }
 
   /// Exchanges are not serialised here: the [SyncPeer] steps are short
@@ -238,7 +251,7 @@ class LanSync {
     final found = await discovery.browse(tag: tag, window: browseWindow);
     final peers = {
       for (final p in found)
-        if (p.instance != instance) p.instance: p,
+        if (!_mine.contains(p.instance)) p.instance: p,
     }.values;
     final results = <PeerResult>[];
     for (final p in peers) {

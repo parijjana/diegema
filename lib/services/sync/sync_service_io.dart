@@ -111,6 +111,7 @@ class SyncService implements SyncController {
   bool _keysUnreadable = false;
   LanSync? _lan;
   final ValueNotifier<LastSync?> _lastSync = ValueNotifier(null);
+  int? _lastInbound;
 
   @override
   ValueListenable<LastSync?> get lastSync => _lastSync;
@@ -185,8 +186,11 @@ class SyncService implements SyncController {
     );
     // Devices that dialled in, and devices a Mac dialled on seeing them,
     // count as syncs too.
-    lan.exchanges.where((r) => r.ok).listen((_) => _lastSync.value =
-        LastSync(DateTime.fromMillisecondsSinceEpoch(_now()), 1));
+    lan.exchanges.where((r) => r.ok).listen((_) {
+      _lastInbound = _now();
+      _lastSync.value =
+          LastSync(DateTime.fromMillisecondsSinceEpoch(_now()), 1);
+    });
     return lan;
   }
 
@@ -298,6 +302,12 @@ class SyncService implements SyncController {
       for (final r in run.results)
         if (r.ok) r.peer.host,
     }.length;
+    // A run that reached nobody doesn't hide a sync a device dialled in for
+    // moments ago (a Mac reaching this phone as its app opened).
+    final inbound = _lastInbound;
+    if (reached == 0 && inbound != null && _now() - inbound < 30000) {
+      return reached;
+    }
     _lastSync.value =
         LastSync(DateTime.fromMillisecondsSinceEpoch(_now()), reached);
     return reached;
@@ -321,8 +331,9 @@ class SyncService implements SyncController {
           .putAll([SyncRecord(kind: SyncKind.forget, key: id, hlc: _clock!)]);
       await _rebuildView();
     });
+    // Announce again so a watching Mac picks the removal up at once.
     final lan = await _lanSync();
-    if (lan != null) unawaited(_run(lan));
+    if (lan != null) unawaited(_run(lan, waitForCallers: true));
   }
 
   @override

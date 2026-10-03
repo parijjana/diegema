@@ -82,6 +82,17 @@ class SettingsScreen extends StatelessWidget {
                   onChanged: settings.setThemeMode,
                 ),
                 const SizedBox(height: Sp.x5),
+                _ThreeWayToggle<LibraryLayout>(
+                  label: 'Library layout',
+                  description: 'Books as a list, or as a grid of covers.',
+                  value: settings.libraryLayout,
+                  options: [
+                    for (final layout in LibraryLayout.values)
+                      _Choice(layout, layout.label),
+                  ],
+                  onChanged: settings.setLibraryLayout,
+                ),
+                const SizedBox(height: Sp.x5),
                 _ThreeWayToggle<PlayerControlsStyle>(
                   label: 'Player buttons',
                   description: 'How Up next, Speed and Sleep look on the '

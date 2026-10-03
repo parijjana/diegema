@@ -25,6 +25,7 @@ class UiPreferences {
   static const String _accentKey = 'appearance.accent';
   static const String _backgroundKey = 'appearance.background';
   static const String _shadowsKey = 'appearance.shadows';
+  static const String _libraryLayoutKey = 'library.layout';
   static const String _ambienceKey = 'ambience.v1';
   static const String _downloadsWifiOnlyKey = 'downloads.wifi_only';
 
@@ -272,6 +273,12 @@ class UiPreferences {
   /// The drop-shadow style's enum name; null when never chosen.
   Future<String?> getShadowsName() => _getString(_shadowsKey);
   Future<void> setShadowsName(String name) => _setString(_shadowsKey, name);
+
+  /// The Library layout's enum name (`list` or `tiles`); null when never
+  /// chosen. Unknown names are resolved (to list) by `LibraryLayout.fromName`.
+  Future<String?> getLibraryLayoutName() => _getString(_libraryLayoutKey);
+  Future<void> setLibraryLayoutName(String name) =>
+      _setString(_libraryLayoutKey, name);
 
   /// The ambience mixer's saved settings, as JSON (see `AmbienceState`).
   Future<String?> getAmbienceJson() => _getString(_ambienceKey);

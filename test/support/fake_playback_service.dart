@@ -22,6 +22,7 @@ class FakePlaybackService extends AudioPlaybackService {
   int playCalls = 0;
   int pauseCalls = 0;
   int seekCalls = 0;
+  int retryCalls = 0;
 
   /// Fixed so golden frames never depend on wall-clock timing.
   static const Duration fixedPosition = Duration(minutes: 12, seconds: 34);
@@ -77,6 +78,12 @@ class FakePlaybackService extends AudioPlaybackService {
   @override
   Future<void> skipBackward({int seconds = kSkipSeconds}) async =>
       seek(positionNotifier.value - Duration(seconds: seconds));
+
+  @override
+  Future<void> retryCurrentChapter() async {
+    retryCalls++;
+    stateNotifier.value = PlaybackState.playing;
+  }
 
   @override
   Future<void> nextChapter() async =>

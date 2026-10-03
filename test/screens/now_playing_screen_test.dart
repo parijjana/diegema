@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:diegema/core/ui_preferences.dart';
 import 'package:diegema/database/app_database.dart';
+import 'package:diegema/domain/models/audiobook.dart';
+import 'package:diegema/services/audio_playback_service.dart';
 import 'package:diegema/screens/now_playing_screen.dart';
 import 'package:diegema/theme/app_theme.dart';
 
@@ -312,5 +314,47 @@ void main() {
       // The queue sheet opened over the player.
       expect(find.text('Middlemarch'), findsWidgets);
     });
+  });
+
+  group('playback error', () {
+    final twoChapters = UnifiedAudiobook(
+      id: 'odyssey',
+      title: 'Odyssey',
+      author: 'Homer',
+      description: '',
+      chapters: [
+        for (var i = 0; i < 2; i++)
+          AudiobookChapter(
+              id: 'odyssey_$i',
+              title: 'Book ${i + 1}',
+              audioPathOrUrl: 'https://example.org/$i.mp3',
+              durationSeconds: 600,
+              isStream: true),
+      ],
+    );
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('offers Retry and Next chapter (text scale $scale)',
+          (tester) async {
+        await setSurface(tester, const Size(390, 844));
+        await tester.pumpWidget(MediaQuery(
+          data: MediaQueryData(
+              size: const Size(390, 844), textScaler: TextScaler.linear(scale)),
+          child: wrap(),
+        ));
+        await pumpFrames(tester);
+        await audio.loadBook(twoChapters);
+        audio.stateNotifier.value = PlaybackState.error;
+        await pumpFrames(tester);
+
+        expect(find.text("Couldn't play this chapter"), findsOneWidget);
+        expect(find.text('Next chapter'), findsOneWidget);
+
+        await tester.tap(find.text('Retry'));
+        await pumpFrames(tester);
+        expect(audio.retryCalls, 1);
+        expect(find.text("Couldn't play this chapter"), findsNothing);
+      });
+    }
   });
 }

@@ -12,6 +12,7 @@ import 'main.dart';
 import 'screens/library_screen.dart' show LibraryScanner;
 import 'services/artwork_enrichment_service.dart';
 import 'services/audio_playback_service.dart';
+import 'services/download_manager.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
 import 'services/ambience_service.dart';
@@ -56,6 +57,11 @@ class AudiobookApp extends StatefulWidget {
   /// don't exercise it; the player then hides the ambience controls.
   final AmbienceService? ambience;
 
+  /// The app-wide download queue, put in scope by [DownloadsScope]. Null on
+  /// the web demo and in tests that don't supply one; Discover's Download
+  /// is then unavailable.
+  final DownloadManager? downloads;
+
   /// Injectable UI preference store, so widget tests never need the
   /// `shared_preferences` platform channel.
   final UiPreferences preferences;
@@ -85,6 +91,7 @@ class AudiobookApp extends StatefulWidget {
     this.artworkService,
     this.audioService,
     this.ambience,
+    this.downloads,
     this.preferences = const UiPreferences(),
     this.libraryScanner,
     this.deepLink = DemoDeepLink.none,
@@ -113,7 +120,7 @@ class _AudiobookAppState extends State<AudiobookApp>
     _settings.addListener(_onSettingsChanged);
     _db = widget.database ?? AppDatabase();
     WidgetsBinding.instance.addObserver(this);
-    _settings.load();
+    _settings.load().then((_) => _syncDownloads());
     widget.ambience?.init();
     _syncHostPageTheme();
 
@@ -142,10 +149,16 @@ class _AudiobookAppState extends State<AudiobookApp>
   }
 
   void _onSettingsChanged() {
+    _syncDownloads();
     // `MaterialApp.themeMode` is read in `build`, so the app itself needs a
     // rebuild; the host page's CSS chrome needs telling separately.
     setState(_syncHostPageTheme);
   }
+
+  /// The Wi-Fi only toggle lives in [AppSettings] like every preference;
+  /// the queue needs to hear about it, including the stored value at start.
+  void _syncDownloads() =>
+      widget.downloads?.setWifiOnly(_settings.downloadsWifiOnly);
 
   /// Only relevant under [ThemeMode.system]: the app's own colours follow the
   /// OS automatically via [MaterialApp.themeMode], but the demo host page's
@@ -232,8 +245,12 @@ class _AudiobookAppState extends State<AudiobookApp>
 
   Widget _withAmbience(Widget app) {
     final ambience = widget.ambience;
-    return ambience == null
+    final downloads = widget.downloads;
+    final withDownloads = downloads == null
         ? app
-        : AmbienceScope(service: ambience, child: app);
+        : DownloadsScope(manager: downloads, child: app);
+    return ambience == null
+        ? withDownloads
+        : AmbienceScope(service: ambience, child: withDownloads);
   }
 }

@@ -62,3 +62,6 @@ app.*.map.json
 # every failed golden comparison (master/test/diff PNGs). They are transient
 # debug output, not source — the goldens themselves live in test/**/goldens/.
 **/test/**/failures/
+
+# Agent worktrees (Claude Code)
+.claude/worktrees/

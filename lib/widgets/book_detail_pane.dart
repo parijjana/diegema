@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
 import '../core/demo_mode.dart';
 import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/librivox_book.dart';
 import '../domain/models/audiobook.dart';
 import '../services/artwork_enrichment_service.dart';
+import '../services/download_manager.dart';
 import '../services/librivox_downloader.dart';
 import '../services/librivox_service.dart';
 import '../services/audio_playback_service.dart';
 import '../theme/app_theme.dart';
-import 'book_cover_image.dart';
-import 'book_description_view.dart';
-import 'glass_card.dart';
+import '../core/utils/duration_format.dart';
+import 'app_book_cover.dart';
+import 'book_detail_parts.dart';
+import 'download_controls.dart';
 
 class BookDetailPane extends StatefulWidget {
   final LibriVoxBook book;
@@ -55,8 +55,11 @@ class BookDetailPane extends StatefulWidget {
 class _BookDetailPaneState extends State<BookDetailPane> {
   String? _coverArtUrl;
   UnifiedAudiobook? _streamableBook;
-  bool _isDownloading = false;
-  double _downloadProgress = 0.0;
+
+  /// The chapter list couldn't be fetched (offline, timeout, feed error).
+  bool _chaptersFailed = false;
+  bool _allChapters = false;
+  static const int _collapsedChapters = 5;
   bool _isDownloaded = false;
 
   /// Null while unknown (still loading, or the lookup failed/found
@@ -71,6 +74,28 @@ class _BookDetailPaneState extends State<BookDetailPane> {
     _loadZipSize();
   }
 
+  /// The archive.org identifier: the saved book's id and the download's.
+  String get _bookId => BookIdentity.archiveIdentifierFor(
+        librivoxApiId: widget.book.id,
+        urlIarchive: widget.book.urlIarchive,
+      );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The queue notifies through [DownloadsScope]; when this book's
+    // download has just been saved, show the saved copy.
+    // Only on the change itself: a book downloaded earlier and since
+    // removed from the library still has a finished entry in the queue.
+    final phase = DownloadsScope.maybeOf(context)?.stateFor(_bookId)?.phase;
+    if (phase == DownloadPhase.done && _downloadPhase != DownloadPhase.done) {
+      _loadChapters();
+    }
+    _downloadPhase = phase;
+  }
+
+  DownloadPhase? _downloadPhase;
+
   @override
   void didUpdateWidget(covariant BookDetailPane oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -82,15 +107,45 @@ class _BookDetailPaneState extends State<BookDetailPane> {
 
   Future<void> _loadEnrichmentData() async {
     final coverFuture = widget.artworkService.resolveCoverArtUrl(widget.book);
-    final streamFuture = widget.downloader.parseStreamableBook(widget.book);
+    final chaptersFuture = _loadChapters();
+    final cover = await coverFuture;
+    if (mounted) setState(() => _coverArtUrl = cover);
+    await chaptersFuture;
+  }
 
-    final results = await Future.wait([coverFuture, streamFuture]);
-
-    if (mounted) {
+  Future<void> _loadChapters() async {
+    if (mounted) setState(() => _chaptersFailed = false);
+    // A downloaded copy plays from disk, so it needs no feed at all; show
+    // it straight away and let the feed only fill in what it adds.
+    final saved = await _savedCopy();
+    if (saved != null && mounted) {
       setState(() {
-        _coverArtUrl = results[0] as String?;
-        _streamableBook = results[1] as UnifiedAudiobook?;
+        _isDownloaded = true;
+        _streamableBook = saved;
       });
+    }
+    try {
+      final book = await widget.downloader.parseStreamableBook(widget.book);
+      if (mounted && saved == null) setState(() => _streamableBook = book);
+    } on ChaptersUnavailable catch (e) {
+      debugPrint('BookDetailPane: chapters unavailable: $e');
+      if (mounted && saved == null) setState(() => _chaptersFailed = true);
+    }
+  }
+
+  /// The downloaded row for this book, if it has one with chapters.
+  Future<UnifiedAudiobook?> _savedCopy() async {
+    try {
+      final id = BookIdentity.archiveIdentifierFor(
+        librivoxApiId: widget.book.id,
+        urlIarchive: widget.book.urlIarchive,
+      );
+      final book = await widget.db.getAudiobook(id);
+      return book != null && book.isDownloaded && book.chapters.isNotEmpty
+          ? book
+          : null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -106,366 +161,337 @@ class _BookDetailPaneState extends State<BookDetailPane> {
     if (mounted) setState(() => _zipSizeBytes = bytes);
   }
 
-  Future<void> _downloadBook() async {
-    if (_isDownloading) return;
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0.0;
-    });
-
+  /// Hands the book to the app-wide queue, which outlives this pane: closing
+  /// the sheet, or the app, does not stop the download.
+  Future<void> _downloadBook(DownloadManager downloads) async {
+    // The feed's section titles and durations, when the feed (not a saved
+    // copy) is what is showing; the queue uses them if they line up.
+    final streamable = _streamableBook;
+    final feed = streamable != null && !streamable.isDownloaded
+        ? streamable.chapters
+        : null;
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final savePath = p.join(appDir.path, 'diegema', 'downloads');
-
-      final extractedFiles = await widget.downloader.downloadAndExtractZip(
-        widget.book,
-        saveDirectoryPath: savePath,
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() => _downloadProgress = progress);
-          }
-        },
-      );
-
-      // Same canonical id as `parseStreamableBook` (both derive from the
-      // archive.org identifier) so downloading a book that was already
-      // being streamed updates the *same* row instead of creating a
-      // second one with separate progress/bookmarks.
-      final canonicalId = BookIdentity.archiveIdentifierFor(
-        librivoxApiId: widget.book.id,
-        urlIarchive: widget.book.urlIarchive,
-      );
-
-      final List<AudiobookChapter> chapters = [];
-      for (int i = 0; i < extractedFiles.length; i++) {
-        final filePath = extractedFiles[i];
-        final filename = p.basename(filePath);
-        chapters.add(
-          AudiobookChapter(
-            id: '${canonicalId}_local_$i',
-            title: filename.replaceAll('.mp3', ''),
-            audioPathOrUrl: filePath,
-            durationSeconds: 0,
-            isStream: false,
-          ),
-        );
-      }
-
-      final downloadedBook = UnifiedAudiobook(
-        id: canonicalId,
-        title: widget.book.title,
-        author: widget.book.authorNames,
-        description: widget.book.description,
-        source: 'Downloaded',
-        origin: BookIdentity.originLibrivox,
-        coverArtUrlOrPath: widget.book.coverArtUrl,
-        chapters: chapters,
-        isDownloaded: true,
-      );
-
-      await widget.db.saveAudiobook(downloadedBook);
-
-      if (mounted) {
-        setState(() {
-          _isDownloading = false;
-          _isDownloaded = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Downloaded ${extractedFiles.length} chapters to local storage & saved to Library!')),
-        );
-      }
+      await downloads.download(widget.book, feed: feed);
     } catch (e) {
+      debugPrint('BookDetailPane: download not started: $e');
       if (mounted) {
-        setState(() => _isDownloading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e')),
+          const SnackBar(
+              content: Text("Couldn't start the download. Choose a folder "
+                  'for downloads and try again.')),
         );
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final wide = widget.wide;
-    final content = _buildContent(context, theme, wide: wide);
-
-    // Wide keeps its previous shape exactly: the download button (or its
-    // demo-mode stand-in) inline in the scrolling content, no sticky
-    // footer, dismissed by tapping outside the dialog as before. Only
-    // phone gets the new sticky footer.
-    if (wide) return content;
-
-    return Column(
-      children: [
-        Expanded(child: content),
-        _DownloadFooter(
-          isDownloading: _isDownloading,
-          isDownloaded: _isDownloaded,
-          downloadProgress: _downloadProgress,
-          zipSizeBytes: _zipSizeBytes,
-          onDownload: _isDownloading ? null : _downloadBook,
-          onClose: () => Navigator.of(context).pop(),
+  /// The one primary action: Download · ZIP size, its in-flight and done
+  /// states, or a disabled stand-in in the web demo (streaming-only, see
+  /// rework_plan.md - shown disabled rather than hidden so offline
+  /// listening still reads as a feature that exists).
+  Widget _primaryAction() {
+    final c = context.colors;
+    if (kDemoMode) {
+      return Semantics(
+        enabled: false,
+        label: 'Download full audiobook. '
+            'Not available in this browser preview.',
+        excludeSemantics: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const DetailPrimaryButton(
+              icon: Icons.download_rounded,
+              label: 'Download',
+              onPressed: null,
+            ),
+            const SizedBox(height: Sp.x2),
+            Text('Offline listening is in the app, not this preview',
+                textAlign: TextAlign.center,
+                style: AppType.caption.copyWith(color: c.textMuted)),
+          ],
         ),
+      );
+    }
+    final downloads = DownloadsScope.maybeOf(context);
+    final state = downloads?.stateFor(_bookId);
+    // A finished download is the saved book's business ([_isDownloaded]).
+    if (downloads == null ||
+        state == null ||
+        state.phase == DownloadPhase.done) {
+      final size = formatZipSize(_zipSizeBytes);
+      return DetailPrimaryButton(
+        icon:
+            _isDownloaded ? Icons.check_circle_rounded : Icons.download_rounded,
+        label: _isDownloaded
+            ? 'Downloaded'
+            : (size == null ? 'Download' : 'Download · ZIP $size'),
+        onPressed: _isDownloaded || downloads == null
+            ? null
+            : () => _downloadBook(downloads),
+        keepFilledWhenDisabled: true,
+      );
+    }
+    final failed = state.phase == DownloadPhase.failed;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DetailPrimaryButton(
+          icon: downloadIcon(state.phase),
+          label: failed ? 'Retry download' : downloadLabel(downloads, state),
+          onPressed: failed ? () => downloads.retry(state.id) : null,
+          keepFilledWhenDisabled: true,
+        ),
+        if (failed && state.error != null) ...[
+          const SizedBox(height: Sp.x2),
+          Text(state.error!,
+              textAlign: TextAlign.center,
+              style: AppType.caption.copyWith(color: c.danger)),
+        ],
+        if (state.phase != DownloadPhase.queued && !failed) ...[
+          const SizedBox(height: Sp.x2),
+          DownloadProgressBar(download: state),
+        ],
+        DownloadActions(
+            manager: downloads, download: state, includeRetry: false),
       ],
     );
   }
 
-  Widget _buildContent(BuildContext context, ThemeData theme,
-      {required bool wide}) {
-    return ListView(
-      padding: EdgeInsets.only(bottom: wide ? 20 : Sp.x2),
+  List<BookMeta> _meta({required bool wide}) {
+    final book = widget.book;
+    final runtime = formatRuntime(book.totalTimeSecs);
+    final chapters = _streamableBook?.chapters.length ?? 0;
+    return [
+      if (book.narrators.isNotEmpty)
+        BookMeta(
+            icon: Icons.headphones_rounded,
+            label: 'Read by',
+            value: book.narrators.join(', ')),
+      if (runtime != null)
+        BookMeta(icon: Icons.schedule_rounded, label: 'Length', value: runtime),
+      if (chapters > 0)
+        BookMeta(
+            icon: Icons.format_list_bulleted_rounded,
+            label: 'Chapters',
+            value: '$chapters ${chapters == 1 ? 'chapter' : 'chapters'}'),
+      const BookMeta(
+          icon: Icons.public_rounded, label: 'Source', value: 'LibriVox'),
+      if (_isDownloaded)
+        const BookMeta(
+            icon: Icons.check_rounded,
+            label: 'Saved',
+            value: 'Downloaded',
+            positive: true),
+    ];
+  }
+
+  Widget _titleBlock({required bool wide}) {
+    final c = context.colors;
+    final book = widget.book;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: (kDemoMode || _coverArtUrl != null)
-                  ? BookCoverImage(
-                      bookId: widget.book.id,
-                      networkUrl: _coverArtUrl,
-                      width: 110,
-                      height: 110,
-                      fit: BoxFit.cover,
-                      fallbackBuilder: (_) => _buildCoverFallback(theme),
-                    )
-                  : _buildCoverFallback(theme),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.book.title,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Author: ${widget.book.authorNames}',
-                    style: TextStyle(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w600),
-                  ),
-                  if (widget.book.narrators.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Narrated by: ${widget.book.narrators.join(', ')}',
-                      style: TextStyle(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6),
-                          fontSize: 12),
-                    ),
-                  ],
-                  if (!widget.book.demoPlayable) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.lock_rounded,
-                              size: 12, color: Colors.white70),
-                          SizedBox(width: 5),
-                          Text(
-                            'PREVIEW ONLY — not streamable in this demo',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.3,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
+        Text(
+          book.title,
+          style: AppType.serif(wide ? AppType.titleLg : AppType.titleMd)
+              .copyWith(color: c.text, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 16),
-        // Full-book ZIP download is never available in the web demo (it is
-        // streaming-only, see rework_plan.md).
-        //
-        // Shown disabled rather than hidden: the demo's job is to represent
-        // the real app, and silently omitting the control made offline
-        // listening look like a feature that does not exist. A greyed box
-        // says "this is here, just not in a browser preview" — and it can
-        // never fail, because it is not a button at all.
-        if (kDemoMode)
-          Semantics(
-            enabled: false,
-            label: 'Download full audiobook. '
-                'Not available in this browser preview.',
-            excludeSemantics: true,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+        const SizedBox(height: Sp.x1),
+        Text(
+          book.authorNames,
+          style: (wide ? AppType.bodyLg : AppType.body)
+              .copyWith(color: c.accentText, fontWeight: FontWeight.w500),
+        ),
+        if (!book.demoPlayable) ...[
+          const SizedBox(height: Sp.x2),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: Sp.x3, vertical: 5),
+            decoration: BoxDecoration(
+              color: c.surfaceSunken,
+              borderRadius: R.sm,
+              border: Border.all(color: c.borderContrast),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_rounded, size: 14, color: c.textSecondary),
+                const SizedBox(width: Sp.x1 + 1),
+                Flexible(
+                  child: Text(
+                    'Preview only - not streamable in this demo',
+                    style: AppType.caption.copyWith(color: c.text),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _chapters({required bool wide}) {
+    final chapters = _streamableBook?.chapters ?? const <AudiobookChapter>[];
+    final total = chapters.fold<int>(0, (sum, ch) => sum + ch.durationSeconds);
+    final playable = widget.book.demoPlayable;
+    final collapsible = chapters.length > _collapsedChapters;
+    final shown = (collapsible && !_allChapters)
+        ? chapters.sublist(0, _collapsedChapters)
+        : chapters;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ChaptersHeader(count: chapters.length, totalSeconds: total),
+        const SizedBox(height: Sp.x1),
+        if (_chaptersFailed && _streamableBook == null)
+          EmptyChaptersNote(onRetry: _loadChapters)
+        else if (_streamableBook != null && chapters.isEmpty)
+          const EmptyChaptersNote(),
+        for (var i = 0; i < shown.length; i++)
+          ChapterListRow(
+            index: i,
+            title: shown[i].title,
+            durationSeconds: shown[i].durationSeconds,
+            wide: wide,
+            disabledNote: playable ? null : 'Preview only',
+            onTap: playable
+                ? () async {
+                    await widget.audioService
+                        .loadBook(_streamableBook!, initialChapterIndex: i);
+                  }
+                : null,
+          ),
+        if (collapsible)
+          TextButton(
+            onPressed: () => setState(() => _allChapters = !_allChapters),
+            child: Text(_allChapters
+                ? 'Show fewer chapters'
+                : 'Show all ${chapters.length} chapters'),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final book = widget.book;
+    final about = ParsedAbout.from(book.description);
+    final credit = about.credit;
+    final creditText = credit == null
+        ? null
+        : Text(credit, style: AppType.caption.copyWith(color: c.textMuted));
+    final cover = AppBookCover(
+      bookId: book.id,
+      title: book.title,
+      coverUrl: _coverArtUrl,
+      width: widget.wide ? 252 : 88,
+      height: widget.wide ? 252 : 88,
+    );
+
+    if (widget.wide) {
+      return ClipRRect(
+        borderRadius: R.lg,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 300,
               decoration: BoxDecoration(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
+                color: c.bg,
+                border: Border(right: BorderSide(color: c.border)),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(Sp.x6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    cover,
+                    const SizedBox(height: Sp.x5),
+                    _primaryAction(),
+                    const SizedBox(height: Sp.x5),
+                    BookMetaList(items: _meta(wide: true)),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    Icons.download_rounded,
-                    size: 20,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.38),
-                  ),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Column(
+                  Padding(
+                    padding:
+                        const EdgeInsets.fromLTRB(Sp.x8, Sp.x6, Sp.x4, Sp.x4),
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          'Download Full Audiobook (ZIP)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.38),
-                          ),
+                        Expanded(child: _titleBlock(wide: true)),
+                        const SizedBox(width: Sp.x2),
+                        IconButton(
+                          tooltip: 'Close',
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(context).pop(),
                         ),
-                        Text(
-                          'Offline listening is in the app, not this preview',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.38),
-                          ),
-                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      padding:
+                          const EdgeInsets.fromLTRB(Sp.x8, 0, Sp.x8, Sp.x6),
+                      children: [
+                        if (about.text != null) ...[
+                          ExpandableAbout(text: about.text!),
+                          const SizedBox(height: Sp.x6),
+                        ],
+                        _chapters(wide: true),
+                        if (creditText != null) ...[
+                          const SizedBox(height: Sp.x5),
+                          creditText,
+                        ],
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-        if (kDemoMode) const SizedBox(height: 20),
-        // On phone this same action lives in the sticky footer below
-        // instead (see [_DownloadFooter]) — inline here only on wide,
-        // where the pane has no footer of its own.
-        if (!kDemoMode && wide)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    _isDownloaded ? Colors.teal : theme.colorScheme.secondary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              icon: Icon(_isDownloading
-                  ? Icons.downloading
-                  : (_isDownloaded
-                      ? Icons.check_circle
-                      : Icons.download_rounded)),
-              label: Text(
-                _isDownloading
-                    ? 'Downloading (${(_downloadProgress * 100).toStringAsFixed(0)}%)...'
-                    : (_isDownloaded
-                        ? 'Downloaded to Local Storage'
-                        : 'Download Full Audiobook (ZIP)'),
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
-              onPressed: _isDownloading ? null : _downloadBook,
-            ),
-          ),
-        if (!kDemoMode && wide) const SizedBox(height: 20),
-        // No card title: the view brings its own "About" / "Contents"
-        // headings, and a "Description" title over them read twice.
-        GlassCard(
-          borderRadius: BorderRadius.circular(10),
-          child: BookDescriptionView(description: widget.book.description),
+          ],
         ),
-        const SizedBox(height: 20),
-        Text(
-          'Chapters (${_streamableBook?.chapters.length ?? 0})',
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium
-              ?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        if (_streamableBook != null && _streamableBook!.chapters.isEmpty)
-          const EmptyChaptersNote(),
-        if (_streamableBook != null)
-          ..._streamableBook!.chapters.asMap().entries.map((entry) {
-            final idx = entry.key;
-            final ch = entry.value;
-            final playable = widget.book.demoPlayable;
-            final disabledColor =
-                theme.colorScheme.onSurface.withValues(alpha: 0.35);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: GlassCard(
-                borderRadius: BorderRadius.circular(8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                child: Material(
-                  color: Colors.transparent,
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(
-                      playable ? Icons.play_circle_fill : Icons.lock_rounded,
-                      color:
-                          playable ? theme.colorScheme.primary : disabledColor,
-                      size: playable ? 26 : 20,
-                    ),
-                    title: Text(ch.title,
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: playable ? null : disabledColor)),
-                    subtitle: Text(
-                        playable
-                            ? '${(ch.durationSeconds / 60).toStringAsFixed(1)} mins'
-                            : 'Preview only — not streamable in this demo',
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: playable ? null : disabledColor)),
-                    onTap: playable
-                        ? () async {
-                            await widget.audioService.loadBook(_streamableBook!,
-                                initialChapterIndex: idx);
-                          }
-                        : null,
-                  ),
-                ),
-              ),
-            );
-          }),
-      ],
-    );
-  }
+      );
+    }
 
-  Widget _buildCoverFallback(ThemeData theme) {
-    return Container(
-      width: 110,
-      height: 110,
-      color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
-      child: Icon(Icons.book, size: 48, color: theme.colorScheme.primary),
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x5),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  cover,
+                  const SizedBox(width: Sp.x4),
+                  Expanded(child: _titleBlock(wide: false)),
+                ],
+              ),
+              const SizedBox(height: Sp.x5),
+              BookMetaRow(items: _meta(wide: false)),
+              if (about.text != null) ...[
+                const SizedBox(height: Sp.x5),
+                ExpandableAbout(text: about.text!),
+              ],
+              const SizedBox(height: Sp.x5),
+              _chapters(wide: false),
+              if (creditText != null) ...[
+                const SizedBox(height: Sp.x5),
+                creditText,
+              ],
+            ],
+          ),
+        ),
+        DetailStickyFooter(child: _primaryAction()),
+      ],
     );
   }
 }
@@ -477,8 +503,13 @@ class _BookDetailPaneState extends State<BookDetailPane> {
 /// "Chapters (0)" heading, and points at the fix (download the book,
 /// which pulls chapters from the ZIP rather than the RSS feed this pane
 /// streams from).
+///
+/// With [onRetry] it is the failure version instead: the chapter list
+/// couldn't be fetched at all (offline, timed out), with a way to try again.
 class EmptyChaptersNote extends StatelessWidget {
-  const EmptyChaptersNote({super.key});
+  final VoidCallback? onRetry;
+
+  const EmptyChaptersNote({super.key, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -498,12 +529,17 @@ class EmptyChaptersNote extends StatelessWidget {
           const SizedBox(width: Sp.x3),
           Expanded(
             child: Text(
-              "The chapter list isn't available yet. Download the book to "
-              'get every chapter.',
+              onRetry != null
+                  ? "Couldn't load the chapters. Check your connection and "
+                      'try again.'
+                  : "The chapter list isn't available yet. Download the book "
+                      'to get every chapter.',
               style:
                   AppType.body.copyWith(color: c.textSecondary, height: 1.45),
             ),
           ),
+          if (onRetry != null)
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );
@@ -519,133 +555,4 @@ String? formatZipSize(int? bytes) {
   final mb = bytes / (1024 * 1024);
   if (mb >= 1024) return '${(mb / 1024).toStringAsFixed(1)} GB';
   return '${mb.round()} MB';
-}
-
-/// Phone-only sticky footer replacing the old top-centre close X (already
-/// gone in favour of the sheet's drag handle — see the callers in
-/// `discover_screen.dart`) with a 56px square Close plus the primary
-/// download action, its size line reading from [LibriVoxService.zipSizeBytes]
-/// by way of [formatZipSize].
-class _DownloadFooter extends StatelessWidget {
-  final bool isDownloading;
-  final bool isDownloaded;
-  final double downloadProgress;
-  final int? zipSizeBytes;
-  final VoidCallback? onDownload;
-  final VoidCallback onClose;
-
-  const _DownloadFooter({
-    required this.isDownloading,
-    required this.isDownloaded,
-    required this.downloadProgress,
-    required this.zipSizeBytes,
-    required this.onDownload,
-    required this.onClose,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final sizeLabel = formatZipSize(zipSizeBytes);
-
-    final String title;
-    String? subtitle;
-    if (isDownloading) {
-      title = 'Downloading…';
-      subtitle = '${(downloadProgress * 100).round()}%';
-    } else if (isDownloaded) {
-      title = 'Downloaded to Local Storage';
-    } else {
-      title = 'Download audiobook';
-      subtitle = sizeLabel == null ? null : 'ZIP · $sizeLabel';
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: c.border)),
-      ),
-      padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x3, Sp.x4, Sp.x5),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Semantics(
-                button: true,
-                label: 'Close',
-                excludeSemantics: true,
-                child: SizedBox(
-                  width: Dim.tapComfy,
-                  height: Dim.tapComfy,
-                  child: OutlinedButton(
-                    onPressed: onClose,
-                    style: OutlinedButton.styleFrom(
-                      shape: const RoundedRectangleBorder(borderRadius: R.md),
-                      side: BorderSide(color: c.border),
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: Icon(Icons.close_rounded,
-                        color: c.text, size: Dim.iconMd),
-                  ),
-                ),
-              ),
-              const SizedBox(width: Sp.x3),
-              Expanded(
-                child: SizedBox(
-                  height: Dim.tapComfy,
-                  child: Semantics(
-                    button: true,
-                    label: subtitle == null ? title : '$title, $subtitle',
-                    excludeSemantics: true,
-                    child: FilledButton.icon(
-                      onPressed: onDownload,
-                      style: FilledButton.styleFrom(
-                        shape: const RoundedRectangleBorder(borderRadius: R.md),
-                        disabledBackgroundColor: c.accentFill,
-                        disabledForegroundColor: c.textOnAccent,
-                      ),
-                      icon: Icon(isDownloaded
-                          ? Icons.check_circle_rounded
-                          : (isDownloading
-                              ? Icons.downloading_rounded
-                              : Icons.download_rounded)),
-                      label: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(title,
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
-                          if (subtitle != null)
-                            Text(
-                              subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppType.caption.copyWith(
-                                  color:
-                                      c.textOnAccent.withValues(alpha: 0.85)),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (isDownloading) ...[
-            const SizedBox(height: Sp.x2),
-            ClipRRect(
-              borderRadius: R.pill,
-              child: LinearProgressIndicator(
-                value: downloadProgress,
-                minHeight: 3,
-                backgroundColor: c.accent.withValues(alpha: 0.2),
-                valueColor: AlwaysStoppedAnimation(c.accent),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 }

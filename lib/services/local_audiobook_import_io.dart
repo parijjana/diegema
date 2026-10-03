@@ -2,13 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
-import 'package:permission_handler/permission_handler.dart' show openAppSettings;
+import 'package:permission_handler/permission_handler.dart'
+    show openAppSettings;
 import '../core/utils/book_identity.dart';
 import '../core/utils/mp4_chapters.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import 'cover_lookup_service.dart';
 import 'library_locations_scanner_io.dart';
+import 'folder_access.dart';
 import 'library_locations_store.dart';
 import 'local_audiobook_storage_io.dart';
 import 'local_book_metadata_io.dart';
@@ -94,13 +96,27 @@ Future<void> importFolder(
       return;
     }
 
-    final selectedDirectory = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Select a folder of audiobooks',
-    );
+    final access = FolderAccess();
+    final String? selectedDirectory;
+    final String? bookmark;
+    if (access.picksNatively) {
+      final picked = await access.pickFolder();
+      selectedDirectory = picked?.path;
+      bookmark = picked?.bookmark;
+    } else {
+      selectedDirectory = await FilePicker.getDirectoryPath(
+        dialogTitle: 'Select a folder of audiobooks',
+      );
+      // Made now, while the picker's access is live, so the folder still
+      // opens after a relaunch (macOS; null where none is needed).
+      bookmark = selectedDirectory == null
+          ? null
+          : await access.bookmark(selectedDirectory);
+    }
     if (selectedDirectory == null) return;
 
     const store = LibraryLocationsStore();
-    final isNew = await store.add(selectedDirectory);
+    final isNew = await store.add(selectedDirectory, bookmark: bookmark);
     final added =
         await scanLibraryLocations(db, store: store, only: selectedDirectory);
     final name = p.basename(selectedDirectory);

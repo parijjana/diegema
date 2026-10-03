@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:path/path.dart' as p;
 import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
+import 'downloads_location_io.dart';
 import 'library_locations_store.dart';
+import 'removed_books_store.dart';
 import 'local_audiobook_import_io.dart' show chaptersForFiles;
 import 'local_book_metadata_io.dart';
 
@@ -30,22 +33,74 @@ const int _maxDepth = 4;
 ///
 /// A book is either a folder holding audio files (all of them, in name
 /// order, one book), or — when a folder holds nothing but two or more
-/// `.m4b` files — one book per `.m4b`. Unreadable folders are skipped.
+/// `.m4b` files — one book per `.m4b`. Unreadable folders are skipped, and
+/// so are Diegema's own downloads roots: a location such as the shared
+/// Audiobooks folder contains `Audiobooks/Diegema/`, whose books the
+/// downloads scan already owns.
 Future<int> scanLibraryLocations(
   AppDatabase db, {
   LibraryLocationsStore store = const LibraryLocationsStore(),
   String? only,
+  RemovedBooksStore removedStore = const RemovedBooksStore(),
+  DownloadsLocation downloads = const DownloadsLocation(),
 }) async {
+  final removed = await removedStore.read();
   final locations = only != null ? [only] : await store.read();
+  final skip = await downloads.all();
+  await _forgetDownloadsReadAsFolders(db, skip);
   var added = 0;
   for (final location in locations) {
-    for (final candidate in await _findBooks(Directory(location))) {
-      if (await db.getAudiobook(candidate.id) != null) continue;
-      await db.saveAudiobook(await _buildBook(candidate));
-      added++;
+    // Unreachable (unplugged drive, access not granted this run): leave its
+    // books alone, they come back with the folder.
+    if (!await Directory(location).exists()) continue;
+    await _forgetVanishedBooks(db, location);
+    for (final candidate in await _findBooks(Directory(location), skip)) {
+      if (removed.contains(candidate.id)) continue;
+      try {
+        if (await db.getAudiobook(candidate.id) != null) continue;
+        await db.saveAudiobook(await _buildBook(candidate));
+        added++;
+      } catch (e) {
+        // One unreadable book must not cost the rest of the scan.
+        debugPrint('Library folder: skipped ${candidate.keyPath}: $e');
+      }
     }
   }
   return added;
+}
+
+/// Forgets books from [location] with a file that no longer exists (moved,
+/// renamed or deleted outside Diegema), keeping their progress the way
+/// removing a folder does. If the folder still holds the book, the scan
+/// that follows adds it back as it is now, under the same id.
+Future<void> _forgetVanishedBooks(AppDatabase db, String location) async {
+  for (final id in await booksInLocation(db, location)) {
+    final book = await db.getAudiobook(id);
+    if (book == null) continue;
+    final files = {for (final ch in book.chapters) ch.audioPathOrUrl};
+    for (final file in files) {
+      if (!await File(file).exists()) {
+        await db.deleteAudiobook(id);
+        break;
+      }
+    }
+  }
+}
+
+/// Drops library-folder rows an earlier scan made from inside a downloads
+/// root (duplicates of the downloaded books). Progress rows stay.
+Future<void> _forgetDownloadsReadAsFolders(
+    AppDatabase db, List<String> roots) async {
+  if (roots.isEmpty) return;
+  for (final book in await db.getAllAudiobooks()) {
+    if (book.source != kLibraryLocationSource || book.chapters.isEmpty) {
+      continue;
+    }
+    final path = book.chapters.first.audioPathOrUrl;
+    if (roots.any((r) => p.isWithin(r, path))) {
+      await db.deleteAudiobook(book.id);
+    }
+  }
 }
 
 /// Ids of the books that were read from [location], for forgetting them
@@ -69,10 +124,12 @@ class _Candidate {
   const _Candidate(this.id, this.keyPath, this.folder, this.files);
 }
 
-Future<List<_Candidate>> _findBooks(Directory root) async {
+Future<List<_Candidate>> _findBooks(Directory root, List<String> skip) async {
   final found = <_Candidate>[];
 
   Future<void> visit(Directory dir, int depth) async {
+    final here = p.normalize(dir.path);
+    if (skip.any((s) => p.equals(s, here) || p.isWithin(s, here))) return;
     final List<FileSystemEntity> entries;
     try {
       entries = await dir.list(followLinks: false).toList();
@@ -178,8 +235,7 @@ Future<UnifiedAudiobook> _buildBook(_Candidate c) async {
     id: c.id,
     title: _nonEmpty(metadata?.title) ?? fallbackTitle.replaceAll('_', ' '),
     author: _nonEmpty(metadata?.author) ?? 'Local Audiobook',
-    description:
-        _nonEmpty(metadata?.description) ?? 'Read from ${c.keyPath}',
+    description: _nonEmpty(metadata?.description) ?? 'Read from ${c.keyPath}',
     coverArtUrlOrPath: coverPath,
     source: kLibraryLocationSource,
     origin: BookIdentity.originLocal,

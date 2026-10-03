@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import '../database/app_database.dart';
+import '../services/folder_access.dart';
 import '../services/library_locations_scanner.dart';
 import '../services/library_locations_store.dart';
 import '../theme/app_theme.dart';
@@ -63,6 +64,7 @@ class _LibraryFoldersSectionState extends State<LibraryFoldersSection> {
       await widget.db.deleteAudiobook(id);
     }
     await widget.store.remove(location);
+    await FolderAccess().close(location);
     await _load();
   }
 
@@ -101,8 +103,8 @@ class _LibraryFoldersSectionState extends State<LibraryFoldersSection> {
                       Text(p.basename(location),
                           style: AppType.label.copyWith(color: c.text)),
                       Text(location,
-                          style: AppType.caption
-                              .copyWith(color: c.textSecondary)),
+                          style:
+                              AppType.caption.copyWith(color: c.textSecondary)),
                     ],
                   ),
                 ),

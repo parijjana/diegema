@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Which way a [SkipIntervalIcon] skips.
@@ -50,7 +52,7 @@ class SkipIntervalIcon extends StatelessWidget {
     // dropped in (48px circular buttons on Now Playing, 20px inline icons
     // on the persistent bar).
     final baseLabelStyle =
-        Theme.of(context).textTheme.labelSmall ?? const TextStyle(fontSize: 10);
+        Theme.of(context).textTheme.labelSmall ?? const TextStyle(fontSize: 13);
 
     return Semantics(
       label: label,
@@ -74,7 +76,9 @@ class SkipIntervalIcon extends StatelessWidget {
                 // this design system's own 13px type floor, and verified
                 // illegible in a rendered screenshot. The ring's inner hole
                 // is what caps this; going much past 0.42 collides with it.
-                fontSize: size * 0.42,
+                // 13 is the floor: callers should pass a [size] of at least
+                // ~31 so the number still clears the ring at that size.
+                fontSize: math.max(13.0, size * 0.42),
                 fontWeight: FontWeight.w800,
                 color: color,
                 height: 1.0,

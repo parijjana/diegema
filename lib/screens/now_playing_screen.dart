@@ -9,7 +9,10 @@ import '../core/ui_preferences.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
+import '../services/download_manager.dart';
+import '../services/redownload.dart';
 import '../theme/app_theme.dart';
+import '../widgets/download_controls.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/player_scrubber.dart';
@@ -979,37 +982,39 @@ class _ActiveView extends StatelessWidget {
                       final showError = state == PlaybackState.error;
                       final showHeaderAction = !wide && headerAction != null;
                       final ambience = AmbienceScope.maybeOf(context);
-                      if (!showError && !showHeaderAction && ambience == null) {
-                        return const SizedBox.shrink();
-                      }
-                      return Padding(
-                        padding:
-                            const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (showError) ...[
-                              Icon(Icons.error_outline_rounded,
-                                  color: c.danger),
-                              const SizedBox(width: Sp.x2),
-                              Text('Playback failed',
-                                  style:
-                                      AppType.label.copyWith(color: c.danger)),
-                            ],
-                            if (showError &&
-                                (showHeaderAction || ambience != null))
-                              const SizedBox(width: Sp.x3),
-                            // The quick ambience switch: small and up here,
-                            // out of the thumb zone and away from the book's
-                            // own controls. The full mixer is its own screen.
-                            if (ambience != null)
-                              _AmbienceToggle(
-                                  service: ambience, onOpen: onOpenAmbience),
-                            if (ambience != null && showHeaderAction)
-                              const SizedBox(width: Sp.x2),
-                            if (showHeaderAction) headerAction!,
-                          ],
-                        ),
+                      final header = !showHeaderAction && ambience == null
+                          ? null
+                          : Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                  Sp.x4, Sp.x2, Sp.x4, 0),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  // The quick ambience switch: small and up here,
+                                  // out of the thumb zone and away from the book's
+                                  // own controls. The full mixer is its own screen.
+                                  if (ambience != null)
+                                    _AmbienceToggle(
+                                        service: ambience,
+                                        onOpen: onOpenAmbience),
+                                  if (ambience != null && showHeaderAction)
+                                    const SizedBox(width: Sp.x2),
+                                  if (showHeaderAction) headerAction!,
+                                ],
+                              ),
+                            );
+                      if (!showError) return header ?? const SizedBox.shrink();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (header != null) header,
+                          _PlaybackErrorNote(
+                              // Re-checks the files for each chapter.
+                              key: ValueKey(
+                                  '${audioService.currentBookNotifier.value?.id}'
+                                  '/${audioService.chapterIndexNotifier.value}'),
+                              service: audioService),
+                        ],
                       );
                     },
                   ),
@@ -1275,7 +1280,7 @@ class _AmbienceToggle extends StatelessWidget {
             onTap: hasMix ? () => service.setOn(!s.on) : onOpen,
             onLongPress: onOpen,
             customBorder: const StadiumBorder(),
-            // A 44px tap target around a 32px pill.
+            // A 48px tap target around a 32px pill.
             child: SizedBox(
               height: Dim.tapMin,
               child: Center(
@@ -1464,6 +1469,134 @@ class _BarFace extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: AppType.caption
                   .copyWith(color: c.text, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+/// The chapter couldn't load or stopped with an error: says so, and offers
+/// to try it again from the same place or move on. When the cause is a
+/// downloaded file that can no longer be read, it says that instead and
+/// offers to download the book again (never to stream it: owner, to spare
+/// archive.org).
+class _PlaybackErrorNote extends StatefulWidget {
+  final AudioPlaybackService service;
+  const _PlaybackErrorNote({super.key, required this.service});
+
+  @override
+  State<_PlaybackErrorNote> createState() => _PlaybackErrorNoteState();
+}
+
+class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
+  bool _filesUnreadable = false;
+  String? _failed;
+
+  /// The re-download's phase last time the queue notified, to catch the
+  /// moment it is saved.
+  DownloadPhase? _phase;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFiles();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final book = widget.service.currentBookNotifier.value;
+    if (book == null) return;
+    final phase = DownloadsScope.maybeOf(context)?.stateFor(book.id)?.phase;
+    if (phase == DownloadPhase.done && _phase != DownloadPhase.done) {
+      _reload(book.id);
+    }
+    _phase = phase;
+  }
+
+  Future<void> _checkFiles() async {
+    final book = widget.service.currentBookNotifier.value;
+    if (book == null || !canRedownload(book)) return;
+    final ok = await downloadedChapterReadable(
+        book, widget.service.chapterIndexNotifier.value);
+    if (mounted && !ok) setState(() => _filesUnreadable = true);
+  }
+
+  /// Through the app-wide queue, so it carries on if the app is
+  /// backgrounded, and shows in Settings > Downloads.
+  Future<void> _redownload(DownloadManager downloads) async {
+    final book = widget.service.currentBookNotifier.value;
+    if (book == null) return;
+    setState(() => _failed = null);
+    try {
+      await downloads.redownload(book);
+    } catch (e) {
+      debugPrint('Re-download failed to start: $e');
+      if (mounted) {
+        setState(() => _failed =
+            "Couldn't download it. Check your connection and try again.");
+      }
+    }
+  }
+
+  /// Picks the saved copy up where the listener left off.
+  Future<void> _reload(String id) async {
+    final service = widget.service;
+    final db = service.database;
+    if (db == null) return;
+    final chapter = service.chapterIndexNotifier.value;
+    final position = service.positionNotifier.value;
+    final fresh = await db.getAudiobook(id);
+    if (fresh == null || service.currentBookNotifier.value?.id != id) return;
+    await service.loadBook(fresh,
+        initialChapterIndex: chapter, initialPosition: position);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final service = widget.service;
+    final book = service.currentBookNotifier.value;
+    final hasNext = book != null &&
+        service.chapterIndexNotifier.value < book.chapters.length - 1;
+    final downloads = DownloadsScope.maybeOf(context);
+    final download = book == null ? null : downloads?.stateFor(book.id);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: Sp.x2,
+        children: [
+          Icon(Icons.error_outline_rounded, color: c.danger),
+          Text(
+              _failed ??
+                  (download?.phase == DownloadPhase.failed
+                      ? download!.error
+                      : null) ??
+                  (_filesUnreadable
+                      ? "This book's downloaded files can't be read"
+                      : "Couldn't play this chapter"),
+              style: AppType.label.copyWith(color: c.danger)),
+          if (_filesUnreadable && download != null && download.isActive)
+            Text(downloadLabel(downloads!, download),
+                style: AppType.label.copyWith(color: c.text))
+          else if (_filesUnreadable && downloads != null)
+            TextButton(
+              onPressed: () => _redownload(downloads),
+              child: const Text('Re-download'),
+            )
+          else ...[
+            TextButton(
+              onPressed: service.retryCurrentChapter,
+              child: const Text('Retry'),
+            ),
+            if (hasNext)
+              TextButton(
+                onPressed: service.nextChapter,
+                child: const Text('Next chapter'),
+              ),
+          ],
         ],
       ),
     );

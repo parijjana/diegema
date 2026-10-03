@@ -159,13 +159,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
         builder: (context) => Dialog(
           shape: const RoundedRectangleBorder(borderRadius: R.lg),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640, maxHeight: 760),
-            child: Padding(
-              padding: const EdgeInsets.all(Sp.x5),
-              child: LibraryBookDetailOverlay(
-                book: book,
-                audioService: widget.audioService,
-              ),
+            constraints: const BoxConstraints(
+                maxWidth: Dim.detailDialogMaxWidth, maxHeight: 680),
+            child: LibraryBookDetailOverlay(
+              book: book,
+              audioService: widget.audioService,
+              db: widget.db,
+              onRemoved: _load,
+              onProgressChanged: _load,
+              wide: true,
             ),
           ),
         ),
@@ -177,12 +179,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
         showDragHandle: true,
         builder: (context) => FractionallySizedBox(
           heightFactor: 0.92,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x4),
-            child: LibraryBookDetailOverlay(
-              book: book,
-              audioService: widget.audioService,
-            ),
+          // The overlay pads itself: its sticky footer runs edge to edge.
+          child: LibraryBookDetailOverlay(
+            book: book,
+            audioService: widget.audioService,
+            db: widget.db,
+            onRemoved: _load,
+            onProgressChanged: _load,
           ),
         ),
       );

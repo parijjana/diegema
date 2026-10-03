@@ -16,7 +16,7 @@ import 'skip_interval_icon.dart';
 /// Differences from the original controls implementation it replaced
 /// (`now_playing_controls.dart`, since deleted):
 /// - **No outer `FittedBox(scaleDown)`.** When the cluster does not fit it
-///   [Wrap]s onto a second line; it never shrinks controls below the 44px
+///   [Wrap]s onto a second line; it never shrinks controls below the 48px
 ///   minimum target.
 /// - **No coloured bloom** behind the play button (the 24px teal glow was
 ///   neon-pass residue). Elevation comes from `shadow-2`.
@@ -72,9 +72,9 @@ class PlayerTransport extends StatelessWidget {
         child: SkipIntervalIcon(
           direction: SkipDirection.backward,
           seconds: skipSeconds,
-          // iconLg, not iconMd: these two carry a number inside them, so
-          // they need more room than a plain glyph.
-          size: Dim.iconLg,
+          // iconXl, not iconMd: these two carry a number inside them, and
+          // it must stay at the 13px floor without touching the ring.
+          size: Dim.iconXl,
           color: c.text,
         ),
       ),
@@ -86,7 +86,7 @@ class PlayerTransport extends StatelessWidget {
         child: SkipIntervalIcon(
           direction: SkipDirection.forward,
           seconds: skipSeconds,
-          size: Dim.iconLg,
+          size: Dim.iconXl,
           color: c.text,
         ),
       ),
@@ -109,7 +109,7 @@ class PlayerTransport extends StatelessWidget {
     switch (style) {
       case PlayerControlsStyle.round:
         // The original cluster. When it does not fit it wraps onto a
-        // second line; it never shrinks controls below the 44px minimum.
+        // second line; it never shrinks controls below the 48px minimum.
         return Wrap(
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -434,6 +434,9 @@ class SpeedSelector extends StatelessWidget {
   }
 }
 
+/// Menu value for the end-of-chapter sleep option (minutes are positive).
+const int kSleepEndOfChapter = -1;
+
 /// Sleep-timer selector. Active state is signalled by the label text as
 /// well as the fill, never by colour alone.
 class SleepTimerSelector extends StatelessWidget {
@@ -451,16 +454,27 @@ class SleepTimerSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return ValueListenableBuilder<Duration?>(
-      valueListenable: audioService.sleepTimerNotifier,
-      builder: (context, remaining, _) {
-        final active = remaining != null;
-        final text = active ? formatTimecode(remaining) : 'Sleep timer';
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        audioService.sleepTimerNotifier,
+        audioService.sleepAtChapterEndNotifier,
+      ]),
+      builder: (context, _) {
+        final remaining = audioService.sleepTimerNotifier.value;
+        final atChapterEnd = audioService.sleepAtChapterEndNotifier.value;
+        final active = remaining != null || atChapterEnd;
+        final text = atChapterEnd
+            ? 'End of chapter'
+            : remaining != null
+                ? formatTimecode(remaining)
+                : 'Sleep timer';
         return PopupMenuButton<int>(
           tooltip: 'Sleep timer',
           onSelected: (minutes) {
             if (minutes == 0) {
               audioService.cancelSleepTimer();
+            } else if (minutes == kSleepEndOfChapter) {
+              audioService.setSleepTimerEndOfChapter();
             } else {
               audioService.setSleepTimer(Duration(minutes: minutes));
             }
@@ -471,10 +485,16 @@ class SleepTimerSelector extends StatelessWidget {
             PopupMenuItem<int>(value: 30, child: Text('30 minutes')),
             PopupMenuItem<int>(value: 45, child: Text('45 minutes')),
             PopupMenuItem<int>(value: 60, child: Text('60 minutes')),
+            PopupMenuItem<int>(
+                value: kSleepEndOfChapter, child: Text('End of chapter')),
           ],
           child: Semantics(
             button: true,
-            label: active ? 'Sleep timer, $text remaining' : 'Sleep timer, off',
+            label: !active
+                ? 'Sleep timer, off'
+                : atChapterEnd
+                    ? 'Sleep timer, at end of chapter'
+                    : 'Sleep timer, $text remaining',
             excludeSemantics: true,
             child: face != null
                 ? face!(
@@ -483,7 +503,8 @@ class SleepTimerSelector extends StatelessWidget {
                       icon: Icons.bedtime_rounded,
                       caption: 'Sleep',
                       value: active ? text : 'Off',
-                      short: active ? text : 'Sleep',
+                      short:
+                          atChapterEnd ? 'Chapter' : (active ? text : 'Sleep'),
                       active: active,
                     ),
                   )

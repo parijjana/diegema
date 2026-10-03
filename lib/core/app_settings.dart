@@ -30,11 +30,13 @@ class AppSettings extends ChangeNotifier {
 
   ThemeMode _themeMode;
   int _skipSeconds;
+  double _defaultSpeed = 1.0;
   PlayerControlsStyle _controlsStyle = PlayerControlsStyle.tiles;
   PlayerControlsStyle _transportStyle = PlayerControlsStyle.round;
   AccentPalette _accent = AccentPalette.fallback;
   BackgroundPair _background = BackgroundPair.fallback;
   ShadowStyle _shadows = ShadowStyle.off;
+  bool _downloadsWifiOnly = false;
 
   AppSettings({
     required UiPreferences preferences,
@@ -49,6 +51,10 @@ class AppSettings extends ChangeNotifier {
   /// How far the rewind/fast-forward controls jump. Always one of
   /// [kSkipSecondsOptions].
   int get skipSeconds => _skipSeconds;
+
+  /// The speed books open at unless they have their own. Always one of
+  /// [kPlaybackSpeedOptions].
+  double get defaultSpeed => _defaultSpeed;
 
   /// Shape of the phone Now Playing Up next / Speed / Sleep row.
   PlayerControlsStyle get controlsStyle => _controlsStyle;
@@ -65,10 +71,14 @@ class AppSettings extends ChangeNotifier {
   /// Drop shadows under cards, tiles and buttons (Settings > Colours).
   ShadowStyle get shadows => _shadows;
 
+  /// Whether downloads wait for Wi-Fi (Settings > Downloads).
+  bool get downloadsWifiOnly => _downloadsWifiOnly;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
     final storedSkip = await _preferences.getSkipSeconds();
+    final storedSpeed = await _preferences.getDefaultSpeed();
     final storedStyle = await _preferences.getPlayerControlsStyle();
     final storedTransport = await _preferences.getTransportStyle();
     final storedAccent = AccentPalette.byId(await _preferences.getAccentId());
@@ -76,23 +86,28 @@ class AppSettings extends ChangeNotifier {
         BackgroundPair.byId(await _preferences.getBackgroundId());
     final storedShadows =
         ShadowStyle.fromName(await _preferences.getShadowsName());
+    final storedWifiOnly = await _preferences.getDownloadsWifiOnly();
 
     if (storedTheme == _themeMode &&
         storedSkip == _skipSeconds &&
+        storedSpeed == _defaultSpeed &&
         storedStyle == _controlsStyle &&
         storedTransport == _transportStyle &&
         storedAccent == _accent &&
         storedBackground == _background &&
-        storedShadows == _shadows) {
+        storedShadows == _shadows &&
+        storedWifiOnly == _downloadsWifiOnly) {
       return;
     }
     _themeMode = storedTheme;
     _skipSeconds = storedSkip;
+    _defaultSpeed = storedSpeed;
     _controlsStyle = storedStyle;
     _transportStyle = storedTransport;
     _accent = storedAccent;
     _background = storedBackground;
     _shadows = storedShadows;
+    _downloadsWifiOnly = storedWifiOnly;
     notifyListeners();
   }
 
@@ -110,6 +125,15 @@ class AppSettings extends ChangeNotifier {
     _skipSeconds = seconds;
     notifyListeners();
     await _preferences.setSkipSeconds(seconds);
+  }
+
+  Future<void> setDefaultSpeed(double speed) async {
+    if (speed == _defaultSpeed || !kPlaybackSpeedOptions.contains(speed)) {
+      return;
+    }
+    _defaultSpeed = speed;
+    notifyListeners();
+    await _preferences.setDefaultSpeed(speed);
   }
 
   Future<void> setControlsStyle(PlayerControlsStyle style) async {
@@ -145,6 +169,13 @@ class AppSettings extends ChangeNotifier {
     _shadows = shadows;
     notifyListeners();
     await _preferences.setShadowsName(shadows.name);
+  }
+
+  Future<void> setDownloadsWifiOnly(bool value) async {
+    if (value == _downloadsWifiOnly) return;
+    _downloadsWifiOnly = value;
+    notifyListeners();
+    await _preferences.setDownloadsWifiOnly(value);
   }
 }
 

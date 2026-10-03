@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import '../core/playback_constants.dart';
+import '../core/ui_preferences.dart';
 import '../domain/models/audiobook.dart';
 import '../database/app_database.dart';
 import 'local_file_playback.dart';
@@ -19,6 +20,10 @@ enum PlaybackState {
 class AudioPlaybackService {
   final AudioPlayer _player;
   final AppDatabase? _db;
+
+  /// The library database, for screens that change a book in place.
+  AppDatabase? get database => _db;
+  final UiPreferences? _preferences;
   bool _isInitialized = false;
 
   UnifiedAudiobook? _currentBook;
@@ -30,6 +35,18 @@ class AudioPlaybackService {
   Timer? _sleepTimerTicker;
   Timer? _progressSaveTimer;
 
+  /// True from the moment a chapter starts loading until the seek to its
+  /// restore position has landed. The player reports "ready, not playing"
+  /// (our paused state) part-way through that, while its position is still
+  /// 0 — or still the previous book's — so progress must not be saved then,
+  /// or a cold start overwrites the saved place with 0.
+  bool _loading = false;
+
+  /// The book whose saved progress was just marked finished or reset. While
+  /// it is the loaded (but not playing) book, pause/seek must not write its
+  /// position back; cleared when it plays again or another book loads.
+  String? _progressFrozenBookId;
+
   final ValueNotifier<PlaybackState> stateNotifier =
       ValueNotifier(PlaybackState.idle);
   final ValueNotifier<UnifiedAudiobook?> currentBookNotifier =
@@ -40,13 +57,21 @@ class AudioPlaybackService {
   final ValueNotifier<double> speedNotifier = ValueNotifier(1.0);
   final ValueNotifier<Duration?> sleepTimerNotifier = ValueNotifier(null);
 
+  /// True while the "end of chapter" sleep timer is armed. Separate from
+  /// [sleepTimerNotifier] because there is no countdown to show.
+  final ValueNotifier<bool> sleepAtChapterEndNotifier = ValueNotifier(false);
+
   /// Bumped each time the sleep timer runs out (not when it is cancelled),
   /// so the ambience channel can stop with the book.
   final ValueNotifier<int> sleepTimerFired = ValueNotifier(0);
 
-  AudioPlaybackService({AudioPlayer? player, AppDatabase? db})
+  /// [preferences] remembers each book's speed and supplies the global
+  /// default; without it speed is not persisted (tests, demo).
+  AudioPlaybackService(
+      {AudioPlayer? player, AppDatabase? db, UiPreferences? preferences})
       : _player = player ?? AudioPlayer(),
-        _db = db {
+        _db = db,
+        _preferences = preferences {
     _listenToPlayerStreams();
     _startProgressAutoSave();
   }
@@ -74,6 +99,7 @@ class AudioPlaybackService {
         stateNotifier.value = PlaybackState.completed;
         _onChapterCompleted();
       } else if (playing) {
+        _progressFrozenBookId = null;
         stateNotifier.value = PlaybackState.playing;
       } else if (!playing && processingState == ProcessingState.ready) {
         stateNotifier.value = PlaybackState.paused;
@@ -81,6 +107,14 @@ class AudioPlaybackService {
       } else if (processingState == ProcessingState.idle) {
         stateNotifier.value = PlaybackState.idle;
       }
+    });
+
+    // Errors after a chapter has loaded (a stream dropping, a file deleted
+    // mid-play) arrive only here, never through playerStateStream.
+    _player.playbackEventStream.listen((_) {}, onError: (Object e, _) {
+      if (_loading) return; // the load's own catch reports it
+      debugPrint('AudioPlaybackService: playback error: $e');
+      stateNotifier.value = PlaybackState.error;
     });
 
     _player.positionStream.listen((pos) {
@@ -101,12 +135,17 @@ class AudioPlaybackService {
   }
 
   Future<void> _persistCurrentProgress() async {
-    if (_db != null && _currentBook != null) {
+    if (_loading) return;
+    if (_db != null &&
+        _currentBook != null &&
+        _currentBook!.id != _progressFrozenBookId) {
       try {
         await _db!.saveProgress(
           audiobookId: _currentBook!.id,
           chapterIndex: _currentChapterIndex,
-          positionSeconds: positionNotifier.value.inSeconds,
+          // The player's own position, not positionNotifier: the notifier
+          // only catches up on the next position tick.
+          positionSeconds: _player.position.inSeconds,
         );
       } catch (e) {
         debugPrint('AudioPlaybackService: Error saving progress: $e');
@@ -129,6 +168,7 @@ class AudioPlaybackService {
     bool autoPlay = true,
   }) async {
     await init();
+    _progressFrozenBookId = null;
     _currentBook = book;
     currentBookNotifier.value = book;
 
@@ -140,6 +180,16 @@ class AudioPlaybackService {
       }
     }
 
+    // A book's own speed wins; otherwise the global default.
+    final prefs = _preferences;
+    if (prefs != null) {
+      try {
+        _playbackSpeed =
+            await prefs.getBookSpeed(book.id) ?? await prefs.getDefaultSpeed();
+        speedNotifier.value = _playbackSpeed;
+      } catch (_) {}
+    }
+
     // Attempt to restore progress from database if not explicitly supplied
     int targetChapter = initialChapterIndex ?? 0;
     Duration targetPosition = initialPosition ?? Duration.zero;
@@ -147,7 +197,10 @@ class AudioPlaybackService {
     if (initialChapterIndex == null && _db != null) {
       try {
         final savedProgress = await _db!.getProgress(book.id);
-        if (savedProgress != null) {
+        // A finished book starts over from the top.
+        if (savedProgress != null &&
+            savedProgress.positionSeconds !=
+                AppDatabase.finishedPositionSeconds) {
           targetChapter = savedProgress.chapterIndex;
           targetPosition = Duration(seconds: savedProgress.positionSeconds);
         }
@@ -173,6 +226,7 @@ class AudioPlaybackService {
 
     final chapter = _currentBook!.chapters[_currentChapterIndex];
     stateNotifier.value = PlaybackState.loading;
+    _loading = true;
 
     try {
       if (chapter.isStream ||
@@ -191,6 +245,7 @@ class AudioPlaybackService {
               : null,
         );
         if (!loaded) {
+          _loading = false;
           stateNotifier.value = PlaybackState.error;
           return;
         }
@@ -201,6 +256,9 @@ class AudioPlaybackService {
       if (seekToPosition != null && seekToPosition > Duration.zero) {
         await _player.seek(seekToPosition);
       }
+      // Cleared here, not in a `finally`: `play()` below only completes
+      // when playback stops.
+      _loading = false;
 
       if (autoPlay) {
         // Only the *start* is allowed to fail benignly. Everything above
@@ -224,12 +282,17 @@ class AudioPlaybackService {
         stateNotifier.value = PlaybackState.paused;
       }
     } catch (e) {
+      _loading = false;
       debugPrint('AudioPlaybackService: Failed to play chapter: $e');
       stateNotifier.value = PlaybackState.error;
     }
   }
 
   void _onChapterCompleted() {
+    if (sleepAtChapterEndNotifier.value) {
+      _finishChapterEndSleep();
+      return;
+    }
     if (_currentBook != null &&
         _currentChapterIndex < _currentBook!.chapters.length - 1) {
       nextChapter();
@@ -237,6 +300,29 @@ class AudioPlaybackService {
       stateNotifier.value = PlaybackState.completed;
     }
   }
+
+  /// The end-of-chapter sleep timer fired. Cueing the next chapter paused
+  /// (rather than leaving the finished one selected) means the next Play
+  /// continues where the listener would expect, and the saved progress
+  /// points there too. The last chapter just stays completed.
+  ///
+  /// Driven by the player's `completed` state, which a chapter that is a
+  /// clip of a shared M4B (`ClippingAudioSource`) reaches at the clip end
+  /// exactly like a separate file reaches its end.
+  Future<void> _finishChapterEndSleep() async {
+    cancelSleepTimer();
+    sleepTimerFired.value++;
+    final book = _currentBook;
+    if (book != null && _currentChapterIndex < book.chapters.length - 1) {
+      _currentChapterIndex++;
+      chapterIndexNotifier.value = _currentChapterIndex;
+      await _playCurrentChapter(autoPlay: false);
+      await _persistCurrentProgress();
+    }
+  }
+
+  @visibleForTesting
+  void debugCompleteChapter() => _onChapterCompleted();
 
   /// Resumes playback. A refused start leaves the book paused rather than
   /// raising — same reasoning as `_playCurrentChapter`: the media is loaded,
@@ -248,6 +334,21 @@ class AudioPlaybackService {
       debugPrint('AudioPlaybackService: start refused, leaving paused: $e');
       stateNotifier.value = PlaybackState.paused;
     }
+  }
+
+  /// Stops playback and clears the loaded book when [bookId] is the one
+  /// currently loaded (a no-op otherwise). Clears the book *before* stopping
+  /// so no progress is written back for a book that is being removed.
+  Future<void> stopIfCurrent(String bookId) async {
+    if (_currentBook?.id != bookId) return;
+    _currentBook = null;
+    _currentChapterIndex = 0;
+    currentBookNotifier.value = null;
+    chapterIndexNotifier.value = 0;
+    await _player.stop();
+    positionNotifier.value = Duration.zero;
+    durationNotifier.value = Duration.zero;
+    stateNotifier.value = PlaybackState.idle;
   }
 
   Future<void> pause() async {
@@ -271,12 +372,21 @@ class AudioPlaybackService {
   Future<void> skipForward({int seconds = kSkipSeconds}) async {
     final newPos = positionNotifier.value + Duration(seconds: seconds);
     final maxDur = durationNotifier.value;
-    await seek(newPos > maxDur ? maxDur : newPos);
+    // Zero means not known yet (a stream still loading): don't clamp to it,
+    // or skipping forward jumps back to the start.
+    await seek(maxDur > Duration.zero && newPos > maxDur ? maxDur : newPos);
   }
 
   Future<void> skipBackward({int seconds = kSkipSeconds}) async {
     final newPos = positionNotifier.value - Duration(seconds: seconds);
     await seek(newPos < Duration.zero ? Duration.zero : newPos);
+  }
+
+  /// Loads the current chapter again from where it stopped, after a
+  /// playback error.
+  Future<void> retryCurrentChapter() async {
+    if (_currentBook == null) return;
+    await _playCurrentChapter(seekToPosition: positionNotifier.value);
   }
 
   Future<void> nextChapter() async {
@@ -304,7 +414,36 @@ class AudioPlaybackService {
   Future<void> setSpeed(double speed) async {
     _playbackSpeed = speed;
     speedNotifier.value = speed;
+    final book = _currentBook;
+    if (book != null) await _preferences?.setBookSpeed(book.id, speed);
     await _player.setSpeed(speed);
+  }
+
+  /// Marks [book] finished: it leaves "In progress" and stays out until it
+  /// is played again. If it is the loaded book, playback stops first and the
+  /// stopped player is not allowed to write its position back.
+  Future<void> markFinished(UnifiedAudiobook book) async {
+    await _stopIfCurrent(book);
+    await _db?.markFinished(book.id,
+        lastChapterIndex: book.chapters.isEmpty ? 0 : book.chapters.length - 1);
+  }
+
+  /// Clears the saved position of [book]. If it is the loaded book it is
+  /// cued back at the start of its first chapter, paused.
+  Future<void> resetProgress(UnifiedAudiobook book) async {
+    await _stopIfCurrent(book);
+    await _db?.resetProgress(book.id);
+    if (_currentBook?.id == book.id && book.chapters.isNotEmpty) {
+      _currentChapterIndex = 0;
+      chapterIndexNotifier.value = 0;
+      await _playCurrentChapter(autoPlay: false);
+    }
+  }
+
+  Future<void> _stopIfCurrent(UnifiedAudiobook book) async {
+    if (_currentBook?.id != book.id) return;
+    _progressFrozenBookId = book.id;
+    await _player.pause();
   }
 
   /// Save a bookmark at the current playback timestamp
@@ -342,7 +481,15 @@ class AudioPlaybackService {
     });
   }
 
+  /// Stops playback when the current chapter ends instead of after a
+  /// duration. Replaces any running timer.
+  void setSleepTimerEndOfChapter() {
+    cancelSleepTimer();
+    sleepAtChapterEndNotifier.value = true;
+  }
+
   void cancelSleepTimer() {
+    sleepAtChapterEndNotifier.value = false;
     _sleepTimer?.cancel();
     _sleepTimerTicker?.cancel();
     _sleepTimer = null;

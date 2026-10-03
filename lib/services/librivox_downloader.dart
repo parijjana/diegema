@@ -12,3 +12,4 @@ library;
 
 export 'librivox_downloader_io.dart'
     if (dart.library.html) 'librivox_downloader_web.dart';
+export 'chapters_unavailable.dart';

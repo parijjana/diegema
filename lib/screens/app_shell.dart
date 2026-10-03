@@ -122,7 +122,8 @@ class _AppShellState extends State<AppShell> {
     _libriVoxService = widget.libriVoxService ?? LibriVoxService();
     _artworkService = widget.artworkService ?? ArtworkEnrichmentService();
     _downloader = widget.downloader ?? LibriVoxStreamAndDownloader();
-    _audioService = widget.audioService ?? AudioPlaybackService(db: widget.db);
+    _audioService = widget.audioService ??
+        AudioPlaybackService(db: widget.db, preferences: widget.preferences);
     if (kDemoMode && widget.deepLink.play != null) {
       _startDeepLinkedPlayback(widget.deepLink.play!);
     } else if (!kDemoMode) {

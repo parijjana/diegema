@@ -60,4 +60,21 @@ void main() {
     expect(view.furthestElsewhere('lv:emma')!.chapter, 9);
     expect(view.finishedOn('ck:dune'), {'mac'});
   });
+
+  test('other devices: everyone but this one, by name, with platform', () {
+    final v = SyncView('phone', [
+      r(SyncKind.device, 'pc', 'pc', 1,
+          {'name': 'Zed PC', 'platform': 'windows'}),
+      r(SyncKind.device, 'mac', 'mac', 1, {'name': 'Alpha Mac'}),
+      r(SyncKind.device, 'phone', 'phone', 1, {'name': 'Me'}),
+      r(SyncKind.catalogue, 'ck:x', 'tablet', 2, {'title': 'X'}),
+    ]);
+    expect(
+        v.otherDeviceIds(),
+        ['mac', 'pc', 'tablet'].toList()
+          ..sort((a, b) => v.deviceName(a).compareTo(v.deviceName(b))));
+    expect(v.otherDeviceIds().first, 'mac');
+    expect(v.devicePlatform('pc'), 'windows');
+    expect(v.devicePlatform('mac'), isNull);
+  });
 }

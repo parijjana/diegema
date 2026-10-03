@@ -16,6 +16,7 @@ import '../theme/app_theme.dart';
 import '../widgets/download_controls.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
+import '../widgets/continue_from_banner.dart';
 import '../widgets/player_scrubber.dart';
 import '../widgets/player_transport.dart';
 import '../services/ambience_service.dart';
@@ -353,6 +354,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                           scale: 0.97 + 0.03 * playerVis,
                           child: _ActiveView(
                             book: book,
+                            db: widget.db,
                             audioService: widget.audioService,
                             onShowUpNext: _showUpNext,
                             headerAction: widget.headerAction,
@@ -852,6 +854,7 @@ class _DismissBackground extends StatelessWidget {
 
 class _ActiveView extends StatelessWidget {
   final UnifiedAudiobook book;
+  final AppDatabase db;
   final AudioPlaybackService audioService;
   final VoidCallback onShowUpNext;
 
@@ -867,6 +870,7 @@ class _ActiveView extends StatelessWidget {
 
   const _ActiveView({
     required this.book,
+    required this.db,
     required this.audioService,
     required this.onShowUpNext,
     this.headerAction,
@@ -1025,6 +1029,10 @@ class _ActiveView extends StatelessWidget {
                       );
                     },
                   ),
+                  // Linked devices: only when another one saved a newer place
+                  // in this book. Nothing seeks until Continue is tapped.
+                  ContinueFromBanner(
+                      book: book, audioService: audioService, db: db),
                   if (wide)
                     Expanded(
                       child: SingleChildScrollView(

@@ -5,12 +5,16 @@ import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
 import '../services/hidden_books_store.dart';
 import '../services/local_library_scanner.dart';
+import '../services/sync/sync_controller.dart';
+import '../sync/sync_view.dart';
+import '../core/utils/sync_format.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/hide_book_action.dart';
 import '../widgets/library_book_detail_overlay.dart';
 import '../widgets/local_audiobook_importer.dart';
+import '../widgets/remote_books_section.dart';
 
 /// Screen 2 — **Library**: books the user owns, whether downloaded through
 /// the in-app store or added manually.
@@ -35,6 +39,15 @@ class LibraryScreen extends StatefulWidget {
   /// Per-device list of books hidden from this screen. Injectable for tests.
   final HiddenBooksStore hiddenStore;
 
+  /// Opens a LibriVox book's Discover detail by its archive.org id (the
+  /// fallback query is "title author", used if the id lookup fails).
+  /// Without it, "On your other devices" taps just go to Discover.
+  final void Function(String archiveId, String fallbackQuery)? onOpenInDiscover;
+
+  /// The local import flow "Add to this device" runs. Defaults to the
+  /// import options sheet; injectable for tests.
+  final void Function(BuildContext, AppDatabase, VoidCallback)? importRunner;
+
   const LibraryScreen({
     super.key,
     required this.db,
@@ -42,6 +55,8 @@ class LibraryScreen extends StatefulWidget {
     required this.onGoToDiscover,
     this.scanLibrary,
     this.hiddenStore = const HiddenBooksStore(),
+    this.onOpenInDiscover,
+    this.importRunner,
   });
 
   @override
@@ -54,6 +69,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   /// Ids the user hid on this device; both lists below leave them out.
   Set<String> _hidden = {};
+
+  /// Portable keys of this device's own books; what "On your other
+  /// devices" is measured against. Empty without sync.
+  Set<String> _localKeys = {};
 
   List<UnifiedAudiobook> get _books =>
       _allBooks.where((b) => !_hidden.contains(b.id)).toList();
@@ -109,6 +128,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _load() async {
+    final sync = context.getInheritedWidgetOfExactType<SyncScope>()?.controller;
     setState(() {
       _loading = true;
       _error = null;
@@ -118,6 +138,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
       final hidden = await widget.hiddenStore.read();
       final books = await widget.db.getAllAudiobooks();
       final inProgress = await widget.db.getContinueListening();
+      var localKeys = <String>{};
+      if (sync != null) {
+        try {
+          localKeys = (await sync.portableKeys()).values.toSet();
+        } catch (_) {}
+      }
       final progressById = <String, double?>{};
       for (final book in inProgress) {
         progressById[book.id] = await _fractionComplete(book);
@@ -125,6 +151,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       if (!mounted) return;
       setState(() {
         _hidden = hidden;
+        _localKeys = localKeys;
         _allBooks = books;
         _allInProgress = inProgress;
         _progressById
@@ -225,6 +252,152 @@ class _LibraryScreenState extends State<LibraryScreen> {
     });
   }
 
+  /// What the other devices have that this one does not, minus what the
+  /// user hid here (by portable key). Empty without sync.
+  List<RemoteBook> _remoteBooks(SyncView? view) => view == null
+      ? const []
+      : view
+          .remoteOnly(_localKeys)
+          .where((b) => !_hidden.contains(b.key))
+          .toList();
+
+  void _openRemote(SyncView view, RemoteBook book) {
+    if (book.isLibrivox) {
+      final open = widget.onOpenInDiscover;
+      if (open != null) {
+        open(book.archiveId!, '${book.title} ${book.author}'.trim());
+      } else {
+        widget.onGoToDiscover();
+      }
+      return;
+    }
+    _showAddHereSheet(view, book);
+  }
+
+  Future<void> _showAddHereSheet(SyncView view, RemoteBook book) async {
+    final device = deviceListLabel(view, book.deviceIds);
+    final add = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final c = sheetContext.colors;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${book.title} is on $device. Add it to this device to '
+                  'listen here.',
+                  style: AppType.body.copyWith(color: c.text),
+                ),
+                const SizedBox(height: Sp.x4),
+                FilledButton.icon(
+                  style: _pairedButton,
+                  onPressed: () => Navigator.of(sheetContext).pop(true),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add to this device'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (add != true || !mounted) return;
+    await _addHere(view, book, device);
+  }
+
+  /// Runs the normal local import, then checks whether what came in is the
+  /// same book (same portable key). A different-looking copy is only linked
+  /// if the user says so.
+  Future<void> _addHere(SyncView view, RemoteBook book, String device) async {
+    final sync = SyncScope.maybeOf(context);
+    if (sync == null) return;
+    final before = {for (final b in await widget.db.getAllAudiobooks()) b.id};
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final run = widget.importRunner ?? LocalAudiobookImporter.showOptionsModal;
+    run(context, widget.db, () async {
+      await _load();
+      await _afterImport(sync, messenger, book, device, before);
+    });
+  }
+
+  Future<void> _afterImport(
+      SyncController sync,
+      ScaffoldMessengerState messenger,
+      RemoteBook book,
+      String device,
+      Set<String> before) async {
+    await sync.refresh();
+    final keys = await sync.portableKeys();
+    final added = [
+      for (final b in await widget.db.getAllAudiobooks())
+        if (!before.contains(b.id) && keys.containsKey(b.id)) b,
+    ];
+    if (added.isEmpty) return;
+    void linked() => messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('Linked with $device')));
+    if (added.any((b) => keys[b.id] == book.key)) {
+      linked();
+      return;
+    }
+    if (!mounted) return;
+    final link = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Different copy'),
+        content: Text('This looks like a different copy of ${book.title}. '
+            'Link it anyway?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Keep separate')),
+          FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Link anyway')),
+        ],
+      ),
+    );
+    if (link != true) return;
+    await sync.linkBook(added.first.id, book.key);
+    linked();
+    if (mounted) await _load();
+  }
+
+  Future<void> _showRemoteMenu(RemoteBook book) {
+    final messenger = ScaffoldMessenger.of(context);
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final c = sheetContext.colors;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                minTileHeight: Dim.tapComfy,
+                leading: Icon(Icons.visibility_off_outlined, color: c.text),
+                title: Text('Hide from library',
+                    style: AppType.body.copyWith(color: c.text)),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  // Not on this device, so the portable key is the id.
+                  hideBookWithUndo(messenger, widget.hiddenStore, book.key);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   /// Long-press on a tile: a small sheet with "Hide from library".
   Future<void> _showTileMenu(BuildContext context, UnifiedAudiobook book) {
     final messenger = ScaffoldMessenger.of(context);
@@ -257,6 +430,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final syncView = SyncScope.viewOf(context);
+    final remote = _remoteBooks(syncView);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -276,7 +451,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               label: const Text('Try again'),
             ),
           );
-        } else if (_books.isEmpty) {
+        } else if (_books.isEmpty && remote.isEmpty) {
           body = AppStateView.empty(
             icon: Icons.collections_bookmark_rounded,
             headline: _allBooks.isNotEmpty
@@ -347,6 +522,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 ),
               ),
             ),
+            if (remote.isNotEmpty) ...[
+              const SizedBox(height: Sp.sectionGap),
+              RemoteBooksSection(
+                view: syncView!,
+                books: remote,
+                onTap: (b) => _openRemote(syncView, b),
+                onLongPress: _showRemoteMenu,
+              ),
+            ],
           ];
 
           if (wide) {

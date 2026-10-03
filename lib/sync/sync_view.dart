@@ -140,6 +140,31 @@ class SyncView {
           if (r.payload['finished'] == true) r.deviceId,
       };
 
+  /// Every other device that has put anything in the view, by id, sorted by
+  /// name.
+  List<String> otherDeviceIds() {
+    final ids = <String>{
+      for (final r in _records)
+        if (r.deviceId != deviceId) r.deviceId,
+      for (final r in _records)
+        if (r.kind == SyncKind.device && r.key != deviceId) r.key,
+    };
+    return ids.toList()
+      ..sort((a, b) =>
+          deviceName(a).toLowerCase().compareTo(deviceName(b).toLowerCase()));
+  }
+
+  /// The platform a device reported (`macos`, `android`, ...), if it did.
+  String? devicePlatform(String id) {
+    for (final r in _records) {
+      if (r.kind == SyncKind.device && r.key == id) {
+        final platform = r.payload['platform'] as String?;
+        if (platform != null && platform.isNotEmpty) return platform;
+      }
+    }
+    return null;
+  }
+
   /// Name a device gave itself, or a short fallback from its id.
   String deviceName(String id) {
     for (final r in _records) {

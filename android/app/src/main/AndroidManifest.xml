@@ -15,6 +15,10 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32"/>
+    <!-- Downloads (background_downloader): the progress notification with
+         its Cancel button. Asked for before the first download, Android
+         13+. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="Diegema"
         android:name="${applicationName}"

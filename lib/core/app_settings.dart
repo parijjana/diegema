@@ -36,6 +36,7 @@ class AppSettings extends ChangeNotifier {
   AccentPalette _accent = AccentPalette.fallback;
   BackgroundPair _background = BackgroundPair.fallback;
   ShadowStyle _shadows = ShadowStyle.off;
+  bool _downloadsWifiOnly = false;
 
   AppSettings({
     required UiPreferences preferences,
@@ -70,6 +71,9 @@ class AppSettings extends ChangeNotifier {
   /// Drop shadows under cards, tiles and buttons (Settings > Colours).
   ShadowStyle get shadows => _shadows;
 
+  /// Whether downloads wait for Wi-Fi (Settings > Downloads).
+  bool get downloadsWifiOnly => _downloadsWifiOnly;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
@@ -82,6 +86,7 @@ class AppSettings extends ChangeNotifier {
         BackgroundPair.byId(await _preferences.getBackgroundId());
     final storedShadows =
         ShadowStyle.fromName(await _preferences.getShadowsName());
+    final storedWifiOnly = await _preferences.getDownloadsWifiOnly();
 
     if (storedTheme == _themeMode &&
         storedSkip == _skipSeconds &&
@@ -90,7 +95,8 @@ class AppSettings extends ChangeNotifier {
         storedTransport == _transportStyle &&
         storedAccent == _accent &&
         storedBackground == _background &&
-        storedShadows == _shadows) {
+        storedShadows == _shadows &&
+        storedWifiOnly == _downloadsWifiOnly) {
       return;
     }
     _themeMode = storedTheme;
@@ -101,6 +107,7 @@ class AppSettings extends ChangeNotifier {
     _accent = storedAccent;
     _background = storedBackground;
     _shadows = storedShadows;
+    _downloadsWifiOnly = storedWifiOnly;
     notifyListeners();
   }
 
@@ -162,6 +169,13 @@ class AppSettings extends ChangeNotifier {
     _shadows = shadows;
     notifyListeners();
     await _preferences.setShadowsName(shadows.name);
+  }
+
+  Future<void> setDownloadsWifiOnly(bool value) async {
+    if (value == _downloadsWifiOnly) return;
+    _downloadsWifiOnly = value;
+    notifyListeners();
+    await _preferences.setDownloadsWifiOnly(value);
   }
 }
 

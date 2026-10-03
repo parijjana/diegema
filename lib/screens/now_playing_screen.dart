@@ -9,8 +9,10 @@ import '../core/ui_preferences.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
+import '../services/download_manager.dart';
 import '../services/redownload.dart';
 import '../theme/app_theme.dart';
+import '../widgets/download_controls.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/player_scrubber.dart';
@@ -1488,13 +1490,28 @@ class _PlaybackErrorNote extends StatefulWidget {
 
 class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
   bool _filesUnreadable = false;
-  double? _progress; // non-null while re-downloading
   String? _failed;
+
+  /// The re-download's phase last time the queue notified, to catch the
+  /// moment it is saved.
+  DownloadPhase? _phase;
 
   @override
   void initState() {
     super.initState();
     _checkFiles();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final book = widget.service.currentBookNotifier.value;
+    if (book == null) return;
+    final phase = DownloadsScope.maybeOf(context)?.stateFor(book.id)?.phase;
+    if (phase == DownloadPhase.done && _phase != DownloadPhase.done) {
+      _reload(book.id);
+    }
+    _phase = phase;
   }
 
   Future<void> _checkFiles() async {
@@ -1505,31 +1522,34 @@ class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
     if (mounted && !ok) setState(() => _filesUnreadable = true);
   }
 
-  Future<void> _redownload() async {
-    final service = widget.service;
-    final book = service.currentBookNotifier.value;
-    final db = service.database;
-    if (book == null || db == null) return;
-    final chapter = service.chapterIndexNotifier.value;
-    final position = service.positionNotifier.value;
-    setState(() {
-      _progress = 0;
-      _failed = null;
-    });
+  /// Through the app-wide queue, so it carries on if the app is
+  /// backgrounded, and shows in Settings > Downloads.
+  Future<void> _redownload(DownloadManager downloads) async {
+    final book = widget.service.currentBookNotifier.value;
+    if (book == null) return;
+    setState(() => _failed = null);
     try {
-      final fresh = await redownloadBook(db, book,
-          onProgress: (p) => mounted ? setState(() => _progress = p) : null);
-      await service.loadBook(fresh,
-          initialChapterIndex: chapter, initialPosition: position);
+      await downloads.redownload(book);
     } catch (e) {
-      debugPrint('Re-download failed: $e');
+      debugPrint('Re-download failed to start: $e');
       if (mounted) {
-        setState(() {
-          _progress = null;
-          _failed = "Couldn't download it. Check your connection and try again.";
-        });
+        setState(() => _failed =
+            "Couldn't download it. Check your connection and try again.");
       }
     }
+  }
+
+  /// Picks the saved copy up where the listener left off.
+  Future<void> _reload(String id) async {
+    final service = widget.service;
+    final db = service.database;
+    if (db == null) return;
+    final chapter = service.chapterIndexNotifier.value;
+    final position = service.positionNotifier.value;
+    final fresh = await db.getAudiobook(id);
+    if (fresh == null || service.currentBookNotifier.value?.id != id) return;
+    await service.loadBook(fresh,
+        initialChapterIndex: chapter, initialPosition: position);
   }
 
   @override
@@ -1539,7 +1559,8 @@ class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
     final book = service.currentBookNotifier.value;
     final hasNext = book != null &&
         service.chapterIndexNotifier.value < book.chapters.length - 1;
-    final progress = _progress;
+    final downloads = DownloadsScope.maybeOf(context);
+    final download = book == null ? null : downloads?.stateFor(book.id);
     return Padding(
       padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
       child: Wrap(
@@ -1550,16 +1571,19 @@ class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
           Icon(Icons.error_outline_rounded, color: c.danger),
           Text(
               _failed ??
+                  (download?.phase == DownloadPhase.failed
+                      ? download!.error
+                      : null) ??
                   (_filesUnreadable
                       ? "This book's downloaded files can't be read"
                       : "Couldn't play this chapter"),
               style: AppType.label.copyWith(color: c.danger)),
-          if (_filesUnreadable && progress != null)
-            Text('Downloading ${(progress * 100).round()}%',
+          if (_filesUnreadable && download != null && download.isActive)
+            Text(downloadLabel(downloads!, download),
                 style: AppType.label.copyWith(color: c.text))
-          else if (_filesUnreadable)
+          else if (_filesUnreadable && downloads != null)
             TextButton(
-              onPressed: _redownload,
+              onPressed: () => _redownload(downloads),
               child: const Text('Re-download'),
             )
           else ...[

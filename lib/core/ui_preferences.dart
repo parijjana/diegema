@@ -26,6 +26,7 @@ class UiPreferences {
   static const String _backgroundKey = 'appearance.background';
   static const String _shadowsKey = 'appearance.shadows';
   static const String _ambienceKey = 'ambience.v1';
+  static const String _downloadsWifiOnlyKey = 'downloads.wifi_only';
 
   /// In-memory store used by tests. When supplied it replaces
   /// `shared_preferences` entirely, so no platform channel is touched.
@@ -275,6 +276,37 @@ class UiPreferences {
   /// The ambience mixer's saved settings, as JSON (see `AmbienceState`).
   Future<String?> getAmbienceJson() => _getString(_ambienceKey);
   Future<void> setAmbienceJson(String json) => _setString(_ambienceKey, json);
+
+  /// Whether downloads wait for Wi-Fi (Settings > Downloads). Off unless
+  /// chosen: most people expect a tap on Download to start downloading.
+  Future<bool> getDownloadsWifiOnly() async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      final value = overrides[_downloadsWifiOnlyKey];
+      return value is bool ? value : false;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_downloadsWifiOnlyKey) ?? false;
+    } catch (e) {
+      debugPrint('UiPreferences: read failed, using default: $e');
+      return false;
+    }
+  }
+
+  Future<void> setDownloadsWifiOnly(bool value) async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      overrides[_downloadsWifiOnlyKey] = value;
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_downloadsWifiOnlyKey, value);
+    } catch (e) {
+      debugPrint('UiPreferences: write failed: $e');
+    }
+  }
 
   Future<String?> _getString(String key) async {
     final overrides = _overrides;

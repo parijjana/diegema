@@ -38,7 +38,9 @@ class SyncScheduler {
     final now = playback!.value;
     final was = _last;
     _last = now;
-    if (now == PlaybackState.playing) {
+    // Playing again, or loading the next chapter after one finished: not a
+    // stop after all.
+    if (now == PlaybackState.playing || now == PlaybackState.loading) {
       _settle?.cancel();
       return;
     }

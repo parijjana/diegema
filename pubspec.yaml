@@ -52,6 +52,7 @@ dev_dependencies:
   # services' tests).
   path_provider_platform_interface: ^2.1.2
   plugin_platform_interface: ^2.1.8
+  fake_async: ^1.3.3
 
 flutter:
   uses-material-design: true

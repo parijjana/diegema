@@ -23,6 +23,7 @@ import 'services/audio_playback_service.dart';
 import 'services/diegema_audio_handler.dart';
 import 'services/download_manager.dart';
 import 'services/sync/sync_controller.dart';
+import 'services/sync/sync_scheduler.dart';
 import 'services/folder_access.dart';
 import 'services/demo_seed.dart';
 import 'services/librivox_downloader.dart';
@@ -31,6 +32,8 @@ import 'services/librivox_service.dart';
 /// Kept alive for the app's lifetime; see the sync setup in [main].
 // ignore: unused_element
 AppLifecycleListener? _syncLifecycle;
+// ignore: unused_element
+SyncScheduler? _syncScheduler;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -128,6 +131,14 @@ Future<void> main() async {
       // still works through `audioService` directly, just without the
       // lock-screen/notification surface.
       debugPrint('main: audio_service init failed: $e');
+    }
+    // Sync every 15 minutes and after playback pauses, stops or finishes.
+    // background() publishes and syncs, and never throws.
+    final s = sync;
+    if (s != null) {
+      _syncScheduler = SyncScheduler(
+          sync: s.background, playback: audioService.stateNotifier)
+        ..start();
     }
   }
 

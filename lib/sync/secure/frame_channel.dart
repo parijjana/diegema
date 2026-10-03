@@ -36,7 +36,11 @@ class LengthPrefixedChannel implements FrameChannel {
   final int maxFrame;
   late final StreamSubscription<List<int>> _sub;
 
-  final _buffer = BytesBuilder(copy: false);
+  // Unread bytes are _buf[_start, _end); appends grow it by doubling and
+  // compact first, so a big frame in small chunks is copied O(n) times.
+  Uint8List _buf = Uint8List(4096);
+  int _start = 0;
+  int _end = 0;
   final _frames = <Uint8List>[];
   final _waiting = <Completer<Uint8List>>[];
   Object? _error;
@@ -50,24 +54,39 @@ class LengthPrefixedChannel implements FrameChannel {
     });
   }
 
+  void _append(List<int> chunk) {
+    if (_end + chunk.length > _buf.length) {
+      final live = _end - _start;
+      var size = _buf.length;
+      while (size < live + chunk.length) {
+        size *= 2;
+      }
+      final grown = size == _buf.length ? _buf : Uint8List(size);
+      grown.setRange(0, live, _buf, _start);
+      _buf = grown;
+      _start = 0;
+      _end = live;
+    }
+    _buf.setRange(_end, _end + chunk.length, chunk);
+    _end += chunk.length;
+  }
+
   void _onData(List<int> chunk) {
     if (_error != null) return;
-    _buffer.add(chunk);
-    final bytes = _buffer.takeBytes();
-    var offset = 0;
-    while (bytes.length - offset >= 4) {
-      final length = ByteData.sublistView(bytes, offset, offset + 4)
+    _append(chunk);
+    while (_end - _start >= 4) {
+      final length = ByteData.sublistView(_buf, _start, _start + 4)
           .getUint32(0, Endian.big);
       if (length > maxFrame) {
         _fail(FrameTooLarge(length));
         return;
       }
-      if (bytes.length - offset - 4 < length) break;
-      _frames.add(
-          Uint8List.fromList(bytes.sublist(offset + 4, offset + 4 + length)));
-      offset += 4 + length;
+      if (_end - _start - 4 < length) break;
+      _frames.add(Uint8List.fromList(
+          Uint8List.sublistView(_buf, _start + 4, _start + 4 + length)));
+      _start += 4 + length;
     }
-    if (offset < bytes.length) _buffer.add(bytes.sublist(offset));
+    if (_start == _end) _start = _end = 0;
     _flushWaiters();
   }
 

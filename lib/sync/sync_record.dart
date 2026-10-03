@@ -21,6 +21,9 @@ enum SyncKind {
 
   /// A bookmark the device made. Key: bookmark id. Tombstone = deleted.
   bookmark,
+
+  /// A device's name and platform. Key: device id.
+  device,
 }
 
 class SyncRecord {

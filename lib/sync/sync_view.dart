@@ -139,4 +139,15 @@ class SyncView {
         for (final r in _others(SyncKind.finished, key))
           if (r.payload['finished'] == true) r.deviceId,
       };
+
+  /// Name a device gave itself, or a short fallback from its id.
+  String deviceName(String id) {
+    for (final r in _records) {
+      if (r.kind == SyncKind.device && r.key == id) {
+        final name = r.payload['name'] as String?;
+        if (name != null && name.isNotEmpty) return name;
+      }
+    }
+    return 'Device ${id.length > 4 ? id.substring(0, 4) : id}';
+  }
 }

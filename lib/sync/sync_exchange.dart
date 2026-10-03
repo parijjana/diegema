@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'hlc.dart';
 import 'sync_record.dart';
 import 'sync_store.dart';
@@ -41,7 +43,7 @@ class SyncPeer {
 
   /// Called with every record that changed this device's store, so the
   /// clock can move past them and the UI can refresh.
-  final void Function(List<SyncRecord> changed)? onChanged;
+  final FutureOr<void> Function(List<SyncRecord> changed)? onChanged;
 
   SyncPeer(this.store, {this.onChanged});
 
@@ -68,6 +70,6 @@ class SyncPeer {
 
   Future<void> _apply(List<SyncRecord> records) async {
     final changed = await mergeInto(store, records);
-    if (changed.isNotEmpty) onChanged?.call(changed);
+    if (changed.isNotEmpty) await onChanged?.call(changed);
   }
 }

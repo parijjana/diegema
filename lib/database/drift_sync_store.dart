@@ -80,4 +80,9 @@ class DriftSyncStore implements SyncStore {
   @override
   Future<List<SyncRecord>> all() async =>
       (await db.select(db.syncRecords).get()).map(_fromRow).toList();
+
+  @override
+  Future<void> keepOnly(String deviceId) => (db.delete(db.syncRecords)
+        ..where((t) => t.deviceId.equals(deviceId).not()))
+      .go();
 }

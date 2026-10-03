@@ -42,6 +42,23 @@ abstract class SyncController {
   /// Whether this device can scan a code with its camera (phones).
   bool get canScan;
 
+  /// Where sync stands on this device, for Settings → Linked devices.
+  Future<SyncStatus> status();
+
+  /// The last sync this session (any trigger), or null before the first.
+  ValueListenable<LastSync?> get lastSync;
+
+  /// Removes a device from every linked device's lists. It comes back if it
+  /// is still linked and syncs again (see SYNC_DESIGN, S8).
+  Future<void> forgetDevice(String deviceId);
+
+  /// Leaves the group: this device stops syncing and keeps its library.
+  Future<void> unlink();
+
+  /// For [SyncStatus.keysUnreadable]: deletes the unreadable keys so this
+  /// device can be linked again (as a new device).
+  Future<void> resetKeys();
+
   /// Book id → portable key, for this device's books.
   Future<Map<String, String>> portableKeys();
 
@@ -51,6 +68,23 @@ abstract class SyncController {
 
   Future<String> deviceName();
   Future<void> setDeviceName(String name);
+}
+
+enum SyncStatus {
+  /// Not linked to any device.
+  unlinked,
+  linked,
+
+  /// The keystore holding this device's sync keys can't be read.
+  keysUnreadable,
+}
+
+class LastSync {
+  final DateTime at;
+
+  /// Linked devices reached.
+  final int reached;
+  const LastSync(this.at, this.reached);
 }
 
 class LinkOffer {

@@ -14,8 +14,7 @@ void main() {
   void run(void Function(FakeAsync clock) body) => fakeAsync((clock) {
         syncs = 0;
         playback = ValueNotifier(PlaybackState.idle);
-        scheduler = SyncScheduler(
-            sync: () async => syncs++, playback: playback)
+        scheduler = SyncScheduler(sync: () async => syncs++, playback: playback)
           ..start();
         body(clock);
         scheduler.dispose();

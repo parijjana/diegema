@@ -234,4 +234,95 @@ void main() {
       expect(await m.joinWithCode(offer.code), JoinOutcome.linked);
     });
   });
+
+  group('Linked devices actions', () {
+    late FakeNetwork net;
+    setUp(() => net = FakeNetwork());
+
+    SyncService linked(Device d, SecretStore secrets,
+            {required bool listens}) =>
+        SyncService(d.db,
+            identity: DeviceIdentityStore(overrides: {
+              'sync.device_id.v1': d == mac ? 'mac' : 'phone',
+              'sync.device_name.v1': d == mac ? 'MacBook' : 'Pixel',
+            }),
+            now: () => d.clock,
+            secrets: secrets,
+            discovery: FakeDiscovery(net),
+            listens: listens,
+            localAddresses: () async => ['127.0.0.1']);
+
+    Future<(SyncService, SyncService)> pair() async {
+      await phone.db.saveAudiobook(emma());
+      final p = linked(phone, InMemorySecretStore(), listens: true);
+      final m = linked(mac, InMemorySecretStore(), listens: false);
+      final offer = await p.createLinkOffer();
+      expect(await m.joinWithCode(offer.code), JoinOutcome.linked);
+      return (p, m);
+    }
+
+    test('status and last sync', () async {
+      final p = linked(phone, InMemorySecretStore(), listens: true);
+      expect(await p.status(), SyncStatus.unlinked);
+      expect(p.lastSync.value, isNull);
+      final (p2, m) = await pair();
+      expect(await p2.status(), SyncStatus.linked);
+      expect(await m.syncNow(), 1);
+      expect(m.lastSync.value!.reached, 1);
+    });
+
+    test('forgetting a device hides it on every linked device', () async {
+      final (p, m) = await pair();
+      final macId = m.view.value!.deviceId;
+      final phoneId = p.view.value!.deviceId;
+      expect(p.view.value!.otherDeviceIds(), [macId]);
+      // The Mac removes the phone (as it would a retired phone or a ghost).
+      await m.forgetDevice(phoneId);
+      expect(m.view.value!.otherDeviceIds(), isEmpty);
+      expect(m.view.value!.remoteOnly({}), isEmpty);
+      // Forgetting yourself does nothing.
+      await m.forgetDevice(macId);
+      expect(m.view.value!.otherDeviceIds(), isEmpty);
+      // The phone is still linked: its next change brings it back.
+      phone.clock += 100000;
+      await phone.db.saveProgress(
+          audiobookId: 'emma_librivox', chapterIndex: 4, positionSeconds: 9);
+      await p.syncNow();
+      await m.syncNow();
+      expect(m.view.value!.otherDeviceIds(), [phoneId]);
+    });
+
+    test('unlink stops syncing and drops other devices\' records', () async {
+      final (p, m) = await pair();
+      expect(m.view.value!.remoteOnly({}), isNotEmpty);
+      await m.unlink();
+      expect(await m.status(), SyncStatus.unlinked);
+      expect(m.view.value!.otherDeviceIds(), isEmpty);
+      expect(m.view.value!.remoteOnly({}), isEmpty);
+      expect(await m.syncNow(), 0);
+      expect(await p.syncNow(), 0, reason: 'phone listens; nobody dials');
+    });
+
+    test('unreadable keys: status says so, reset gives a new unlinked device',
+        () async {
+      final broken = _Broken();
+      final s = linked(phone, broken, listens: true);
+      expect(await s.status(), SyncStatus.keysUnreadable);
+      final oldId = await s.deviceId();
+      broken.broken = false;
+      await s.resetKeys();
+      expect(await s.status(), SyncStatus.unlinked);
+      expect(await s.deviceId(), isNot(oldId));
+    });
+  });
+}
+
+/// A keystore whose reads throw until [broken] is cleared.
+class _Broken extends InMemorySecretStore {
+  bool broken = true;
+  @override
+  Future<String?> read(String key) async {
+    if (broken) throw StateError('keystore unreadable');
+    return super.read(key);
+  }
 }

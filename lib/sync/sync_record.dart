@@ -24,6 +24,10 @@ enum SyncKind {
 
   /// A device's name and platform. Key: device id.
   device,
+
+  /// A device removed from the group's lists. Key: the removed device's id.
+  /// Its records are hidden everywhere until it syncs something newer.
+  forget,
 }
 
 class SyncRecord {

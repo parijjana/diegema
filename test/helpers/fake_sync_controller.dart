@@ -105,6 +105,36 @@ class FakeSyncController implements SyncController {
     return outcome;
   }
 
+  SyncStatus syncStatus = SyncStatus.unlinked;
+  final ValueNotifier<LastSync?> lastSyncNotifier = ValueNotifier(null);
+  final forgotten = <String>[];
+  int unlinkCalls = 0;
+  int resetCalls = 0;
+
+  @override
+  Future<SyncStatus> status() async =>
+      linked && syncStatus == SyncStatus.unlinked
+          ? SyncStatus.linked
+          : syncStatus;
+
+  @override
+  ValueListenable<LastSync?> get lastSync => lastSyncNotifier;
+
+  @override
+  Future<void> forgetDevice(String deviceId) async => forgotten.add(deviceId);
+
+  @override
+  Future<void> unlink() async {
+    unlinkCalls++;
+    linked = false;
+  }
+
+  @override
+  Future<void> resetKeys() async {
+    resetCalls++;
+    syncStatus = SyncStatus.unlinked;
+  }
+
   @override
   Future<void> foreground() => refresh();
 

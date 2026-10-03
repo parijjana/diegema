@@ -84,6 +84,17 @@ class SyncGroup {
     await _store.delete(_groupKey);
   }
 
+  /// Deletes every sync secret, for a store that can't be read any more.
+  /// The next [load] is fresh: a new device id, unlinked. Best effort: a
+  /// key that won't delete is overwritten by that load's writes.
+  static Future<void> wipe(SecretStore store) async {
+    for (final k in const [_installKey, _groupKey, 'sync.device_seed.v1']) {
+      try {
+        await store.delete(k);
+      } catch (_) {}
+    }
+  }
+
   /// What devices advertise over mDNS so they find their own group without
   /// saying anything about themselves: 8 bytes of HMAC of the group key.
   /// Null while unlinked.

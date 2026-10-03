@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -104,7 +105,12 @@ class SyncService implements SyncController {
   Hlc? _clock;
   String? _deviceId;
   Future<SyncGroup?>? _group;
+  bool _keysUnreadable = false;
   LanSync? _lan;
+  final ValueNotifier<LastSync?> _lastSync = ValueNotifier(null);
+
+  @override
+  ValueListenable<LastSync?> get lastSync => _lastSync;
 
   /// Store writes that move the clock (publishing, and each step of an
   /// exchange) run one at a time, so a refresh can't overwrite a clock an
@@ -143,9 +149,11 @@ class SyncService implements SyncController {
           _deviceId = await identity.resetDeviceId();
           _clock = null;
         }
+        _keysUnreadable = false;
         return g;
       } catch (e) {
         debugPrint('sync: keys unavailable, sync off for now: $e');
+        _keysUnreadable = true;
         _group = null;
         return null;
       }
@@ -178,7 +186,7 @@ class SyncService implements SyncController {
         final lan = await _lanSync();
         if (lan == null) return;
         await lan.startListening();
-        await lan.syncNow();
+        await _run(lan);
       });
 
   /// App going to the background: publish and push it to whoever is near.
@@ -187,7 +195,8 @@ class SyncService implements SyncController {
   @override
   Future<void> background() => _logged('background', () async {
         await refresh();
-        await (await _lanSync())?.syncNow();
+        final lan = await _lanSync();
+        if (lan != null) await _run(lan);
       });
 
   @override
@@ -198,7 +207,7 @@ class SyncService implements SyncController {
     final lan = await _lanSync();
     if (lan == null) return 0;
     await refresh();
-    return (await lan.syncNow()).results.where((r) => r.ok).length;
+    return _run(lan);
   }
 
   @override
@@ -254,8 +263,65 @@ class SyncService implements SyncController {
         }
       }
     }
-    final reached = (await lan.syncNow()).results.any((r) => r.ok);
-    return reached ? JoinOutcome.linked : JoinOutcome.linkedNotSynced;
+    final reached = await _run(lan);
+    return reached > 0 ? JoinOutcome.linked : JoinOutcome.linkedNotSynced;
+  }
+
+  /// Syncs with whoever is near and records it as [lastSync].
+  Future<int> _run(LanSync lan) async {
+    final reached = (await lan.syncNow()).results.where((r) => r.ok).length;
+    _lastSync.value =
+        LastSync(DateTime.fromMillisecondsSinceEpoch(_now()), reached);
+    return reached;
+  }
+
+  @override
+  Future<SyncStatus> status() async {
+    final g = await group();
+    if (g == null) {
+      return _keysUnreadable ? SyncStatus.keysUnreadable : SyncStatus.unlinked;
+    }
+    return g.linked ? SyncStatus.linked : SyncStatus.unlinked;
+  }
+
+  @override
+  Future<void> forgetDevice(String id) async {
+    if (id == await deviceId()) return;
+    await _serial(() async {
+      _clock = (await _clockNow()).tick(_now());
+      await store
+          .putAll([SyncRecord(kind: SyncKind.forget, key: id, hlc: _clock!)]);
+      await _rebuildView();
+    });
+    final lan = await _lanSync();
+    if (lan != null) unawaited(_run(lan));
+  }
+
+  @override
+  Future<void> unlink() async {
+    final g = await group();
+    if (g == null || !g.linked) return;
+    await _lan?.stopListening();
+    await g.leave();
+    // Other devices' books and positions go too; this device's own records
+    // stay, so linking again later picks up where it was.
+    await _serial(() async {
+      await store.keepOnly(await deviceId());
+      await _rebuildView();
+    });
+  }
+
+  @override
+  Future<void> resetKeys() async {
+    final s = secrets;
+    if (s == null) return;
+    await _lan?.stopListening();
+    _lan = null;
+    await SyncGroup.wipe(s);
+    _group = null;
+    _keysUnreadable = false;
+    await group();
+    await refresh();
   }
 
   Future<void> _logged(String what, Future<void> Function() f) async {

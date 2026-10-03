@@ -11,13 +11,11 @@ import '../theme/app_theme.dart';
 /// Whether this device must dial the one that scans its code: a Mac never
 /// listens. Uses the framework's platform value, so it is web-safe and a
 /// test can override it.
-bool get isMacHost =>
-    !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
+bool get isMacHost => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
 
 /// "Link a device": shows a code for the other device to scan.
 /// [pollForScanner] defaults to [isMacHost].
-Future<void> showLinkDeviceSheet(BuildContext context,
-    {bool? pollForScanner}) {
+Future<void> showLinkDeviceSheet(BuildContext context, {bool? pollForScanner}) {
   final sync = SyncScope.maybeOf(context);
   if (sync == null) return Future.value();
   return showModalBottomSheet<void>(
@@ -51,7 +49,10 @@ class _LinkDeviceSheetState extends State<LinkDeviceSheet> {
   bool _copied = false;
   int _secondsLeft = 0;
   String? _linkedTo;
-  late final Set<String> _before;
+
+  /// Devices already linked when the sheet opened; taken from the first
+  /// loaded view, so a view still loading doesn't count them as new.
+  Set<String>? _before;
   Timer? _countdown;
   Timer? _poll;
   bool _polling = false;
@@ -59,7 +60,8 @@ class _LinkDeviceSheetState extends State<LinkDeviceSheet> {
   @override
   void initState() {
     super.initState();
-    _before = {...?widget.sync.view.value?.otherDeviceIds()};
+    final view = widget.sync.view.value;
+    if (view != null) _before = {...view.otherDeviceIds()};
     widget.sync.view.addListener(_onView);
     _fetch();
     // A device that scanned the code only shows up after a sync; a phone is
@@ -78,7 +80,9 @@ class _LinkDeviceSheetState extends State<LinkDeviceSheet> {
   }
 
   Future<void> _pollOnce() async {
-    if (_polling || _linkedTo != null) return;
+    // Nothing to wait for once the code has expired (until a new one).
+    final expired = _offer != null && _secondsLeft == 0;
+    if (_polling || _linkedTo != null || expired) return;
     _polling = true;
     try {
       await widget.sync.syncNow();
@@ -93,8 +97,13 @@ class _LinkDeviceSheetState extends State<LinkDeviceSheet> {
     if (_linkedTo != null || !mounted) return;
     final view = widget.sync.view.value;
     if (view == null) return;
+    final before = _before;
+    if (before == null) {
+      _before = {...view.otherDeviceIds()};
+      return;
+    }
     for (final id in view.otherDeviceIds()) {
-      if (!_before.contains(id)) {
+      if (!before.contains(id)) {
         _countdown?.cancel();
         _poll?.cancel();
         setState(() => _linkedTo = view.deviceName(id));
@@ -188,8 +197,8 @@ class _LinkDeviceSheetState extends State<LinkDeviceSheet> {
         children: [
           _message(c, 'Linked to $_linkedTo'),
           FilledButton(
-            style: FilledButton.styleFrom(
-                minimumSize: const Size(0, Dim.tapMin)),
+            style:
+                FilledButton.styleFrom(minimumSize: const Size(0, Dim.tapMin)),
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Done'),
           ),
@@ -241,7 +250,9 @@ class _LinkDeviceSheetState extends State<LinkDeviceSheet> {
         const SizedBox(height: Sp.x3),
         Center(
           child: Text(
-            expired ? 'This code has expired.' : 'Good for ${_clock(_secondsLeft)}',
+            expired
+                ? 'This code has expired.'
+                : 'Good for ${_clock(_secondsLeft)}',
             style: AppType.tabularBody(expired ? c.danger : c.textSecondary),
           ),
         ),
@@ -263,8 +274,8 @@ class _LinkDeviceSheetState extends State<LinkDeviceSheet> {
         const SizedBox(height: Sp.x3),
         if (expired)
           FilledButton(
-            style: FilledButton.styleFrom(
-                minimumSize: const Size(0, Dim.tapMin)),
+            style:
+                FilledButton.styleFrom(minimumSize: const Size(0, Dim.tapMin)),
             onPressed: _newCode,
             child: const Text('Show a new code'),
           )

@@ -27,9 +27,8 @@ void main() {
     await tester.pumpWidget(SyncScope(
       controller: sync,
       child: MaterialApp(
-        theme: brightness == Brightness.light
-            ? AppTheme.light()
-            : AppTheme.dark(),
+        theme:
+            brightness == Brightness.light ? AppTheme.light() : AppTheme.dark(),
         builder: (context, child) => MediaQuery(
             data: MediaQuery.of(context)
                 .copyWith(textScaler: TextScaler.linear(textScale)),
@@ -116,8 +115,7 @@ void main() {
     await close(tester);
   });
 
-  testWidgets('a device that was already linked is not "new"',
-      (tester) async {
+  testWidgets('a device that was already linked is not "new"', (tester) async {
     sync.setRecords([
       rec(SyncKind.device, 'mac', 'mac', 1, {'name': 'MacBook'}),
     ]);
@@ -145,6 +143,16 @@ void main() {
     final after = sync.syncNowCalls;
     await tester.pump(const Duration(seconds: 9));
     expect(sync.syncNowCalls, after);
+  });
+
+  testWidgets('a Mac stops dialling once the code has expired', (tester) async {
+    await pumpScreen(tester, pollForScanner: true);
+    await openSheet(tester);
+    await tester.pump(const Duration(minutes: 5, seconds: 2));
+    final atExpiry = sync.syncNowCalls;
+    await tester.pump(const Duration(seconds: 9));
+    expect(sync.syncNowCalls, atExpiry);
+    await close(tester);
   });
 
   testWidgets('without the flag nothing is dialled', (tester) async {
@@ -233,8 +241,7 @@ void main() {
       await close(tester);
     });
 
-    testWidgets('other group: declining does not join again',
-        (tester) async {
+    testWidgets('other group: declining does not join again', (tester) async {
       sync.joinOutcome = JoinOutcome.otherGroup;
       await pumpScreen(tester);
       await paste(tester, 'DIEGEMALINK1.abc');

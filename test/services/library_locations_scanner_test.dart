@@ -184,4 +184,21 @@ void main() {
     await scanLibraryLocations(db, store: store);
     expect(await db.getAllAudiobooks(), hasLength(1));
   });
+
+  test(
+      'without the audio permission (Android after a reinstall) the scan '
+      'leaves the shelf alone instead of forgetting every book', () async {
+    write('Austen/Emma/01.mp3');
+    await store.add(location.path);
+    expect(await scanLibraryLocations(db, store: store), 1);
+
+    // With no permission every file reads as missing; simulate that too.
+    await location.delete(recursive: true);
+    await location.create();
+    expect(
+        await scanLibraryLocations(db,
+            store: store, canReadSharedAudio: () async => false),
+        0);
+    expect((await db.getAllAudiobooks()).map((b) => b.title), ['Emma']);
+  });
 }

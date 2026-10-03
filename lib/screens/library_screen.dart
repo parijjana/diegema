@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/app_settings.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
@@ -13,6 +14,7 @@ import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/hide_book_action.dart';
 import '../widgets/library_book_detail_overlay.dart';
+import '../widgets/library_tiles.dart';
 import '../widgets/local_audiobook_importer.dart';
 import '../widgets/remote_books_section.dart';
 
@@ -432,6 +434,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final c = context.colors;
     final syncView = SyncScope.viewOf(context);
     final remote = _remoteBooks(syncView);
+    final settings = SettingsScope.maybeOf(context);
+    final tiles = settings?.libraryLayout == LibraryLayout.tiles;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -494,38 +498,93 @@ class _LibraryScreenState extends State<LibraryScreen> {
             if (_inProgress.isNotEmpty) ...[
               const _SectionHeader(title: 'In progress'),
               const SizedBox(height: Sp.x3),
-              ..._inProgress.map(
+              if (tiles)
+                LibraryTileGrid(
+                  count: _inProgress.length,
+                  itemBuilder: (context, i, size) {
+                    final book = _inProgress[i];
+                    final p = _progressById[book.id];
+                    return _BookTile(
+                      book: book,
+                      coverSize: size,
+                      progress: p,
+                      caption: p == null
+                          ? 'In progress'
+                          : '${(p * 100).round()}% listened',
+                      semanticsLabel: p == null
+                          ? 'View details for ${book.title}'
+                          : 'View details for ${book.title}, '
+                              '${(p * 100).round()}% complete',
+                      onTap: () => _openDetail(context, book, wide: wide),
+                      onLongPress: () => _showTileMenu(context, book),
+                    );
+                  },
+                )
+              else
+                ..._inProgress.map(
+                  (book) => Padding(
+                    padding: const EdgeInsets.only(bottom: Sp.listGap),
+                    child: _InProgressRow(
+                      book: book,
+                      progress: _progressById[book.id],
+                      compact: !wide,
+                      onTap: () => _openDetail(context, book, wide: wide),
+                      onLongPress: () => _showTileMenu(context, book),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: Sp.sectionGap),
+              const _SectionHeader(title: 'All books'),
+              const SizedBox(height: Sp.x3),
+            ],
+            if (tiles)
+              LibraryTileGrid(
+                count: _books.length,
+                itemBuilder: (context, i, size) {
+                  final book = _books[i];
+                  final isInProgress = _inProgress.any((b) => b.id == book.id);
+                  final p = isInProgress ? _progressById[book.id] : null;
+                  final chapters = book.chapters.length;
+                  return _BookTile(
+                    book: book,
+                    coverSize: size,
+                    progress: p,
+                    caption: isInProgress
+                        ? (p == null
+                            ? 'In progress'
+                            : 'In progress \u00b7 ${(p * 100).round()}%')
+                        : (chapters == 0
+                            ? (book.source ?? 'Local')
+                            : '$chapters '
+                                '${chapters == 1 ? 'chapter' : 'chapters'}'),
+                    captionAccent: isInProgress,
+                    semanticsLabel: p != null
+                        ? 'View details for ${book.title}, '
+                            '${(p * 100).round()}% complete'
+                        : 'View details for ${book.title}',
+                    onTap: () => _openDetail(context, book, wide: wide),
+                    onLongPress: () => _showTileMenu(context, book),
+                  );
+                },
+              )
+            else
+              ..._books.map(
                 (book) => Padding(
                   padding: const EdgeInsets.only(bottom: Sp.listGap),
-                  child: _InProgressRow(
+                  child: _BookRow(
                     book: book,
+                    inProgress: _inProgress.any((b) => b.id == book.id),
                     progress: _progressById[book.id],
-                    compact: !wide,
                     onTap: () => _openDetail(context, book, wide: wide),
                     onLongPress: () => _showTileMenu(context, book),
                   ),
                 ),
               ),
-              const SizedBox(height: Sp.sectionGap),
-              const _SectionHeader(title: 'All books'),
-              const SizedBox(height: Sp.x3),
-            ],
-            ..._books.map(
-              (book) => Padding(
-                padding: const EdgeInsets.only(bottom: Sp.listGap),
-                child: _BookRow(
-                  book: book,
-                  inProgress: _inProgress.any((b) => b.id == book.id),
-                  progress: _progressById[book.id],
-                  onTap: () => _openDetail(context, book, wide: wide),
-                  onLongPress: () => _showTileMenu(context, book),
-                ),
-              ),
-            ),
             if (remote.isNotEmpty) ...[
               const SizedBox(height: Sp.sectionGap),
               RemoteBooksSection(
                 view: syncView!,
+                tiles: tiles,
                 books: remote,
                 onTap: (b) => _openRemote(syncView, b),
                 onLongPress: _showRemoteMenu,
@@ -595,6 +654,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           ),
                         ),
                       ),
+                      if (settings != null)
+                        Semantics(
+                          button: true,
+                          label: tiles ? 'Show as list' : 'Show as tiles',
+                          excludeSemantics: true,
+                          child: IconButton(
+                            tooltip: tiles ? 'Show as list' : 'Show as tiles',
+                            onPressed: () => settings.setLibraryLayout(tiles
+                                ? LibraryLayout.list
+                                : LibraryLayout.tiles),
+                            icon: Icon(tiles
+                                ? Icons.view_list_rounded
+                                : Icons.grid_view_rounded),
+                          ),
+                        ),
                       // Wide only: on phone, Import moves to the floating
                       // button below (in the thumb zone, above the mini
                       // player) and Refresh becomes pull-to-refresh on the
@@ -895,6 +969,54 @@ class _InProgressRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A library book as a [LibraryTile]; the tile counterpart of `_BookRow`
+/// and `_InProgressRow`, taking the same callbacks so tap and long-press
+/// behave identically in either layout.
+class _BookTile extends StatelessWidget {
+  final UnifiedAudiobook book;
+  final double coverSize;
+  final double? progress;
+  final String caption;
+  final bool captionAccent;
+  final String semanticsLabel;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const _BookTile({
+    required this.book,
+    required this.coverSize,
+    required this.progress,
+    required this.caption,
+    required this.semanticsLabel,
+    required this.onTap,
+    this.onLongPress,
+    this.captionAccent = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LibraryTile(
+      cover: AppBookCover(
+        bookId: book.id,
+        title: book.title,
+        coverUrl: book.coverArtUrlOrPath,
+        width: coverSize,
+        height: coverSize,
+      ),
+      title: book.title,
+      author: book.author,
+      progress: progress,
+      caption: caption,
+      captionAccent: captionAccent,
+      semanticsLabel: book.author.isEmpty
+          ? semanticsLabel
+          : '$semanticsLabel, by ${book.author}',
+      onTap: onTap,
+      onLongPress: onLongPress,
     );
   }
 }

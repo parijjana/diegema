@@ -146,4 +146,42 @@ void main() {
     await store.remove('/a');
     expect(await store.read(), ['/b']);
   });
+
+  test(
+      'a book whose files vanished is forgotten, progress kept, and comes '
+      'back as it is now', () async {
+    final first = write('Homer/Odyssey/01.mp3');
+    write('Homer/Odyssey/02.mp3');
+    write('Austen/Emma/01.mp3');
+    await store.add(location.path);
+    await scanLibraryLocations(db, store: store);
+    final odysseyId = BookIdentity.localIdForPath(p.dirname(first));
+    await db.saveProgress(
+        audiobookId: odysseyId, chapterIndex: 1, positionSeconds: 7);
+
+    // Renamed outside Diegema: the saved chapter list is now wrong.
+    File(first).renameSync(p.join(p.dirname(first), '01 - Invocation.mp3'));
+    await scanLibraryLocations(db, store: store);
+
+    final odyssey = (await db.getAudiobook(odysseyId))!;
+    expect(odyssey.chapters.map((c) => p.basename(c.audioPathOrUrl)),
+        ['01 - Invocation.mp3', '02.mp3']);
+    expect((await db.getProgress(odysseyId))!.positionSeconds, 7);
+
+    // Deleted outright: gone from the library, Emma untouched.
+    Directory(p.dirname(first)).deleteSync(recursive: true);
+    await scanLibraryLocations(db, store: store);
+    expect(await db.getAudiobook(odysseyId), isNull);
+    expect((await db.getAllAudiobooks()).map((b) => b.title), ['Emma']);
+  });
+
+  test('an unreachable folder keeps its books', () async {
+    write('Austen/Emma/01.mp3');
+    await store.add(location.path);
+    await scanLibraryLocations(db, store: store);
+
+    await location.delete(recursive: true);
+    await scanLibraryLocations(db, store: store);
+    expect(await db.getAllAudiobooks(), hasLength(1));
+  });
 }

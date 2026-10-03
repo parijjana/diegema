@@ -40,7 +40,7 @@ class GlassCard extends StatelessWidget {
             title!.toUpperCase(),
             style: TextStyle(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-              fontSize: 10,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
             ),

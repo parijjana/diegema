@@ -33,7 +33,7 @@ class LocalAudiobookImporter {
             Text(
               'IMPORT LOCAL AUDIOBOOK',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.5,
                 color: primary,
@@ -47,7 +47,7 @@ class LocalAudiobookImporter {
               subtitle: const Text(
                   'A book or a folder of books. Read where it is: nothing is '
                   'copied or changed.',
-                  style: TextStyle(fontSize: 11)),
+                  style: TextStyle(fontSize: 13)),
               onTap: () {
                 Navigator.pop(context);
                 importFolder(context, db, onSuccess);
@@ -60,7 +60,7 @@ class LocalAudiobookImporter {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               subtitle: const Text(
                   'Select individual audio files to group into an audiobook',
-                  style: TextStyle(fontSize: 11)),
+                  style: TextStyle(fontSize: 13)),
               onTap: () {
                 Navigator.pop(context);
                 importFiles(context, db, onSuccess);

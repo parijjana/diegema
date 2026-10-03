@@ -7,8 +7,10 @@ import '../core/app_settings.dart';
 import '../core/playback_constants.dart';
 import '../core/player_controls_style.dart';
 import '../database/app_database.dart';
+import '../services/download_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/library_folders_section.dart';
+import 'downloads_screen.dart';
 
 /// The settings panel — Phase 1 of `settings_panel_plan.md`.
 ///
@@ -29,12 +31,21 @@ class SettingsScreen extends StatelessWidget {
   /// which has no local folders) the section is left out.
   final AppDatabase? db;
 
-  const SettingsScreen({super.key, this.db});
+  /// Resolves the version shown in About; tests pass a synchronous fake.
+  final Future<String> Function() versionLoader;
+
+  const SettingsScreen({
+    super.key,
+    this.db,
+    this.versionLoader = loadAppVersion,
+  });
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final settings = SettingsScope.of(context);
+    final downloads = DownloadsScope.maybeOf(context);
+    final active = downloads?.all.where((d) => d.isActive).length ?? 0;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -145,8 +156,35 @@ class SettingsScreen extends StatelessWidget {
                   ],
                   onChanged: settings.setSkipSeconds,
                 ),
+                _ChoiceGroup<double>(
+                  label: 'Default speed',
+                  description: 'The speed a book starts at until you change '
+                      'it for that book.',
+                  value: settings.defaultSpeed,
+                  options: [
+                    for (final speed in kPlaybackSpeedOptions)
+                      _Choice(speed, '${speed}x'),
+                  ],
+                  onChanged: settings.setDefaultSpeed,
+                ),
               ],
             ),
+            if (db != null && downloads != null && !kIsWeb)
+              _Section(
+                title: 'Downloads',
+                children: [
+                  const DownloadsWifiToggle(),
+                  const SizedBox(height: Sp.x2),
+                  _LinkRow(
+                    label: active == 0
+                        ? 'Manage downloads'
+                        : 'Manage downloads ($active in progress)',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) =>
+                            DownloadsScreen(db: db!, manager: downloads))),
+                  ),
+                ],
+              ),
             if (db != null && !kIsWeb)
               _Section(
                 title: 'Library folders',
@@ -155,7 +193,13 @@ class SettingsScreen extends StatelessWidget {
             _Section(
               title: 'About',
               children: [
-                const _InfoRow(label: kAppName, value: 'Version $kAppVersion'),
+                FutureBuilder<String>(
+                  future: versionLoader(),
+                  initialData: kFallbackAppVersion,
+                  builder: (context, snap) => _InfoRow(
+                      label: kAppName,
+                      value: 'Version ${snap.data ?? kFallbackAppVersion}'),
+                ),
                 // Credit as LibriVox asks for it ("we much prefer if you
                 // do credit us (with a link to our site)" —
                 // librivox.org/pages/public-domain), their objective in
@@ -207,11 +251,15 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 _LinkRow(
                   label: 'Open source licences',
-                  onTap: () => showLicensePage(
-                    context: context,
-                    applicationName: kAppName,
-                    applicationVersion: kAppVersion,
-                  ),
+                  onTap: () async {
+                    final version = await versionLoader();
+                    if (!context.mounted) return;
+                    showLicensePage(
+                      context: context,
+                      applicationName: kAppName,
+                      applicationVersion: version,
+                    );
+                  },
                 ),
               ],
             ),

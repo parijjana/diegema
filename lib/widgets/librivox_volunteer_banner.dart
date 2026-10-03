@@ -43,14 +43,14 @@ class LibriVoxVolunteerBanner extends StatelessWidget {
                   'VOLUNTEER FOR LIBRIVOX',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: 13,
                       letterSpacing: 1.0),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   'Donate your voice or proof-listen to help bring public domain books to life.',
                   style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 13,
                       color:
                           theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                 ),
@@ -67,7 +67,7 @@ class LibriVoxVolunteerBanner extends StatelessWidget {
             child: Text(
               'JOIN →',
               style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 13,
                   fontWeight: FontWeight.bold,
                   color: primary,
                   letterSpacing: 1.0),

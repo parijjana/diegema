@@ -103,7 +103,7 @@ class _AutoResumeBannerState extends State<AutoResumeBanner> {
                       Text(
                         'RESUME LISTENING',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 13,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.2,
                           color: primary,
@@ -113,7 +113,7 @@ class _AutoResumeBannerState extends State<AutoResumeBanner> {
                       Text(
                         '• $timestampText',
                         style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 13,
                             color: theme.colorScheme.onSurface
                                 .withValues(alpha: 0.6)),
                       ),
@@ -132,7 +132,7 @@ class _AutoResumeBannerState extends State<AutoResumeBanner> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 13,
                         color:
                             theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                   ),
@@ -153,7 +153,7 @@ class _AutoResumeBannerState extends State<AutoResumeBanner> {
               label: const Text('RESUME ▶',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 11,
+                      fontSize: 13,
                       letterSpacing: 0.8)),
               onPressed: () async {
                 await widget.audioService.loadBook(

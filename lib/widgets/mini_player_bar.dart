@@ -93,7 +93,7 @@ class MiniPlayerBar extends StatelessWidget {
                             child: SkipIntervalIcon(
                               direction: SkipDirection.backward,
                               seconds: skipSeconds,
-                              size: Dim.iconSm,
+                              size: Dim.iconLg,
                               color: c.text,
                             ),
                           ),
@@ -106,7 +106,7 @@ class MiniPlayerBar extends StatelessWidget {
                             child: SkipIntervalIcon(
                               direction: SkipDirection.forward,
                               seconds: skipSeconds,
-                              size: Dim.iconSm,
+                              size: Dim.iconLg,
                               color: c.text,
                             ),
                           ),

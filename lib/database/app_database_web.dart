@@ -28,6 +28,13 @@ class AppDatabase {
 
   static const int maxPinnedBooks = 5;
   static const int continueListeningMinPositionSeconds = 30;
+
+  /// `PlaybackProgress.positionSeconds` value meaning "the listener marked
+  /// this book finished". A real position is never negative, so the existing
+  /// row carries the flag without a schema change, and [getContinueListening]
+  /// (`positionSeconds > continueListeningMinPositionSeconds`) already
+  /// excludes it.
+  static const int finishedPositionSeconds = -1;
   static const double continueListeningMaxProgressFraction = 0.95;
 
   AppDatabase();
@@ -75,6 +82,20 @@ class AppDatabase {
 
   Future<PlaybackProgressData?> getProgress(String audiobookId) async {
     return _progress[audiobookId];
+  }
+
+  /// See `AppDatabase.markFinished` in `app_database_io.dart`.
+  Future<void> markFinished(String audiobookId,
+      {required int lastChapterIndex}) {
+    return saveProgress(
+      audiobookId: audiobookId,
+      chapterIndex: lastChapterIndex,
+      positionSeconds: finishedPositionSeconds,
+    );
+  }
+
+  Future<void> resetProgress(String audiobookId) async {
+    _progress.remove(audiobookId);
   }
 
   Future<PlaybackProgressData?> getMostRecentProgress() async {
@@ -250,6 +271,14 @@ class AppDatabase {
   Future<void> deleteAudiobook(String id) async {
     _audiobooks.remove(id);
   }
+
+  /// Mirrors `app_database_io.dart`'s `isLibraryFromNewerVersion`. The web
+  /// library lives in memory, so it is never from another version.
+  static Future<bool> isLibraryFromNewerVersion() async => false;
+
+  /// Mirrors `app_database_io.dart`'s `rebaseAppPaths`. Web has no app
+  /// documents folder to move, so there is nothing to rewrite.
+  Future<int> rebaseAppPaths(String from, String to) async => 0;
 
   /// Mirrors `app_database_io.dart`'s `deleteAudiobookAndUserData`.
   Future<void> deleteAudiobookAndUserData(String id) async {

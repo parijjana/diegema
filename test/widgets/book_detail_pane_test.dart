@@ -1,3 +1,5 @@
+import 'package:diegema/core/utils/book_identity.dart';
+import 'package:diegema/domain/models/audiobook.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,10 +8,14 @@ import 'package:http/testing.dart';
 import 'package:diegema/database/app_database.dart';
 import 'package:diegema/domain/models/librivox_book.dart';
 import 'package:diegema/services/artwork_enrichment_service.dart';
+import 'package:diegema/services/download_manager.dart';
+import 'package:diegema/services/downloads_location_io.dart';
 import 'package:diegema/services/librivox_downloader.dart';
 import 'package:diegema/services/librivox_service.dart';
 import 'package:diegema/widgets/book_detail_pane.dart';
+import 'package:diegema/widgets/book_detail_parts.dart';
 
+import '../support/fake_download_engine.dart';
 import '../support/fake_playback_service.dart';
 import '../support/test_harness.dart';
 
@@ -20,6 +26,7 @@ import '../support/test_harness.dart';
 void main() {
   late AppDatabase db;
   late FakePlaybackService audio;
+  var rssStatus = 200;
 
   final book = LibriVoxBook(
     id: '1205',
@@ -42,10 +49,14 @@ void main() {
   const rssWithNoChapters = '''<?xml version="1.0"?>
 <rss version="2.0"><channel><title>Frankenstein</title></channel></rss>''';
 
-  Widget wrap({required String rssBody, int? zipBytes}) {
+  Widget wrap(
+      {required String rssBody,
+      int? zipBytes,
+      bool wide = false,
+      DownloadManager? downloads}) {
     final httpClient = MockClient((request) async {
       if (request.url.toString().contains('/rss/')) {
-        return http.Response(rssBody, 200);
+        return http.Response(rssStatus == 200 ? rssBody : '', rssStatus);
       }
       // Cover art probe — a 404 is fine, the pane falls back to its
       // placeholder either way.
@@ -62,7 +73,7 @@ void main() {
             }),
           );
 
-    return MaterialApp(
+    final app = MaterialApp(
       home: Scaffold(
         body: BookDetailPane(
           book: book,
@@ -71,12 +82,17 @@ void main() {
           audioService: audio,
           db: db,
           libriVoxService: librivoxService,
+          wide: wide,
         ),
       ),
     );
+    return downloads == null
+        ? app
+        : DownloadsScope(manager: downloads, child: app);
   }
 
   setUp(() {
+    rssStatus = 200;
     db = AppDatabase(NativeDatabase.memory());
     audio = FakePlaybackService();
   });
@@ -86,16 +102,17 @@ void main() {
     await db.close();
   });
 
-  testWidgets('phone: sticky footer shows Close and Download with the ZIP size',
+  testWidgets('phone: sticky footer is one Download action with the ZIP size',
       (tester) async {
     await setSurface(tester, const Size(390, 844));
     await tester.pumpWidget(
         wrap(rssBody: rssWithOneChapter, zipBytes: 10 * 1024 * 1024));
     await pumpFrames(tester);
 
-    expect(find.bySemanticsLabel('Close'), findsOneWidget);
-    expect(find.text('Download audiobook'), findsOneWidget);
-    expect(find.text('ZIP · 10 MB'), findsOneWidget);
+    expect(find.text('Download · ZIP 10 MB'), findsOneWidget);
+    expect(find.byType(DetailStickyFooter), findsOneWidget);
+    // One primary action: a single filled button on the whole pane.
+    expect(find.byType(FilledButton), findsOneWidget);
 
     // The old inline "Download Full Audiobook (ZIP)" button is gone from
     // the scrolling content on phone — the footer is the only download
@@ -109,8 +126,8 @@ void main() {
     await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
     await pumpFrames(tester);
 
-    expect(find.text('Download audiobook'), findsOneWidget);
-    expect(find.textContaining('ZIP ·'), findsNothing);
+    expect(find.text('Download'), findsOneWidget);
+    expect(find.textContaining('ZIP'), findsNothing);
   });
 
   testWidgets(
@@ -120,7 +137,7 @@ void main() {
     await tester.pumpWidget(wrap(rssBody: rssWithNoChapters));
     await pumpFrames(tester);
 
-    expect(find.text('Chapters (0)'), findsOneWidget);
+    expect(find.text('Chapters'), findsOneWidget);
     expect(
       find.text("The chapter list isn't available yet. Download the book to "
           'get every chapter.'),
@@ -134,7 +151,218 @@ void main() {
     await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
     await pumpFrames(tester);
 
-    expect(find.text('Chapters (1)'), findsOneWidget);
+    expect(find.text('Chapters'), findsOneWidget);
+    expect(find.byType(ChapterListRow), findsOneWidget);
     expect(find.byType(EmptyChaptersNote), findsNothing);
+  });
+
+  testWidgets('phone: a failed chapter fetch says so and Retry loads them',
+      (tester) async {
+    await setSurface(tester, const Size(390, 844));
+    rssStatus = 503;
+    await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
+    await pumpFrames(tester);
+
+    expect(find.textContaining("Couldn't load the chapters"), findsOneWidget);
+    expect(find.textContaining("isn't available yet"), findsNothing);
+
+    rssStatus = 200;
+    await tester.tap(find.text('Retry'));
+    await pumpFrames(tester);
+
+    expect(find.textContaining("Couldn't load the chapters"), findsNothing);
+    expect(find.text('Chapters'), findsOneWidget);
+    expect(find.byType(ChapterListRow), findsOneWidget);
+  });
+
+  testWidgets(
+      'phone: a downloaded book shows its own chapters when the feed fails',
+      (tester) async {
+    await setSurface(tester, const Size(390, 844));
+    rssStatus = 503;
+    await db.saveAudiobook(UnifiedAudiobook(
+      id: 'frankenstein_1205_librivox',
+      title: 'Frankenstein',
+      author: 'Mary Shelley',
+      description: '',
+      source: 'Downloaded',
+      origin: BookIdentity.originLibrivox,
+      isDownloaded: true,
+      chapters: [
+        AudiobookChapter(
+            id: 'c0',
+            title: 'Letter 1',
+            audioPathOrUrl: '/books/01.mp3',
+            durationSeconds: 60),
+        AudiobookChapter(
+            id: 'c1',
+            title: 'Letter 2',
+            audioPathOrUrl: '/books/02.mp3',
+            durationSeconds: 60),
+      ],
+    ));
+    await tester.pumpWidget(wrap(rssBody: rssWithOneChapter));
+    await pumpFrames(tester);
+
+    expect(find.textContaining("Couldn't load the chapters"), findsNothing);
+    expect(find.byType(ChapterListRow), findsNWidgets(2));
+    rssStatus = 200;
+  });
+
+  for (final wide in [false, true]) {
+    testWidgets('no overflow at 2.0x text, ${wide ? 'wide' : 'phone'}',
+        (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await setSurface(
+          tester, wide ? const Size(1280, 800) : const Size(390, 844));
+      await tester.pumpWidget(Center(
+        child: SizedBox(
+          width: wide ? 880 : 390,
+          height: wide ? 680 : 844,
+          child: wrap(
+              rssBody: rssWithOneChapter,
+              zipBytes: 98 * 1024 * 1024,
+              wide: wide),
+        ),
+      ));
+      await pumpFrames(tester);
+      expect(find.text('Download · ZIP 98 MB'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  group('download footer, driven by the queue', () {
+    late FakeDownloadEngine engine;
+    late DownloadManager downloads;
+    const id = 'frankenstein_1205_librivox';
+
+    setUp(() async {
+      engine = FakeDownloadEngine();
+      downloads = DownloadManager(
+          db: db,
+          engine: engine,
+          finish: (db, job, zip, root) async => job.toBook(const []),
+          location: DownloadsLocation(
+              documentsRoot: () async => '/docs',
+              visibleRoot: () async => null));
+      await downloads.start();
+    });
+
+    tearDown(() => downloads.dispose());
+
+    Future<void> open(WidgetTester tester, {bool wide = false}) async {
+      await setSurface(
+          tester, wide ? const Size(1280, 800) : const Size(390, 844));
+      await tester.pumpWidget(Center(
+        child: SizedBox(
+          width: wide ? 880 : 390,
+          height: wide ? 680 : 844,
+          child: wrap(
+              rssBody: rssWithOneChapter,
+              zipBytes: 10 * 1024 * 1024,
+              wide: wide,
+              downloads: downloads),
+        ),
+      ));
+      await pumpFrames(tester);
+    }
+
+    testWidgets('Download queues it with the feed titles; Cancel removes it',
+        (tester) async {
+      await open(tester);
+      await tester.tap(find.text('Download · ZIP 10 MB'));
+      await pumpFrames(tester);
+
+      expect(engine.enqueued.single.id, id);
+      expect(engine.enqueued.single.chapters.single.title, 'Letter 1');
+      expect(find.text('Queued · next'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await pumpFrames(tester);
+      expect(engine.cancelled, [id]);
+      expect(find.text('Download · ZIP 10 MB'), findsOneWidget);
+    });
+
+    testWidgets('progress, pause and resume; the state outlives the sheet',
+        (tester) async {
+      await open(tester);
+      await tester.tap(find.text('Download · ZIP 10 MB'));
+      await pumpFrames(tester);
+      final job = engine.enqueued.single;
+      engine.emit(job, status: EngineStatus.running);
+      engine.emit(job, progress: 0.42);
+      await pumpFrames(tester);
+
+      expect(find.text('Downloading… 42%'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      await tester.tap(find.text('Pause'));
+      await pumpFrames(tester);
+      expect(find.text('Paused 42%'), findsOneWidget);
+      expect(find.text('Resume'), findsOneWidget);
+
+      // Close the detail and open it again: the queue still knows.
+      await tester.pumpWidget(const SizedBox());
+      await open(tester);
+      expect(find.text('Paused 42%'), findsOneWidget);
+    });
+
+    testWidgets('waiting for Wi-Fi, then a failure offers Retry',
+        (tester) async {
+      await downloads.setWifiOnly(true);
+      await open(tester);
+      await tester.tap(find.text('Download · ZIP 10 MB'));
+      await pumpFrames(tester);
+      expect(find.text('Waiting for Wi-Fi'), findsOneWidget);
+      expect(engine.wifiFlags, [true]);
+
+      engine.emit(engine.enqueued.single, status: EngineStatus.failed);
+      await pumpFrames(tester);
+      expect(find.text('Retry download'), findsOneWidget);
+      expect(find.textContaining('Check your connection'), findsOneWidget);
+
+      await tester.tap(find.text('Retry download'));
+      await pumpFrames(tester);
+      expect(engine.enqueued, hasLength(2));
+    });
+
+    testWidgets('a finished download shows Downloaded', (tester) async {
+      await open(tester);
+      await tester.tap(find.text('Download · ZIP 10 MB'));
+      await pumpFrames(tester);
+      await db.saveAudiobook(UnifiedAudiobook(
+          id: id,
+          title: 'Frankenstein',
+          author: 'Mary Shelley',
+          description: '',
+          isDownloaded: true,
+          chapters: [
+            AudiobookChapter(
+                id: 'c0',
+                title: 'Letter 1',
+                audioPathOrUrl: '/b/01.mp3',
+                durationSeconds: 60),
+          ]));
+      engine.emit(engine.enqueued.single, status: EngineStatus.complete);
+      await pumpFrames(tester);
+      expect(find.text('Downloaded'), findsWidgets);
+    });
+
+    for (final wide in [false, true]) {
+      testWidgets(
+          'no overflow at 2.0x text while downloading, '
+          '${wide ? 'wide' : 'phone'}', (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await open(tester, wide: wide);
+        await tester.tap(find.text('Download · ZIP 10 MB'));
+        await pumpFrames(tester);
+        engine.emit(engine.enqueued.single, status: EngineStatus.running);
+        engine.emit(engine.enqueued.single, progress: 0.5);
+        await pumpFrames(tester);
+        expect(find.text('Downloading… 50%'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 }

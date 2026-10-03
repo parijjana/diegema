@@ -33,7 +33,7 @@ void main() {
   test('reads the schema version from the header', () async {
     expect(await AppDatabase.storedSchemaVersion(file), isNull);
     await createDb();
-    expect(await AppDatabase.storedSchemaVersion(file), 3);
+    expect(await AppDatabase.storedSchemaVersion(file), 4);
 
     await File(p.join(dir.path, 'not.sqlite')).writeAsString('hello');
     expect(

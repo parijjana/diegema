@@ -92,6 +92,12 @@ class $AudiobooksTable extends Audiobooks
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("hidden_from_continue" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _portableKeyMeta =
+      const VerificationMeta('portableKey');
+  @override
+  late final GeneratedColumn<String> portableKey = GeneratedColumn<String>(
+      'portable_key', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -114,6 +120,7 @@ class $AudiobooksTable extends Audiobooks
         isPinned,
         pinOrder,
         hiddenFromContinue,
+        portableKey,
         createdAt
       ];
   @override
@@ -189,6 +196,12 @@ class $AudiobooksTable extends Audiobooks
           hiddenFromContinue.isAcceptableOrUnknown(
               data['hidden_from_continue']!, _hiddenFromContinueMeta));
     }
+    if (data.containsKey('portable_key')) {
+      context.handle(
+          _portableKeyMeta,
+          portableKey.isAcceptableOrUnknown(
+              data['portable_key']!, _portableKeyMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -226,6 +239,8 @@ class $AudiobooksTable extends Audiobooks
           .read(DriftSqlType.int, data['${effectivePrefix}pin_order']),
       hiddenFromContinue: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}hidden_from_continue'])!,
+      portableKey: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}portable_key']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
     );
@@ -271,6 +286,12 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
   /// NOT delete the book or its [PlaybackProgress] row; it only affects
   /// [AppDatabase.getContinueListening]'s WHERE clause.
   final bool hiddenFromContinue;
+
+  /// Key shared across devices (schema v4): `lv:<archive id>` for LibriVox
+  /// books, `ck:<content hash>` for local ones (see
+  /// `services/portable_key_io.dart`). Null until worked out — a local
+  /// book's needs its files read.
+  final String? portableKey;
   final DateTime createdAt;
   const Audiobook(
       {required this.id,
@@ -285,6 +306,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       required this.isPinned,
       this.pinOrder,
       required this.hiddenFromContinue,
+      this.portableKey,
       required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -307,6 +329,9 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       map['pin_order'] = Variable<int>(pinOrder);
     }
     map['hidden_from_continue'] = Variable<bool>(hiddenFromContinue);
+    if (!nullToAbsent || portableKey != null) {
+      map['portable_key'] = Variable<String>(portableKey);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -331,6 +356,9 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           ? const Value.absent()
           : Value(pinOrder),
       hiddenFromContinue: Value(hiddenFromContinue),
+      portableKey: portableKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(portableKey),
       createdAt: Value(createdAt),
     );
   }
@@ -351,6 +379,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       isPinned: serializer.fromJson<bool>(json['isPinned']),
       pinOrder: serializer.fromJson<int?>(json['pinOrder']),
       hiddenFromContinue: serializer.fromJson<bool>(json['hiddenFromContinue']),
+      portableKey: serializer.fromJson<String?>(json['portableKey']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -370,6 +399,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       'isPinned': serializer.toJson<bool>(isPinned),
       'pinOrder': serializer.toJson<int?>(pinOrder),
       'hiddenFromContinue': serializer.toJson<bool>(hiddenFromContinue),
+      'portableKey': serializer.toJson<String?>(portableKey),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -387,6 +417,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           bool? isPinned,
           Value<int?> pinOrder = const Value.absent(),
           bool? hiddenFromContinue,
+          Value<String?> portableKey = const Value.absent(),
           DateTime? createdAt}) =>
       Audiobook(
         id: id ?? this.id,
@@ -402,6 +433,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
         isPinned: isPinned ?? this.isPinned,
         pinOrder: pinOrder.present ? pinOrder.value : this.pinOrder,
         hiddenFromContinue: hiddenFromContinue ?? this.hiddenFromContinue,
+        portableKey: portableKey.present ? portableKey.value : this.portableKey,
         createdAt: createdAt ?? this.createdAt,
       );
   Audiobook copyWithCompanion(AudiobooksCompanion data) {
@@ -425,6 +457,8 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       hiddenFromContinue: data.hiddenFromContinue.present
           ? data.hiddenFromContinue.value
           : this.hiddenFromContinue,
+      portableKey:
+          data.portableKey.present ? data.portableKey.value : this.portableKey,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -444,6 +478,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           ..write('isPinned: $isPinned, ')
           ..write('pinOrder: $pinOrder, ')
           ..write('hiddenFromContinue: $hiddenFromContinue, ')
+          ..write('portableKey: $portableKey, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -463,6 +498,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       isPinned,
       pinOrder,
       hiddenFromContinue,
+      portableKey,
       createdAt);
   @override
   bool operator ==(Object other) =>
@@ -480,6 +516,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           other.isPinned == this.isPinned &&
           other.pinOrder == this.pinOrder &&
           other.hiddenFromContinue == this.hiddenFromContinue &&
+          other.portableKey == this.portableKey &&
           other.createdAt == this.createdAt);
 }
 
@@ -496,6 +533,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
   final Value<bool> isPinned;
   final Value<int?> pinOrder;
   final Value<bool> hiddenFromContinue;
+  final Value<String?> portableKey;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const AudiobooksCompanion({
@@ -511,6 +549,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     this.isPinned = const Value.absent(),
     this.pinOrder = const Value.absent(),
     this.hiddenFromContinue = const Value.absent(),
+    this.portableKey = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -527,6 +566,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     this.isPinned = const Value.absent(),
     this.pinOrder = const Value.absent(),
     this.hiddenFromContinue = const Value.absent(),
+    this.portableKey = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -546,6 +586,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     Expression<bool>? isPinned,
     Expression<int>? pinOrder,
     Expression<bool>? hiddenFromContinue,
+    Expression<String>? portableKey,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -563,6 +604,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
       if (pinOrder != null) 'pin_order': pinOrder,
       if (hiddenFromContinue != null)
         'hidden_from_continue': hiddenFromContinue,
+      if (portableKey != null) 'portable_key': portableKey,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -581,6 +623,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
       Value<bool>? isPinned,
       Value<int?>? pinOrder,
       Value<bool>? hiddenFromContinue,
+      Value<String?>? portableKey,
       Value<DateTime>? createdAt,
       Value<int>? rowid}) {
     return AudiobooksCompanion(
@@ -596,6 +639,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
       isPinned: isPinned ?? this.isPinned,
       pinOrder: pinOrder ?? this.pinOrder,
       hiddenFromContinue: hiddenFromContinue ?? this.hiddenFromContinue,
+      portableKey: portableKey ?? this.portableKey,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -640,6 +684,9 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     if (hiddenFromContinue.present) {
       map['hidden_from_continue'] = Variable<bool>(hiddenFromContinue.value);
     }
+    if (portableKey.present) {
+      map['portable_key'] = Variable<String>(portableKey.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -664,6 +711,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
           ..write('isPinned: $isPinned, ')
           ..write('pinOrder: $pinOrder, ')
           ..write('hiddenFromContinue: $hiddenFromContinue, ')
+          ..write('portableKey: $portableKey, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1894,6 +1942,392 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
   }
 }
 
+class $SyncRecordsTable extends SyncRecords
+    with TableInfo<$SyncRecordsTable, SyncRecordRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _slotMeta = const VerificationMeta('slot');
+  @override
+  late final GeneratedColumn<String> slot = GeneratedColumn<String>(
+      'slot', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+      'kind', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+      'key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _hlcMeta = const VerificationMeta('hlc');
+  @override
+  late final GeneratedColumn<String> hlc = GeneratedColumn<String>(
+      'hlc', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('{}'));
+  static const VerificationMeta _deletedMeta =
+      const VerificationMeta('deleted');
+  @override
+  late final GeneratedColumn<bool> deleted = GeneratedColumn<bool>(
+      'deleted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("deleted" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns =>
+      [slot, kind, key, deviceId, hlc, payload, deleted];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_records';
+  @override
+  VerificationContext validateIntegrity(Insertable<SyncRecordRow> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('slot')) {
+      context.handle(
+          _slotMeta, slot.isAcceptableOrUnknown(data['slot']!, _slotMeta));
+    } else if (isInserting) {
+      context.missing(_slotMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+          _kindMeta, kind.isAcceptableOrUnknown(data['kind']!, _kindMeta));
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('key')) {
+      context.handle(
+          _keyMeta, key.isAcceptableOrUnknown(data['key']!, _keyMeta));
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('hlc')) {
+      context.handle(
+          _hlcMeta, hlc.isAcceptableOrUnknown(data['hlc']!, _hlcMeta));
+    } else if (isInserting) {
+      context.missing(_hlcMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
+    }
+    if (data.containsKey('deleted')) {
+      context.handle(_deletedMeta,
+          deleted.isAcceptableOrUnknown(data['deleted']!, _deletedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {slot};
+  @override
+  SyncRecordRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncRecordRow(
+      slot: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}slot'])!,
+      kind: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}kind'])!,
+      key: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}key'])!,
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
+      hlc: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}hlc'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
+      deleted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}deleted'])!,
+    );
+  }
+
+  @override
+  $SyncRecordsTable createAlias(String alias) {
+    return $SyncRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class SyncRecordRow extends DataClass implements Insertable<SyncRecordRow> {
+  final String slot;
+  final String kind;
+  final String key;
+  final String deviceId;
+
+  /// `Hlc.encode()`: sorts as text in stamp order.
+  final String hlc;
+
+  /// JSON object.
+  final String payload;
+  final bool deleted;
+  const SyncRecordRow(
+      {required this.slot,
+      required this.kind,
+      required this.key,
+      required this.deviceId,
+      required this.hlc,
+      required this.payload,
+      required this.deleted});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['slot'] = Variable<String>(slot);
+    map['kind'] = Variable<String>(kind);
+    map['key'] = Variable<String>(key);
+    map['device_id'] = Variable<String>(deviceId);
+    map['hlc'] = Variable<String>(hlc);
+    map['payload'] = Variable<String>(payload);
+    map['deleted'] = Variable<bool>(deleted);
+    return map;
+  }
+
+  SyncRecordsCompanion toCompanion(bool nullToAbsent) {
+    return SyncRecordsCompanion(
+      slot: Value(slot),
+      kind: Value(kind),
+      key: Value(key),
+      deviceId: Value(deviceId),
+      hlc: Value(hlc),
+      payload: Value(payload),
+      deleted: Value(deleted),
+    );
+  }
+
+  factory SyncRecordRow.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncRecordRow(
+      slot: serializer.fromJson<String>(json['slot']),
+      kind: serializer.fromJson<String>(json['kind']),
+      key: serializer.fromJson<String>(json['key']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      hlc: serializer.fromJson<String>(json['hlc']),
+      payload: serializer.fromJson<String>(json['payload']),
+      deleted: serializer.fromJson<bool>(json['deleted']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'slot': serializer.toJson<String>(slot),
+      'kind': serializer.toJson<String>(kind),
+      'key': serializer.toJson<String>(key),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'hlc': serializer.toJson<String>(hlc),
+      'payload': serializer.toJson<String>(payload),
+      'deleted': serializer.toJson<bool>(deleted),
+    };
+  }
+
+  SyncRecordRow copyWith(
+          {String? slot,
+          String? kind,
+          String? key,
+          String? deviceId,
+          String? hlc,
+          String? payload,
+          bool? deleted}) =>
+      SyncRecordRow(
+        slot: slot ?? this.slot,
+        kind: kind ?? this.kind,
+        key: key ?? this.key,
+        deviceId: deviceId ?? this.deviceId,
+        hlc: hlc ?? this.hlc,
+        payload: payload ?? this.payload,
+        deleted: deleted ?? this.deleted,
+      );
+  SyncRecordRow copyWithCompanion(SyncRecordsCompanion data) {
+    return SyncRecordRow(
+      slot: data.slot.present ? data.slot.value : this.slot,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      key: data.key.present ? data.key.value : this.key,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      hlc: data.hlc.present ? data.hlc.value : this.hlc,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      deleted: data.deleted.present ? data.deleted.value : this.deleted,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncRecordRow(')
+          ..write('slot: $slot, ')
+          ..write('kind: $kind, ')
+          ..write('key: $key, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('hlc: $hlc, ')
+          ..write('payload: $payload, ')
+          ..write('deleted: $deleted')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(slot, kind, key, deviceId, hlc, payload, deleted);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncRecordRow &&
+          other.slot == this.slot &&
+          other.kind == this.kind &&
+          other.key == this.key &&
+          other.deviceId == this.deviceId &&
+          other.hlc == this.hlc &&
+          other.payload == this.payload &&
+          other.deleted == this.deleted);
+}
+
+class SyncRecordsCompanion extends UpdateCompanion<SyncRecordRow> {
+  final Value<String> slot;
+  final Value<String> kind;
+  final Value<String> key;
+  final Value<String> deviceId;
+  final Value<String> hlc;
+  final Value<String> payload;
+  final Value<bool> deleted;
+  final Value<int> rowid;
+  const SyncRecordsCompanion({
+    this.slot = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.key = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.hlc = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.deleted = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncRecordsCompanion.insert({
+    required String slot,
+    required String kind,
+    required String key,
+    required String deviceId,
+    required String hlc,
+    this.payload = const Value.absent(),
+    this.deleted = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : slot = Value(slot),
+        kind = Value(kind),
+        key = Value(key),
+        deviceId = Value(deviceId),
+        hlc = Value(hlc);
+  static Insertable<SyncRecordRow> custom({
+    Expression<String>? slot,
+    Expression<String>? kind,
+    Expression<String>? key,
+    Expression<String>? deviceId,
+    Expression<String>? hlc,
+    Expression<String>? payload,
+    Expression<bool>? deleted,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (slot != null) 'slot': slot,
+      if (kind != null) 'kind': kind,
+      if (key != null) 'key': key,
+      if (deviceId != null) 'device_id': deviceId,
+      if (hlc != null) 'hlc': hlc,
+      if (payload != null) 'payload': payload,
+      if (deleted != null) 'deleted': deleted,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncRecordsCompanion copyWith(
+      {Value<String>? slot,
+      Value<String>? kind,
+      Value<String>? key,
+      Value<String>? deviceId,
+      Value<String>? hlc,
+      Value<String>? payload,
+      Value<bool>? deleted,
+      Value<int>? rowid}) {
+    return SyncRecordsCompanion(
+      slot: slot ?? this.slot,
+      kind: kind ?? this.kind,
+      key: key ?? this.key,
+      deviceId: deviceId ?? this.deviceId,
+      hlc: hlc ?? this.hlc,
+      payload: payload ?? this.payload,
+      deleted: deleted ?? this.deleted,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (slot.present) {
+      map['slot'] = Variable<String>(slot.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (hlc.present) {
+      map['hlc'] = Variable<String>(hlc.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (deleted.present) {
+      map['deleted'] = Variable<bool>(deleted.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncRecordsCompanion(')
+          ..write('slot: $slot, ')
+          ..write('kind: $kind, ')
+          ..write('key: $key, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('hlc: $hlc, ')
+          ..write('payload: $payload, ')
+          ..write('deleted: $deleted, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1902,12 +2336,21 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PlaybackProgressTable playbackProgress =
       $PlaybackProgressTable(this);
   late final $BookmarksTable bookmarks = $BookmarksTable(this);
+  late final $SyncRecordsTable syncRecords = $SyncRecordsTable(this);
+  late final Index syncRecordsDeviceHlc = Index('sync_records_device_hlc',
+      'CREATE INDEX sync_records_device_hlc ON sync_records (device_id, hlc)');
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [audiobooks, chapters, playbackProgress, bookmarks];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+        audiobooks,
+        chapters,
+        playbackProgress,
+        bookmarks,
+        syncRecords,
+        syncRecordsDeviceHlc
+      ];
 }
 
 typedef $$AudiobooksTableCreateCompanionBuilder = AudiobooksCompanion Function({
@@ -1923,6 +2366,7 @@ typedef $$AudiobooksTableCreateCompanionBuilder = AudiobooksCompanion Function({
   Value<bool> isPinned,
   Value<int?> pinOrder,
   Value<bool> hiddenFromContinue,
+  Value<String?> portableKey,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -1939,6 +2383,7 @@ typedef $$AudiobooksTableUpdateCompanionBuilder = AudiobooksCompanion Function({
   Value<bool> isPinned,
   Value<int?> pinOrder,
   Value<bool> hiddenFromContinue,
+  Value<String?> portableKey,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -1988,6 +2433,9 @@ class $$AudiobooksTableFilterComposer
   ColumnFilters<bool> get hiddenFromContinue => $composableBuilder(
       column: $table.hiddenFromContinue,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get portableKey => $composableBuilder(
+      column: $table.portableKey, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -2041,6 +2489,9 @@ class $$AudiobooksTableOrderingComposer
       column: $table.hiddenFromContinue,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get portableKey => $composableBuilder(
+      column: $table.portableKey, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 }
@@ -2090,6 +2541,9 @@ class $$AudiobooksTableAnnotationComposer
   GeneratedColumn<bool> get hiddenFromContinue => $composableBuilder(
       column: $table.hiddenFromContinue, builder: (column) => column);
 
+  GeneratedColumn<String> get portableKey => $composableBuilder(
+      column: $table.portableKey, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 }
@@ -2129,6 +2583,7 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             Value<bool> isPinned = const Value.absent(),
             Value<int?> pinOrder = const Value.absent(),
             Value<bool> hiddenFromContinue = const Value.absent(),
+            Value<String?> portableKey = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2145,6 +2600,7 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             isPinned: isPinned,
             pinOrder: pinOrder,
             hiddenFromContinue: hiddenFromContinue,
+            portableKey: portableKey,
             createdAt: createdAt,
             rowid: rowid,
           ),
@@ -2161,6 +2617,7 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             Value<bool> isPinned = const Value.absent(),
             Value<int?> pinOrder = const Value.absent(),
             Value<bool> hiddenFromContinue = const Value.absent(),
+            Value<String?> portableKey = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2177,6 +2634,7 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             isPinned: isPinned,
             pinOrder: pinOrder,
             hiddenFromContinue: hiddenFromContinue,
+            portableKey: portableKey,
             createdAt: createdAt,
             rowid: rowid,
           ),
@@ -2825,6 +3283,213 @@ typedef $$BookmarksTableProcessedTableManager = ProcessedTableManager<
     (Bookmark, BaseReferences<_$AppDatabase, $BookmarksTable, Bookmark>),
     Bookmark,
     PrefetchHooks Function()>;
+typedef $$SyncRecordsTableCreateCompanionBuilder = SyncRecordsCompanion
+    Function({
+  required String slot,
+  required String kind,
+  required String key,
+  required String deviceId,
+  required String hlc,
+  Value<String> payload,
+  Value<bool> deleted,
+  Value<int> rowid,
+});
+typedef $$SyncRecordsTableUpdateCompanionBuilder = SyncRecordsCompanion
+    Function({
+  Value<String> slot,
+  Value<String> kind,
+  Value<String> key,
+  Value<String> deviceId,
+  Value<String> hlc,
+  Value<String> payload,
+  Value<bool> deleted,
+  Value<int> rowid,
+});
+
+class $$SyncRecordsTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncRecordsTable> {
+  $$SyncRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get slot => $composableBuilder(
+      column: $table.slot, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get key => $composableBuilder(
+      column: $table.key, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get hlc => $composableBuilder(
+      column: $table.hlc, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get deleted => $composableBuilder(
+      column: $table.deleted, builder: (column) => ColumnFilters(column));
+}
+
+class $$SyncRecordsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncRecordsTable> {
+  $$SyncRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get slot => $composableBuilder(
+      column: $table.slot, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get key => $composableBuilder(
+      column: $table.key, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get hlc => $composableBuilder(
+      column: $table.hlc, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get deleted => $composableBuilder(
+      column: $table.deleted, builder: (column) => ColumnOrderings(column));
+}
+
+class $$SyncRecordsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncRecordsTable> {
+  $$SyncRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get slot =>
+      $composableBuilder(column: $table.slot, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<String> get hlc =>
+      $composableBuilder(column: $table.hlc, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<bool> get deleted =>
+      $composableBuilder(column: $table.deleted, builder: (column) => column);
+}
+
+class $$SyncRecordsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $SyncRecordsTable,
+    SyncRecordRow,
+    $$SyncRecordsTableFilterComposer,
+    $$SyncRecordsTableOrderingComposer,
+    $$SyncRecordsTableAnnotationComposer,
+    $$SyncRecordsTableCreateCompanionBuilder,
+    $$SyncRecordsTableUpdateCompanionBuilder,
+    (
+      SyncRecordRow,
+      BaseReferences<_$AppDatabase, $SyncRecordsTable, SyncRecordRow>
+    ),
+    SyncRecordRow,
+    PrefetchHooks Function()> {
+  $$SyncRecordsTableTableManager(_$AppDatabase db, $SyncRecordsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncRecordsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> slot = const Value.absent(),
+            Value<String> kind = const Value.absent(),
+            Value<String> key = const Value.absent(),
+            Value<String> deviceId = const Value.absent(),
+            Value<String> hlc = const Value.absent(),
+            Value<String> payload = const Value.absent(),
+            Value<bool> deleted = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SyncRecordsCompanion(
+            slot: slot,
+            kind: kind,
+            key: key,
+            deviceId: deviceId,
+            hlc: hlc,
+            payload: payload,
+            deleted: deleted,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String slot,
+            required String kind,
+            required String key,
+            required String deviceId,
+            required String hlc,
+            Value<String> payload = const Value.absent(),
+            Value<bool> deleted = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SyncRecordsCompanion.insert(
+            slot: slot,
+            kind: kind,
+            key: key,
+            deviceId: deviceId,
+            hlc: hlc,
+            payload: payload,
+            deleted: deleted,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable<$SyncRecordsTable, SyncRecordRow>(table),
+                    BaseReferences<_$AppDatabase, $SyncRecordsTable,
+                        SyncRecordRow>(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$SyncRecordsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $SyncRecordsTable,
+    SyncRecordRow,
+    $$SyncRecordsTableFilterComposer,
+    $$SyncRecordsTableOrderingComposer,
+    $$SyncRecordsTableAnnotationComposer,
+    $$SyncRecordsTableCreateCompanionBuilder,
+    $$SyncRecordsTableUpdateCompanionBuilder,
+    (
+      SyncRecordRow,
+      BaseReferences<_$AppDatabase, $SyncRecordsTable, SyncRecordRow>
+    ),
+    SyncRecordRow,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2837,4 +3502,6 @@ class $AppDatabaseManager {
       $$PlaybackProgressTableTableManager(_db, _db.playbackProgress);
   $$BookmarksTableTableManager get bookmarks =>
       $$BookmarksTableTableManager(_db, _db.bookmarks);
+  $$SyncRecordsTableTableManager get syncRecords =>
+      $$SyncRecordsTableTableManager(_db, _db.syncRecords);
 }

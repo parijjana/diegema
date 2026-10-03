@@ -21,7 +21,9 @@ class SyncScheduler {
 
   Timer? _periodic;
   Timer? _settle;
-  PlaybackState? _last;
+  /// Playback was going (playing, or loading the next chapter after one
+  /// finished) and hasn't stopped since.
+  bool _going = false;
 
   SyncScheduler({required this.sync, this.playback});
 
@@ -29,25 +31,32 @@ class SyncScheduler {
     _periodic ??= Timer.periodic(every, (_) => unawaited(sync()));
     final p = playback;
     if (p != null) {
-      _last = p.value;
+      _going = p.value == PlaybackState.playing;
       p.addListener(_onPlayback);
     }
   }
 
   void _onPlayback() {
     final now = playback!.value;
-    final was = _last;
-    _last = now;
-    // Playing again, or loading the next chapter after one finished: not a
-    // stop after all.
-    if (now == PlaybackState.playing || now == PlaybackState.loading) {
+    if (now == PlaybackState.playing) {
       _settle?.cancel();
+      _going = true;
+      return;
+    }
+    // Loading the next chapter after one finished: not a stop after all,
+    // and a pause while it loads still counts as stopping playback.
+    if (now == PlaybackState.loading) {
+      final pending = _settle?.isActive ?? false;
+      _settle?.cancel();
+      _going = pending;
       return;
     }
     final stopped = now == PlaybackState.paused ||
         now == PlaybackState.completed ||
         now == PlaybackState.idle;
-    if (was == PlaybackState.playing && stopped) {
+    final going = _going;
+    _going = false;
+    if (going && stopped) {
       _settle?.cancel();
       _settle = Timer(afterPlayback, () => unawaited(sync()));
     }

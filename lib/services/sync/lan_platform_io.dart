@@ -166,7 +166,8 @@ class BonsoirPeerDiscovery implements PeerDiscovery {
           });
           await disc.start();
         } catch (e) {
-          debugPrint('sync: watch failed: $e');
+          // LanSync logs it and tries again later.
+          if (!out.isClosed) out.addError(e);
         }
       },
       onCancel: () async {

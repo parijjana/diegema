@@ -36,6 +36,7 @@ class Device {
       browseWindow: Duration.zero,
       timeout: const Duration(seconds: 5),
       callerWindow: const Duration(milliseconds: 300),
+      watchRetry: const Duration(milliseconds: 100),
       instance: 'dg-$id',
     );
     return this;
@@ -180,6 +181,52 @@ void main() {
     expect(seen, hasLength(1));
     await mac.lan.stopWatching();
     await phone.lan.stopListening();
+  });
+
+  test('a watch that fails to start tries again', () async {
+    final net = FakeNetwork();
+    final failing = FakeDiscovery(net)..failWatches = 1;
+    final phone =
+        await Device('phone').start(net, listens: true, groupKey: groupKey);
+    final mac = await Device('mac')
+        .start(net, listens: false, groupKey: groupKey, discovery: failing);
+    final seen = <PeerResult>[];
+    mac.lan.exchanges.listen(seen.add);
+    await mac.lan.startWatching();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    await phone.lan.startListening();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(seen.single.ok, isTrue);
+    await mac.lan.dispose();
+    await phone.lan.dispose();
+  });
+
+  test('stopping a failed watch cancels its retry', () async {
+    final net = FakeNetwork();
+    final failing = FakeDiscovery(net)..failWatches = 1;
+    final phone =
+        await Device('phone').start(net, listens: true, groupKey: groupKey);
+    final mac = await Device('mac')
+        .start(net, listens: false, groupKey: groupKey, discovery: failing);
+    final seen = <PeerResult>[];
+    mac.lan.exchanges.listen(seen.add);
+    await mac.lan.startWatching();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await mac.lan.stopWatching();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    await phone.lan.startListening();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(seen, isEmpty);
+    await phone.lan.dispose();
+  });
+
+  test('dispose ends the exchanges stream', () async {
+    final mac = await Device('mac')
+        .start(FakeNetwork(), listens: false, groupKey: groupKey);
+    final done = mac.lan.exchanges.toList();
+    await mac.lan.startWatching();
+    await mac.lan.dispose();
+    expect(await done, isEmpty);
   });
 
   test('Sync now with waitForCallers counts a Mac that dials in', () async {

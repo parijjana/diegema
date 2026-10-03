@@ -110,6 +110,7 @@ class SyncService implements SyncController {
   Future<SyncGroup?>? _group;
   bool _keysUnreadable = false;
   LanSync? _lan;
+  StreamSubscription<PeerResult>? _lanExchanges;
   final ValueNotifier<LastSync?> _lastSync = ValueNotifier(null);
   int? _lastInbound;
 
@@ -186,7 +187,7 @@ class SyncService implements SyncController {
     );
     // Devices that dialled in, and devices a Mac dialled on seeing them,
     // count as syncs too.
-    lan.exchanges.where((r) => r.ok).listen((_) {
+    _lanExchanges = lan.exchanges.where((r) => r.ok).listen((_) {
       _lastInbound = _now();
       _lastSync.value =
           LastSync(DateTime.fromMillisecondsSinceEpoch(_now()), 1);
@@ -333,7 +334,10 @@ class SyncService implements SyncController {
     });
     // Announce again so a watching Mac picks the removal up at once.
     final lan = await _lanSync();
-    if (lan != null) unawaited(_run(lan, waitForCallers: true));
+    if (lan != null) {
+      unawaited(_logged('announce after remove',
+          () => _run(lan, waitForCallers: true)));
+    }
   }
 
   @override
@@ -355,6 +359,9 @@ class SyncService implements SyncController {
     final s = secrets;
     if (s == null) return;
     await _offline(_lan);
+    await _lanExchanges?.cancel();
+    _lanExchanges = null;
+    await _lan?.dispose();
     _lan = null;
     await SyncGroup.wipe(s);
     _group = null;

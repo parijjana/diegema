@@ -2,7 +2,9 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
-import 'package:path_provider/path_provider.dart';
+// path_provider needs Flutter; the CLI build gets a stub instead.
+import 'database_folder_cli.dart'
+    if (dart.library.ui) 'database_folder_flutter.dart';
 import 'package:path/path.dart' as p;
 import '../core/utils/book_identity.dart';
 import '../domain/models/audiobook.dart' as domain;
@@ -193,6 +195,9 @@ class AppDatabase extends _$AppDatabase {
 
   static const int _schemaVersion = 4;
 
+  /// The schema this build reads and writes; the CLI refuses any other.
+  static const int currentSchemaVersion = _schemaVersion;
+
   @override
   int get schemaVersion => _schemaVersion;
 
@@ -331,7 +336,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   static Future<File> _databaseFile() async {
-    final dbFolder = await getApplicationDocumentsDirectory();
+    final dbFolder = await defaultDatabaseFolder();
     return File(p.join(dbFolder.path, 'diegema.sqlite'));
   }
 

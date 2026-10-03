@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:bonsoir/bonsoir.dart';
@@ -8,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../sync/file_secret_store.dart';
 import '../../sync/lan_sync.dart';
 import '../../sync/sync_group.dart';
 
@@ -35,46 +35,10 @@ class KeystoreSecretStore implements SecretStore {
 /// macOS: a JSON file in the app's sandbox container, which only this app
 /// can read. The Keychain needs a properly signed build (lessons_learnt
 /// flutter-secure-storage-macos-sandbox.md); owner decision 2026-10-03.
-class FileSecretStore implements SecretStore {
-  final Future<File> Function() _file;
-  FileSecretStore([Future<File> Function()? file])
-      : _file = file ??
-            (() async => File(p.join(
-                (await getApplicationSupportDirectory()).path,
-                'sync_secrets.json')));
-
-  Future<Map<String, String>> _load() async {
-    final f = await _file();
-    if (!await f.exists()) return {};
-    try {
-      return (jsonDecode(await f.readAsString()) as Map).cast<String, String>();
-    } catch (_) {
-      return {};
-    }
-  }
-
-  Future<void> _save(Map<String, String> values) async {
-    final f = await _file();
-    await f.parent.create(recursive: true);
-    final tmp = File('${f.path}.tmp');
-    await tmp.writeAsString(jsonEncode(values), flush: true);
-    await tmp.rename(f.path);
-  }
-
-  @override
-  Future<String?> read(String key) async => (await _load())[key];
-
-  @override
-  Future<void> write(String key, String value) async =>
-      _save({...await _load(), key: value});
-
-  @override
-  Future<void> delete(String key) async => _save(await _load()
-    ..remove(key));
-}
-
-SecretStore platformSecretStore() =>
-    Platform.isMacOS ? FileSecretStore() : KeystoreSecretStore();
+SecretStore platformSecretStore() => Platform.isMacOS
+    ? FileSecretStore(() async => File(p.join(
+        (await getApplicationSupportDirectory()).path, syncSecretsFileName)))
+    : KeystoreSecretStore();
 
 /// Phones and Windows listen; a Mac only connects out (SYNC_DESIGN §3).
 bool get platformListens => !Platform.isMacOS;

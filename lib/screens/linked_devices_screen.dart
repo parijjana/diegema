@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/sync/sync_controller.dart';
+import '../services/sync/sync_file_picker.dart';
+import '../sync/sync_file.dart';
 import '../sync/sync_view.dart';
 import '../theme/app_theme.dart';
 import 'link_device_sheet.dart';
@@ -19,7 +21,14 @@ class LinkedDevicesScreen extends StatefulWidget {
   /// The time source for "synced 3 min ago"; tests pass a fake one.
   final DateTime Function()? now;
 
-  const LinkedDevicesScreen({super.key, this.pollForScanner, this.now});
+  /// The save and open dialogs for the sync file; tests pass a fake one.
+  final SyncFilePicker filePicker;
+
+  const LinkedDevicesScreen(
+      {super.key,
+      this.pollForScanner,
+      this.now,
+      this.filePicker = const PlatformSyncFilePicker()});
 
   @override
   State<LinkedDevicesScreen> createState() => _LinkedDevicesScreenState();
@@ -176,6 +185,68 @@ class _LinkedDevicesScreenState extends State<LinkedDevicesScreen> {
     }
     final n = last.reached;
     return 'Synced $ago with $n ${n == 1 ? 'device' : 'devices'}';
+  }
+
+  // --- Sync file ---
+  bool _fileBusy = false;
+
+  void _say(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _exportFile() async {
+    final sync = SyncScope.maybeOf(context);
+    if (sync == null || _fileBusy) return;
+    setState(() => _fileBusy = true);
+    String? message;
+    try {
+      final file = await sync.exportSyncFile();
+      final saved = await widget.filePicker.save(file.fileName, file.bytes);
+      if (saved) message = 'Saved ${file.fileName}';
+    } catch (_) {
+      message = 'Couldn\'t save the sync file.';
+    }
+    if (!mounted) return;
+    setState(() => _fileBusy = false);
+    if (message != null) _say(message);
+  }
+
+  Future<void> _importFile() async {
+    final sync = SyncScope.maybeOf(context);
+    if (sync == null || _fileBusy) return;
+    setState(() => _fileBusy = true);
+    String? message;
+    try {
+      final file = await widget.filePicker.pick();
+      if (file != null) {
+        final bytes = file.bytes;
+        if (file.size > SyncFile.maxBytes ||
+            (bytes != null && bytes.length > SyncFile.maxBytes)) {
+          message = 'This file is too big to be a Diegema sync file.';
+        } else if (bytes == null) {
+          message = 'Couldn\'t read that file.';
+        } else {
+          final n = await sync.importSyncFile(bytes);
+          message = n > 0
+              ? 'Imported: $n ${n == 1 ? 'update' : 'updates'} from the file'
+              : 'Nothing new in this file';
+        }
+      }
+    } on SyncFileError catch (e) {
+      message = switch (e.problem) {
+        SyncFileProblem.notSyncFile => 'This isn\'t a Diegema sync file.',
+        SyncFileProblem.otherGroup =>
+          'This file is from a device that isn\'t linked to this one.',
+        SyncFileProblem.damaged =>
+          'This file was changed or damaged after it was exported.',
+      };
+    } catch (_) {
+      message = 'Couldn\'t import the sync file.';
+    }
+    if (!mounted) return;
+    setState(() => _fileBusy = false);
+    if (message != null) _say(message);
   }
 
   Future<void> _loadName() async {
@@ -420,6 +491,36 @@ class _LinkedDevicesScreenState extends State<LinkedDevicesScreen> {
                       onRemove: () => _remove(id, view.deviceName(id)),
                     ),
                   ),
+              const SizedBox(height: Sp.sectionGap),
+              Semantics(
+                header: true,
+                child: Text('Sync file',
+                    style: AppType.titleSm.copyWith(color: c.textSecondary)),
+              ),
+              const SizedBox(height: Sp.x3),
+              Text(
+                  'For devices that can\'t reach each other on Wi-Fi, such as '
+                  'two Macs: export here, open the file on the other device.',
+                  style: AppType.body.copyWith(color: c.textSecondary)),
+              const SizedBox(height: Sp.x3),
+              OutlinedButton.icon(
+                style: _actionStyle,
+                onPressed: _fileBusy ? null : _exportFile,
+                icon: const Icon(Icons.upload_file_rounded),
+                label: const Text('Export sync file'),
+              ),
+              const SizedBox(height: Sp.x2),
+              OutlinedButton.icon(
+                style: _actionStyle,
+                onPressed: _fileBusy ? null : _importFile,
+                icon: _fileBusy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.file_open_rounded),
+                label: const Text('Import sync file'),
+              ),
               const SizedBox(height: Sp.sectionGap),
               OutlinedButton.icon(
                 style: _actionStyle.copyWith(

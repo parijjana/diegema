@@ -252,6 +252,8 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await pumpFrames(tester);
       expect(sync.unlinkCalls, 0);
+      await tester.scrollUntilVisible(find.text('Sync now'), -100,
+          scrollable: find.byType(Scrollable).first);
       expect(find.text('Sync now'), findsOneWidget);
       await close(tester);
     });

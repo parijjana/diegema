@@ -38,7 +38,8 @@ const String kHeroBookId = 'frankenstein_cs_librivox';
 /// point of the shot is a library in use, and the "Up next" list only has
 /// anything to show when there is a next.
 const int kHeroChapterIndex = 2;
-const int kHeroPositionSeconds = 492;
+/// Must stay inside chapter 3's 410 s, or the scrubber pins at 100%.
+const int kHeroPositionSeconds = 187;
 
 /// Two more books carrying progress, so "Continue listening" is populated
 /// rather than a single-item row. Ordered by [DateTime] below so the shelf's

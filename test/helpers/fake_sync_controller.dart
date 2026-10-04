@@ -171,4 +171,29 @@ class FakeSyncController implements SyncController {
 
   @override
   Future<void> setDeviceName(String value) async => name = value.trim();
+
+  /// What [exportSyncFile] returns; null makes it throw (not linked).
+  SyncFileExport? exportResult = const SyncFileExport(
+      [1, 2, 3], 'diegema-this-phone-2026-10-04.diegemasync');
+  int exportCalls = 0;
+
+  @override
+  Future<SyncFileExport> exportSyncFile() async {
+    exportCalls++;
+    return exportResult ?? (throw StateError('not linked'));
+  }
+
+  /// Every file [importSyncFile] was handed.
+  final imports = <List<int>>[];
+
+  /// What [importSyncFile] returns, or throws when it is an exception.
+  Object importResult = 0;
+
+  @override
+  Future<int> importSyncFile(List<int> bytes) async {
+    imports.add(bytes);
+    final r = importResult;
+    if (r is int) return r;
+    throw r;
+  }
 }

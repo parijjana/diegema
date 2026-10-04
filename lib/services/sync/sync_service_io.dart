@@ -13,6 +13,7 @@ import '../../sync/lan_sync.dart';
 import '../../sync/link_code.dart';
 import '../../sync/local_publisher.dart';
 import '../../sync/sync_exchange.dart';
+import '../../sync/sync_file.dart';
 import '../../sync/sync_group.dart';
 import '../../sync/sync_record.dart';
 import '../../sync/sync_store.dart';
@@ -459,6 +460,44 @@ class SyncService implements SyncController {
     await _serial(() async {
       await _publishDevice(_now());
       await _rebuildView();
+    });
+  }
+
+  @override
+  Future<SyncFileExport> exportSyncFile() async {
+    final key = (await group())?.key;
+    if (key == null) throw StateError('not linked');
+    await refresh();
+    final records = await _serial(store.all);
+    final now = _now();
+    return SyncFileExport(
+      await SyncFile.encode(
+          groupKey: key,
+          deviceId: await deviceId(),
+          createdAtMillis: now,
+          records: records),
+      SyncFile.fileName(await identity.deviceName(),
+          DateTime.fromMillisecondsSinceEpoch(now)),
+    );
+  }
+
+  @override
+  Future<int> importSyncFile(List<int> bytes) async {
+    final key = (await group())?.key;
+    if (key == null) throw StateError('not linked');
+    final file = await SyncFile.decode(bytes, groupKey: key);
+    final clock = await _clockNow();
+    return _serial(() async {
+      // Merged like a sync: only newer records replace what is here.
+      final changed = await mergeInto(store, file.records);
+      if (changed.isEmpty) return 0;
+      var c = _clock ?? clock;
+      for (final r in changed) {
+        c = c.receive(r.hlc, _now());
+      }
+      _clock = c;
+      await _rebuildView();
+      return changed.length;
     });
   }
 

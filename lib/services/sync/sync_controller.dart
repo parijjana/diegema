@@ -2,9 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../database/app_database.dart';
+import '../../sync/sync_file.dart';
 import '../../sync/sync_view.dart';
 import 'sync_controller_web.dart' if (dart.library.io) 'sync_controller_io.dart'
     as platform;
+
+export '../../sync/sync_file.dart' show SyncFileError, SyncFileProblem;
 
 /// What the UI uses of linked-device sync. Implemented by `SyncService` on
 /// native platforms; absent (null) on the web and in widget tests that
@@ -68,6 +71,24 @@ abstract class SyncController {
 
   Future<String> deviceName();
   Future<void> setDeviceName(String name);
+
+  /// A sync file holding every record this device has, to carry by hand to
+  /// a device it can't reach over the network (SYNC_DESIGN S12). Publishes
+  /// first. Throws [StateError] when not linked.
+  Future<SyncFileExport> exportSyncFile();
+
+  /// Merges a sync file written by a device of this group; how many
+  /// records it changed (0 for an old or repeated file). Throws
+  /// [SyncFileError] for a file it refuses, [StateError] when not linked.
+  Future<int> importSyncFile(List<int> bytes);
+}
+
+class SyncFileExport {
+  final List<int> bytes;
+
+  /// Suggested name, e.g. `diegema-animeshs-mac-2026-10-04.diegemasync`.
+  final String fileName;
+  const SyncFileExport(this.bytes, this.fileName);
 }
 
 enum SyncStatus {

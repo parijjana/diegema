@@ -24,8 +24,10 @@
 //   * a FlutterError hook with TWO buckets (overflow + layout error) and an
 //     authoritative capture_manifest.json.
 //
-// Run in DEBUG (assertions on — required for overflow/layout-error detection):
-//   flutter run -d macos -t lib/screenshot_main.dart
+// Run in DEBUG (assertions on — required for overflow/layout-error detection)
+// and with DEMO_MODE (AppShell honours DemoDeepLink only under kDemoMode; without
+// it scene 4 never opens the book and no scene loads the hero book):
+//   flutter run -d macos -t lib/screenshot_main.dart --dart-define=DEMO_MODE=true
 // It opens a window, silently renders every (target x scene), writes PNGs under
 // /private/tmp/diegema-store-screenshots/<store-or-device-subfolder>/ (e.g. ios/ipad13/, play/phone/),
 // writes /private/tmp/diegema-store-screenshots/capture_manifest.json, prints the written paths, and exits.
@@ -34,7 +36,7 @@
 // SELECTIVE (PARTIAL) CAPTURE — re-shoot one store without re-shooting all of
 // them. Optional; with no --dart-define the run is a FULL run and behaves
 // exactly as it always has:
-//   flutter run -d macos -t lib/screenshot_main.dart \
+//   flutter run -d macos -t lib/screenshot_main.dart --dart-define=DEMO_MODE=true \
 //     --dart-define=CAPTURE_TARGETS=ios,mac --dart-define=CAPTURE_SCENES=game
 // See the SELECTIVE CAPTURE block further down for the matching rules, and
 // _mergeIntoManifest() for how a partial run MERGES into the existing manifest
@@ -125,6 +127,7 @@ import 'package:flutter/rendering.dart';
 //   import 'screenshot_seed.dart';
 import 'app.dart';
 import 'core/demo_deeplink.dart';
+import 'core/demo_mode.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'screenshot_mode.dart';
@@ -137,7 +140,12 @@ import 'services/demo_librivox_service.dart';
 /// synchronous and seeding drift is not. Sharing it is also correct rather than
 /// merely convenient: each scene remounts the app against the SAME library, so
 /// the shots depict one user's collection instead of five unrelated ones.
-late final AppDatabase _screenshotDb;
+///
+/// Rebuilt (same seed) before EVERY shot: AudiobookApp closes its database in
+/// dispose(), and each shot remounts the app under a new key, so a shared
+/// instance is closed from the second shot on (Library then shows its "Could
+/// not read your library" error state — the 2026-10-04 Play run caught this).
+late AppDatabase _screenshotDb;
 
 /// The library scan `LibraryScreen` runs on mount, replaced with a no-op. The
 /// real one walks the downloads directory through `path_provider`; under
@@ -271,10 +279,9 @@ class _Target {
 //   * landscape iPad: defaults to the SAME scenes as portrait iPad — re-pick by
 //     eye (a landscape composition may want a different subset).
 const List<_Target> _targets = [
-  // Mac + iOS only. Microsoft Store and Google Play are deliberately absent:
-  // neither is a near-term target, and `windows/`/`android/` are not even
-  // scaffolded. Adding them later is one row each plus a re-run — the harness
-  // renders every size from the same macOS process.
+  // Mac, iOS and Google Play. Microsoft Store is absent until `windows/` is
+  // scaffolded; adding it is one row plus a re-run — the harness renders
+  // every size from the same macOS process.
   //
   // store             device               dir             prefix   w     h     ratio  layout                        controls                        scenes
   _Target('mac-app-store', 'mac', 'mac', '', 1440, 900, 2.0,
@@ -310,6 +317,22 @@ const List<_Target> _targets = [
       'land-',
       1366,
       1024,
+      2.0,
+      ScreenshotLayout.tablet,
+      ScreenshotWindowControls.none,
+      [1, 2, 3, 4, 5]),
+  _Target('google-play', 'phone', 'play/phone', '', 360, 800, 3.0,
+      ScreenshotLayout.mobilePhone, ScreenshotWindowControls.none,
+      [1, 2, 3, 4, 5]),
+  _Target('google-play', 'tablet', 'play/tablet', '', 800, 1280, 2.0,
+      ScreenshotLayout.tablet, ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
+  _Target(
+      'google-play',
+      'tablet-landscape',
+      'play/tablet',
+      'land-',
+      1280,
+      800,
       2.0,
       ScreenshotLayout.tablet,
       ScreenshotWindowControls.none,
@@ -550,6 +573,16 @@ _CapturePlan _buildCapturePlan() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (!kDemoMode) {
+    // Every scene is entered through DemoDeepLink, which AppShell ignores
+    // outside demo mode: the run would "pass" with the wrong screens.
+    // ignore: avoid_print
+    print('CAPTURE_SETUP_ERROR: run with --dart-define=DEMO_MODE=true');
+    exit(2);
+  }
+  // On before seeding: the demo catalogue reads it to make every book
+  // playable, so the gallery shows the full app rather than the web demo.
+  kScreenshotCaptureMode = true;
   // Layout hook: attribute any layout error to the shot being rendered now
   // (_currentShotId), then still present it normally so it shows in the console.
   // DEBUG-ONLY — Flutter only routes these here when assertions are on. See the
@@ -757,6 +790,7 @@ class _CaptureAppState extends State<_CaptureApp> {
         // this shot. It stays at the BASE id across the retry below, so the
         // manifest entry still finds its errors.
         _currentShotId = shotId;
+        _screenshotDb = await buildScreenshotDatabase();
         // Build the scene ONCE. _buildScene() may MUTATE shared app state
         // (seeding a controller, starting a round, pushing a route), so the
         // retry below must remount THIS SAME widget rather than call the builder

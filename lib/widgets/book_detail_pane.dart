@@ -9,6 +9,7 @@ import '../services/download_manager.dart';
 import '../services/librivox_downloader.dart';
 import '../services/librivox_service.dart';
 import '../services/audio_playback_service.dart';
+import '../screenshot_mode.dart';
 import '../theme/app_theme.dart';
 import '../core/utils/duration_format.dart';
 import 'app_book_cover.dart';
@@ -190,7 +191,7 @@ class _BookDetailPaneState extends State<BookDetailPane> {
   /// listening still reads as a feature that exists).
   Widget _primaryAction() {
     final c = context.colors;
-    if (kDemoMode) {
+    if (kDemoMode && !kScreenshotCaptureMode) {
       return Semantics(
         enabled: false,
         label: 'Download full audiobook. '

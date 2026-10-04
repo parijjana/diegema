@@ -23,12 +23,17 @@ class OtherDevicesSection extends StatelessWidget {
   /// Jump to a place the user chose.
   final ValueChanged<DevicePosition> onJump;
 
+  /// Show the "On your other devices" heading. A host that has its own title
+  /// (the Now Playing sheet) turns it off.
+  final bool showHeader;
+
   const OtherDevicesSection({
     super.key,
     required this.view,
     required this.bookKey,
     required this.local,
     required this.onJump,
+    this.showHeader = true,
   });
 
   static bool hasContent(SyncView view, String key) =>
@@ -47,12 +52,14 @@ class OtherDevicesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Semantics(
-          header: true,
-          child: Text('On your other devices',
-              style: AppType.titleSm.copyWith(color: c.text)),
-        ),
-        const SizedBox(height: Sp.x3),
+        if (showHeader) ...[
+          Semantics(
+            header: true,
+            child: Text('On your other devices',
+                style: AppType.titleSm.copyWith(color: c.text)),
+          ),
+          const SizedBox(height: Sp.x3),
+        ],
         if (finished.isNotEmpty) ...[
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

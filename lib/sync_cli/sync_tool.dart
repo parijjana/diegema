@@ -11,8 +11,10 @@ import '../database/drift_sync_store.dart';
 import '../sync/file_secret_store.dart';
 import '../sync/lan_sync.dart';
 import '../sync/sync_exchange.dart';
+import '../sync/sync_file.dart';
 import '../sync/sync_group.dart';
 import '../sync/sync_record.dart';
+import '../sync/sync_store.dart';
 import '../sync/sync_view.dart';
 import 'mdns_discovery.dart';
 
@@ -396,4 +398,99 @@ class SyncTool {
     }
     return results;
   }
+
+  /// The group key, or a [ToolError] saying why there isn't one.
+  Future<List<int>> _linkedKey() async {
+    if (data.secrets == null) {
+      throw const ToolError(
+          'this computer keeps its sync key in the OS keystore, which the CLI can\'t read yet: pass --secrets');
+    }
+    final key = (await _group())?.key;
+    if (key == null) {
+      throw const ToolError(
+          'this computer isn\'t linked: link it in the app first');
+    }
+    return key;
+  }
+
+  /// Writes a sync file of every record this computer's app holds (S12), to
+  /// [out], or into it under the app's file name when it is a directory.
+  /// Reads the database only. Refuses to overwrite a file.
+  Future<File> exportFile(String out) async {
+    final key = await _linkedKey();
+    final self = data.deviceId;
+    if (self == null) {
+      throw const ToolError(
+          'can\'t find this computer\'s device id: pass --device-id');
+    }
+    final records = await _reading((store) => store.all());
+    final now = DateTime.now();
+    var file = File(out);
+    if (await FileSystemEntity.isDirectory(out)) {
+      file = File(p.join(out,
+          SyncFile.fileName(SyncView(self, records).deviceName(self), now)));
+    }
+    if (await file.exists()) throw ToolError('${file.path} already exists');
+    await file.writeAsBytes(await SyncFile.encode(
+        groupKey: key,
+        deviceId: self,
+        createdAtMillis: now.millisecondsSinceEpoch,
+        records: records));
+    return file;
+  }
+
+  /// Merges the sync file at [path] into this computer's app, as an import
+  /// in the app would. Refuses while the app runs: two writers to one
+  /// database.
+  Future<ImportReport> importFile(String path, {bool force = false}) async {
+    final key = await _linkedKey();
+    final file = File(path);
+    if (!await file.exists()) throw ToolError('no file at $path');
+    if (await file.length() > SyncFile.maxBytes) {
+      throw const ToolError('not a Diegema sync file');
+    }
+    final SyncFileContents contents;
+    try {
+      contents =
+          await SyncFile.decode(await file.readAsBytes(), groupKey: key);
+    } on SyncFileError catch (e) {
+      throw ToolError(switch (e.problem) {
+        SyncFileProblem.notSyncFile => 'not a Diegema sync file',
+        SyncFileProblem.otherGroup =>
+          'this file is from a device of another sync group',
+        SyncFileProblem.damaged =>
+          'this file was changed or damaged after it was written',
+      });
+    }
+    if (!force && await _appRunning()) {
+      throw const ToolError(
+          'Diegema is running: import the file in the app, or quit it first');
+    }
+    final db = await _open(write: true);
+    try {
+      final changed = await mergeInto(DriftSyncStore(db), contents.records);
+      return ImportReport(contents.deviceId, contents.createdAtMillis,
+          contents.records.length, changed.length);
+    } finally {
+      await db.close();
+    }
+  }
+}
+
+class ImportReport {
+  final String from;
+  final int createdAtMillis;
+  final int records;
+  final int changed;
+  const ImportReport(
+      this.from, this.createdAtMillis, this.records, this.changed);
+
+  Map<String, Object?> toJson() => {
+        'from': from,
+        'created': DateTime.fromMillisecondsSinceEpoch(createdAtMillis)
+            .toUtc()
+            .toIso8601String(),
+        'records': records,
+        'changed': changed,
+      };
 }

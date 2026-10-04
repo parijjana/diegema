@@ -355,6 +355,70 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 2100));
     expect(await p.syncNow(), 1);
   });
+
+  group('sync file', () {
+    Future<SyncService> inGroup(Device d, String id, String name,
+        {List<int>? key}) async {
+      final secrets = InMemorySecretStore();
+      await (await SyncGroup.load(secrets))
+          .join(key ?? List<int>.generate(32, (i) => i));
+      return SyncService(d.db,
+          identity: DeviceIdentityStore(overrides: {
+            'sync.device_id.v1': id,
+            'sync.device_name.v1': name,
+          }),
+          now: () => d.clock,
+          secrets: secrets);
+    }
+
+    test("one Mac's file brings its book and place to another Mac", () async {
+      final other = Device('mac2', 'iMac', 2000);
+      addTearDown(other.db.close);
+      await mac.db.saveAudiobook(emma());
+      await mac.db.saveProgress(
+          audiobookId: 'emma_librivox', chapterIndex: 2, positionSeconds: 120);
+      final from = await inGroup(mac, 'mac', 'MacBook');
+      final to = await inGroup(other, 'mac2', 'iMac');
+      await to.refresh();
+
+      final file = await from.exportSyncFile();
+      expect(file.fileName, endsWith('.diegemasync'));
+      expect(file.fileName, startsWith('diegema-macbook-'));
+
+      expect(await to.importSyncFile(file.bytes), greaterThan(0));
+      final view = to.view.value!;
+      expect(view.remoteOnly({}).single.title, 'Emma');
+      expect(view.positions('lv:emma_librivox').single.chapter, 2);
+      expect(view.deviceName('mac'), 'MacBook');
+
+      // The same file again changes nothing.
+      expect(await to.importSyncFile(file.bytes), 0);
+    });
+
+    test('another group\'s file is refused; unlinked can\'t export',
+        () async {
+      final other = Device('mac2', 'iMac', 2000);
+      addTearDown(other.db.close);
+      final from = await inGroup(mac, 'mac', 'MacBook',
+          key: List<int>.filled(32, 7));
+      final to = await inGroup(other, 'mac2', 'iMac');
+      final file = await from.exportSyncFile();
+      await expectLater(
+          to.importSyncFile(file.bytes),
+          throwsA(isA<SyncFileError>().having(
+              (e) => e.problem, 'problem', SyncFileProblem.otherGroup)));
+      expect(await other.db.portableKeys(), isEmpty);
+
+      final unlinked = SyncService(phone.db,
+          identity: const DeviceIdentityStore(overrides: {
+            'sync.device_id.v1': 'phone',
+            'sync.device_name.v1': 'Pixel',
+          }),
+          secrets: InMemorySecretStore());
+      await expectLater(unlinked.exportSyncFile(), throwsStateError);
+      await expectLater(unlinked.importSyncFile(file.bytes), throwsStateError);
+    });
+  });
 }
 
 /// A keystore whose reads throw until [broken] is cleared.

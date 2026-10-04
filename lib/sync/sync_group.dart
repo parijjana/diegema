@@ -5,6 +5,17 @@ import 'package:cryptography/cryptography.dart';
 
 import 'secure/auth_session.dart';
 
+/// A group's public tag: 8 bytes of HMAC of [groupKey], hex. Advertised
+/// over mDNS and written on sync files; says nothing about the key.
+Future<String> groupTagOf(List<int> groupKey) async {
+  final mac = await Hmac.sha256().calculateMac(utf8.encode('diegema-tag/1'),
+      secretKey: SecretKey(groupKey));
+  return mac.bytes
+      .take(8)
+      .map((b) => b.toRadixString(16).padLeft(2, '0'))
+      .join();
+}
+
 /// Where this device keeps its sync secrets: the platform keystore on
 /// phones and Windows, a file in the sandbox container on macOS (the
 /// Keychain needs a properly signed build; see lessons_learnt
@@ -100,13 +111,7 @@ class SyncGroup {
   /// Null while unlinked.
   Future<String?> tag() async {
     final k = _key;
-    if (k == null) return null;
-    final mac = await Hmac.sha256()
-        .calculateMac(utf8.encode('diegema-tag/1'), secretKey: SecretKey(k));
-    return mac.bytes
-        .take(8)
-        .map((b) => b.toRadixString(16).padLeft(2, '0'))
-        .join();
+    return k == null ? null : groupTagOf(k);
   }
 
   /// Session settings for a sync with another member.

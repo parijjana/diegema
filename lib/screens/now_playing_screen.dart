@@ -17,6 +17,7 @@ import '../widgets/download_controls.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/continue_from_banner.dart';
+import '../widgets/listeners_sheet.dart';
 import '../widgets/player_scrubber.dart';
 import '../widgets/player_transport.dart';
 import '../services/ambience_service.dart';
@@ -1032,6 +1033,8 @@ class _ActiveView extends StatelessWidget {
                   // Linked devices: only when another one saved a newer place
                   // in this book. Nothing seeks until Continue is tapped.
                   ContinueFromBanner(
+                      book: book, audioService: audioService, db: db),
+                  ListenersButton(
                       book: book, audioService: audioService, db: db),
                   if (wide)
                     Expanded(

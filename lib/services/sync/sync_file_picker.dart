@@ -1,5 +1,3 @@
-import 'dart:io' show File;
-
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -30,12 +28,6 @@ abstract class SyncFilePicker {
 class PlatformSyncFilePicker extends SyncFilePicker {
   const PlatformSyncFilePicker();
 
-  static bool get _isDesktop =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.macOS ||
-          defaultTargetPlatform == TargetPlatform.windows ||
-          defaultTargetPlatform == TargetPlatform.linux);
-
   @override
   Future<bool> save(String fileName, List<int> bytes) async {
     final data = Uint8List.fromList(bytes);
@@ -46,9 +38,8 @@ class PlatformSyncFilePicker extends SyncFilePicker {
     );
     if (kIsWeb) return true; // The browser handles the download.
     if (path == null) return false;
-    // Desktop may hand back only a path; writing the same bytes again is
-    // harmless if the plugin already did.
-    if (_isDesktop) await File(path).writeAsBytes(data, flush: true);
+    // The plugin has written [bytes] itself on every platform (desktop to the
+    // returned path, Android through the chosen content URI).
     return true;
   }
 

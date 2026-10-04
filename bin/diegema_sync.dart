@@ -36,12 +36,19 @@ Future<void> main(List<String> argv) async {
             'as it appears.')
     ..addFlag('force',
         negatable: false, help: 'Sync even though the app is running.');
+  parser.addCommand('export').addOption('out',
+      defaultsTo: '.',
+      help: 'File to write, or a folder for the default file name.');
+  parser.addCommand('import').addFlag('force',
+      negatable: false, help: 'Import even though the app is running.');
 
-  String usage() => 'usage: diegema-sync <status|devices|log|peers|sync> '
+  String usage() => 'usage: diegema-sync <status|devices|log|peers|sync|export|import> '
       '[options]\n\n${parser.usage}\n\n'
       'log:   --device <id> --kind <kind> --limit <n>\n'
       'peers: --all --window <s>\n'
-      'sync:  --watch <s> --force';
+      'sync:  --watch <s> --force\n'
+      'export: --out <file or folder>\n'
+      'import: <file> --force';
 
   ArgResults args;
   try {
@@ -143,6 +150,21 @@ Future<void> main(List<String> argv) async {
           ].join('\n');
         });
         if (results.isNotEmpty && results.every((r) => !r.ok)) exit(1);
+      case 'export':
+        final file = await tool.exportFile(cmd.option('out')!);
+        out({'file': file.path}, () => 'wrote ${file.path}');
+      case 'import':
+        if (cmd.rest.length != 1) {
+          stderr.writeln('diegema-sync: import takes one file\n\n${usage()}');
+          exit(64);
+        }
+        final r =
+            await tool.importFile(cmd.rest.single, force: cmd.flag('force'));
+        out(
+            r.toJson(),
+            () => '${r.records} records from '
+                '${r.from.substring(0, r.from.length.clamp(0, 8))}, '
+                '${r.changed} new or newer here');
     }
   } on ToolError catch (e) {
     stderr.writeln('diegema-sync: ${e.message}');

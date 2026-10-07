@@ -28,6 +28,7 @@ import 'services/folder_access.dart';
 import 'services/demo_seed.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
+import 'services/windows_audio.dart';
 
 /// Kept alive for the app's lifetime; see the sync setup in [main].
 // ignore: unused_element
@@ -38,6 +39,7 @@ SyncScheduler? _syncScheduler;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installErrorHandlers();
+  initWindowsAudio(); // before any AudioPlayer exists
   if (!kIsWeb && await AppDatabase.isLibraryFromNewerVersion()) {
     runApp(const NewerLibraryApp());
     return;

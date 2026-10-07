@@ -2,8 +2,8 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
+import '../core/app_data_directory.dart';
 import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
@@ -30,7 +30,7 @@ class LocalImportMigrationService {
 
   Future<void> run() async {
     try {
-      final appDocs = await getApplicationDocumentsDirectory();
+      final appDocs = await appDataDirectory();
       final libraryRoot = p.join(appDocs.path, 'diegema', 'library');
 
       final books = await db.getAllAudiobooks();

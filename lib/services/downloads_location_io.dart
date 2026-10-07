@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/app_data_directory.dart';
 import '../database/app_database.dart';
 import 'folder_access.dart';
 
@@ -14,7 +14,7 @@ typedef DirectoryResolver = Future<String?> Function();
 
 Future<String?> _platformDocumentsRoot() async {
   try {
-    return (await getApplicationDocumentsDirectory()).path;
+    return (await appDataDirectory()).path;
   } catch (_) {
     // No plugin or no binding (plain unit tests): there is no folder.
     return null;

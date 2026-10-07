@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/app_data_directory.dart';
 import '../database/app_database.dart';
 
 const String _documentsRootKey = 'app_paths.documents_root.v1';
@@ -19,8 +19,8 @@ Future<void> rebaseAppPathsIfMoved(
   Future<SharedPreferences> Function()? prefs,
 }) async {
   try {
-    final root = await (documentsRoot ??
-        () async => (await getApplicationDocumentsDirectory()).path)();
+    final root =
+        await (documentsRoot ?? () async => (await appDataDirectory()).path)();
     final store = await (prefs ?? SharedPreferences.getInstance)();
     final previous = store.getString(_documentsRootKey);
     if (previous != null && previous != root) {

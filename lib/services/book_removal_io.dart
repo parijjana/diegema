@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
+import '../core/app_data_directory.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import 'downloads_location_io.dart';
@@ -36,7 +36,7 @@ class BookRemovalPlan {
 /// [downloads] the downloads roots (tests).
 Future<BookRemovalPlan> planBookRemoval(UnifiedAudiobook book,
     {String? documentsPath, DownloadsLocation? downloads}) async {
-  final docs = documentsPath ?? (await getApplicationDocumentsDirectory()).path;
+  final docs = documentsPath ?? (await appDataDirectory()).path;
   final root = p.normalize(p.join(docs, 'diegema'));
   final downloadRoots =
       await _location(downloads, documentsPath: documentsPath).all();

@@ -5,6 +5,10 @@ Reproducible and dependency-free (macOS `afconvert` + the Python stdlib):
 
     python3 tool/ambience/prepare_ambience.py ~/code/projects/Aulos/assets/audio/noise
 
+(Sources outside the repo; the newer clips live in a folder of their own, e.g.
+`~/diegema-ambience-src`. Any recording whose source file is missing is skipped
+with a note, so each folder can be built on its own.)
+
 For each recording it:
   1. decodes the source MP3 to 16-bit PCM (`afconvert`);
   2. keeps at most MAX_SECONDS and folds the tail back over the head with an
@@ -36,6 +40,18 @@ RECORDINGS = {
     'thunderstorm': ('thunderstorm.mp3', True),
     'campfire': ('campfire.mp3', False),
     'city_street': ('city_street.mp3', True),
+    # Added for Mimesis cue sheets. Source files are named after the sound id
+    # (see assets/ambience/CREDITS.md for each clip's BigSoundBank page).
+    # `battle` has no CC0 source yet, so it is not built.
+    'tavern_crowd': ('tavern_crowd.mp3', True),
+    'wind': ('wind.mp3', True),
+    'gulls': ('gulls.mp3', True),
+    'ship_timbers': ('ship_timbers.mp3', True),
+    'jungle_insects': ('jungle_insects.mp3', True),
+    'night_crickets': ('night_crickets.mp3', True),
+    'river': ('river.mp3', True),
+    'horses': ('horses.mp3', True),
+    'fireplace': ('fireplace.mp3', True),
 }
 
 
@@ -109,10 +125,13 @@ def encode(wav, name, ch):
     print(f'{name}.m4a  {os.path.getsize(dst) // 1024} KB')
 
 
-def main(src_dir):
+def main(src_dir, noises=True):
     os.makedirs(OUT, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         for name, (src, stereo) in RECORDINGS.items():
+            if not os.path.exists(os.path.join(src_dir, src)):
+                print(f'skip {name}: {src} not in {src_dir}')
+                continue
             raw = os.path.join(tmp, name + '.wav')
             args = ['afconvert', '-f', 'WAVE', '-d', 'LEI16']
             if not stereo:
@@ -122,7 +141,7 @@ def main(src_dir):
             looped = os.path.join(tmp, name + '_loop.wav')
             write_wav(looped, ch, rate, loop_and_level(ch, rate, data, TARGET_DBFS))
             encode(looped, name, ch)
-        for colour in ('white', 'pink', 'brown'):
+        for colour in ('white', 'pink', 'brown') if noises else ():
             ch, rate, data = noise(colour)
             looped = os.path.join(tmp, colour + '_loop.wav')
             write_wav(looped, ch, rate, loop_and_level(ch, rate, data, NOISE_DBFS))
@@ -130,4 +149,4 @@ def main(src_dir):
 
 
 if __name__ == '__main__':
-    main(os.path.expanduser(sys.argv[1]))
+    main(os.path.expanduser(sys.argv[1]), noises='--no-noise' not in sys.argv)

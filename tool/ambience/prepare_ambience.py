@@ -88,8 +88,27 @@ def loop_and_level(ch, rate, data, target_dbfs):
             tail = float(data[(body + f) * ch + c])
             out[f * ch + c] = head * g_in + tail * g_out
     rms = math.sqrt(sum(s * s for s in out) / len(out)) or 1.0
-    gain = (32767 * 10 ** (target_dbfs / 20)) / rms
-    return [max(-32768, min(32767, int(round(s * gain)))) for s in out]
+    want = 32767 * 10 ** (target_dbfs / 20)
+    gain = want / rms
+    # Sparse sources (crackling fire, hooves) have peaks far above their RMS,
+    # so levelling them would clip. Peaks go through a soft knee instead
+    # (identity below half scale), and the gain is nudged until the result
+    # still lands on the target RMS. Steady sources never reach the knee.
+    for _ in range(6):
+        leveled = [_soft(s * gain) for s in out]
+        got = math.sqrt(sum(v * v for v in leveled) / len(leveled)) or 1.0
+        if abs(20 * math.log10(got / want)) < 0.05:
+            break
+        gain *= want / got
+    return [int(round(v)) for v in leveled]
+
+
+def _soft(x, knee=16384.0, top=32767.0):
+    a = abs(x)
+    if a <= knee:
+        return x
+    y = knee + (top - knee) * math.tanh((a - knee) / (top - knee))
+    return math.copysign(min(y, top), x)
 
 
 def noise(colour, rate=44100, seconds=20.0):

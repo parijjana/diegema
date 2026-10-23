@@ -6,3 +6,7 @@ Future<bool> downloadedChapterReadable(
     true;
 
 bool canRedownload(UnifiedAudiobook book) => false;
+
+Future<bool> needsAudioReadAccess() async => false;
+
+Future<bool> requestAudioReadAccess() async => true;

@@ -7,6 +7,7 @@ import '../domain/models/audiobook.dart';
 import 'downloads_location_io.dart';
 import 'library_locations_scanner_io.dart';
 import 'library_locations_store.dart';
+import 'storage_access_io.dart';
 
 /// Resolves the directory the app keeps its data in. Returning `null` means
 /// "there is no documents directory here", and the scan is skipped rather
@@ -32,10 +33,37 @@ Future<void> scanDownloadedLibrary(
   LibraryLocationsStore locations = const LibraryLocationsStore(),
 }) async {
   final location = downloads ?? DownloadsLocation(documentsRoot: documentsRoot);
+  await _askForSharedAudioAccessOnce(db, location, locations);
   for (final root in await location.all()) {
     await _scanDownloads(db, root);
   }
   await scanLibraryLocations(db, store: locations, downloads: location);
+}
+
+bool _askedThisRun = false;
+
+/// After a reinstall Android restores the library but not the audio
+/// permission, so library folders and downloads in the shared Audiobooks
+/// folder can't be read. Ask once per launch, and only when the library
+/// actually has books there — someone with neither never sees the prompt.
+Future<void> _askForSharedAudioAccessOnce(
+  AppDatabase db,
+  DownloadsLocation downloads,
+  LibraryLocationsStore locations,
+) async {
+  if (_askedThisRun || !Platform.isAndroid) return;
+  _askedThisRun = true;
+  if (await hasAudioReadAccess()) return;
+  var needed = (await locations.read()).isNotEmpty;
+  if (!needed) {
+    final visible = await downloads.userVisibleRoot();
+    if (visible != null) {
+      final root = p.normalize(visible);
+      needed = (await db.getAllAudiobooks()).any((book) => book.chapters.any(
+          (ch) => !ch.isStream && p.isWithin(root, ch.audioPathOrUrl)));
+    }
+  }
+  if (needed) await ensureAudioReadAccess();
 }
 
 Future<void> _scanDownloads(AppDatabase db, String root) async {

@@ -8,6 +8,7 @@ import '../services/hidden_books_store.dart';
 import '../services/local_library_scanner.dart';
 import '../services/sync/sync_controller.dart';
 import '../sync/sync_view.dart';
+import '../core/utils/book_identity.dart';
 import '../core/utils/sync_format.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
@@ -96,6 +97,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
   /// dividing by zero.
   final Map<String, double?> _progressById = {};
 
+  /// Last-played time, fraction and finished flag for every book that has a
+  /// saved position; what Sort and Filter work from.
+  final Map<String, LibraryBookStats> _stats = {};
+
   bool _loading = true;
   Object? _error;
 
@@ -146,10 +151,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
           localKeys = (await sync.portableKeys()).values.toSet();
         } catch (_) {}
       }
-      final progressById = <String, double?>{};
-      for (final book in inProgress) {
-        progressById[book.id] = await _fractionComplete(book);
+      final stats = <String, LibraryBookStats>{};
+      for (final book in books) {
+        final st = await _statsFor(book);
+        if (st != null) stats[book.id] = st;
       }
+      final progressById = <String, double?>{
+        for (final book in inProgress) book.id: stats[book.id]?.fraction,
+      };
       if (!mounted) return;
       setState(() {
         _hidden = hidden;
@@ -159,6 +168,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
         _progressById
           ..clear()
           ..addAll(progressById);
+        _stats
+          ..clear()
+          ..addAll(stats);
         _loading = false;
       });
     } catch (e) {
@@ -174,24 +186,35 @@ class _LibraryScreenState extends State<LibraryScreen> {
   /// `PlaybackProgress.positionSeconds` is a position *within
   /// `chapterIndex`*, not an absolute offset into the book, so the
   /// fraction is the sum of every prior chapter's duration plus the
-  /// current position, over the sum of all chapter durations. Returns
-  /// `null` when the total is `0` (nothing probed yet) rather than
-  /// dividing by zero.
-  Future<double?> _fractionComplete(UnifiedAudiobook book) async {
+  /// current position, over the sum of all chapter durations. The fraction
+  /// is `null` when the total is `0` (nothing probed yet) rather than
+  /// dividing by zero. A negative position is the "finished" marker.
+  Future<LibraryBookStats?> _statsFor(UnifiedAudiobook book) async {
     final progress = await widget.db.getProgress(book.id);
     if (progress == null) return null;
+    final marked = progress.positionSeconds < 0;
 
+    double? fraction;
     final totalSeconds =
         book.chapters.fold<int>(0, (sum, ch) => sum + ch.durationSeconds);
-    if (totalSeconds <= 0) return null;
-
-    var elapsedSeconds = progress.positionSeconds;
-    for (var i = 0;
-        i < progress.chapterIndex && i < book.chapters.length;
-        i++) {
-      elapsedSeconds += book.chapters[i].durationSeconds;
+    if (marked) {
+      fraction = 1;
+    } else if (totalSeconds > 0) {
+      var elapsedSeconds = progress.positionSeconds;
+      for (var i = 0;
+          i < progress.chapterIndex && i < book.chapters.length;
+          i++) {
+        elapsedSeconds += book.chapters[i].durationSeconds;
+      }
+      fraction = (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
     }
-    return (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
+    return LibraryBookStats(
+      lastPlayed: progress.updatedAt,
+      fraction: fraction,
+      finished: marked ||
+          (fraction != null &&
+              fraction >= AppDatabase.continueListeningMaxProgressFraction),
+    );
   }
 
   void _import() =>
@@ -436,6 +459,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final remote = _remoteBooks(syncView);
     final settings = SettingsScope.maybeOf(context);
     final tiles = settings?.libraryLayout == LibraryLayout.tiles;
+    final sort = settings?.librarySort ?? LibrarySort.recent;
+    final filter = settings?.libraryFilter ?? LibraryFilter.all;
+    final inProgressIds = {for (final b in _inProgress) b.id};
+    final shown = applyLibraryView(
+      _books,
+      sort: sort,
+      filter: filter,
+      stats: _stats,
+      inProgressIds: inProgressIds,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -488,6 +521,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ),
             ),
           );
+        } else if (shown.isEmpty && filter != LibraryFilter.all) {
+          body = AppStateView.empty(
+            icon: Icons.filter_list_off_rounded,
+            headline: 'No ${filter.label.toLowerCase()} books',
+            body: 'Nothing in your library matches this filter.',
+            action: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: FilledButton(
+                style: _pairedButton,
+                onPressed: () => settings?.setLibraryFilter(LibraryFilter.all),
+                child: const Text('Show all books'),
+              ),
+            ),
+          );
         } else {
           // "In progress" is omitted entirely when nothing qualifies — no
           // empty-state placeholder for it — so the plain all-books list
@@ -495,7 +542,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           // existed. A book that is in progress deliberately appears in
           // both sections; see `_inProgress`'s doc comment.
           final rows = <Widget>[
-            if (_inProgress.isNotEmpty) ...[
+            if (_inProgress.isNotEmpty && filter == LibraryFilter.all) ...[
               const _SectionHeader(title: 'In progress'),
               const SizedBox(height: Sp.x3),
               if (tiles)
@@ -539,10 +586,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ],
             if (tiles)
               LibraryTileGrid(
-                count: _books.length,
+                count: shown.length,
                 itemBuilder: (context, i, size) {
-                  final book = _books[i];
-                  final isInProgress = _inProgress.any((b) => b.id == book.id);
+                  final book = shown[i];
+                  final isInProgress = inProgressIds.contains(book.id);
                   final p = isInProgress ? _progressById[book.id] : null;
                   final chapters = book.chapters.length;
                   return _BookTile(
@@ -568,19 +615,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 },
               )
             else
-              ..._books.map(
+              ...shown.map(
                 (book) => Padding(
                   padding: const EdgeInsets.only(bottom: Sp.listGap),
                   child: _BookRow(
                     book: book,
-                    inProgress: _inProgress.any((b) => b.id == book.id),
+                    inProgress: inProgressIds.contains(book.id),
                     progress: _progressById[book.id],
                     onTap: () => _openDetail(context, book, wide: wide),
                     onLongPress: () => _showTileMenu(context, book),
                   ),
                 ),
               ),
-            if (remote.isNotEmpty) ...[
+            if (remote.isNotEmpty && filter == LibraryFilter.all) ...[
               const SizedBox(height: Sp.sectionGap),
               RemoteBooksSection(
                 view: syncView!,
@@ -698,6 +745,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     ],
                   ),
                 ),
+                if (settings != null &&
+                    !_loading &&
+                    _error == null &&
+                    _books.isNotEmpty)
+                  _SortFilterBar(
+                    gutter: gutter,
+                    sort: sort,
+                    filter: filter,
+                    onSort: settings.setLibrarySort,
+                    onFilter: settings.setLibraryFilter,
+                  ),
                 Expanded(child: body),
               ],
             ),
@@ -1138,6 +1196,161 @@ class _BookRow extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What Sort and Filter know about one book's listening.
+class LibraryBookStats {
+  final DateTime lastPlayed;
+
+  /// 0..1 of the book, or null when its runtime is unknown.
+  final double? fraction;
+  final bool finished;
+
+  const LibraryBookStats({
+    required this.lastPlayed,
+    required this.fraction,
+    required this.finished,
+  });
+}
+
+/// Filters then sorts [books] for the Library. Pure, so it is tested
+/// directly. The caller passes the already un-hidden list; hidden books
+/// never reach here, whatever the filter. Sorts are stable, so ties keep
+/// the library's own order.
+///
+/// - Recent: last played first; never-played books follow in library order.
+/// - Progress: furthest along first; never-started books last.
+List<UnifiedAudiobook> applyLibraryView(
+  List<UnifiedAudiobook> books, {
+  required LibrarySort sort,
+  required LibraryFilter filter,
+  required Map<String, LibraryBookStats> stats,
+  required Set<String> inProgressIds,
+}) {
+  bool keep(UnifiedAudiobook b) {
+    switch (filter) {
+      case LibraryFilter.all:
+        return true;
+      case LibraryFilter.inProgress:
+        return inProgressIds.contains(b.id);
+      case LibraryFilter.finished:
+        return stats[b.id]?.finished ?? false;
+      case LibraryFilter.downloaded:
+        return b.isDownloaded;
+      case LibraryFilter.local:
+        return b.origin == BookIdentity.originLocal;
+    }
+  }
+
+  final indexed = [
+    for (var i = 0; i < books.length; i++)
+      if (keep(books[i])) (i, books[i]),
+  ];
+  int byText(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
+  int compare((int, UnifiedAudiobook) x, (int, UnifiedAudiobook) y) {
+    final a = x.$2, b = y.$2;
+    final int r;
+    switch (sort) {
+      case LibrarySort.recent:
+        final ta = stats[a.id]?.lastPlayed, tb = stats[b.id]?.lastPlayed;
+        r = ta == null && tb == null
+            ? 0
+            : ta == null
+                ? 1
+                : tb == null
+                    ? -1
+                    : tb.compareTo(ta);
+      case LibrarySort.title:
+        r = byText(a.title, b.title);
+      case LibrarySort.author:
+        r = byText(a.author, b.author);
+      case LibrarySort.progress:
+        double f(UnifiedAudiobook k) => stats[k.id]?.fraction ?? -1;
+        r = f(b).compareTo(f(a));
+    }
+    return r != 0 ? r : x.$1.compareTo(y.$1);
+  }
+
+  indexed.sort(compare);
+  return [for (final e in indexed) e.$2];
+}
+
+/// Sort menu and filter chips, one horizontally scrolling row so it never
+/// overflows at large text scales. Every control is at least 48dp tall.
+class _SortFilterBar extends StatelessWidget {
+  final double gutter;
+  final LibrarySort sort;
+  final LibraryFilter filter;
+  final ValueChanged<LibrarySort> onSort;
+  final ValueChanged<LibraryFilter> onFilter;
+
+  const _SortFilterBar({
+    required this.gutter,
+    required this.sort,
+    required this.filter,
+    required this.onSort,
+    required this.onFilter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sp.x2),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: gutter),
+        child: Row(
+          children: [
+            PopupMenuButton<LibrarySort>(
+              tooltip: 'Sort books',
+              initialValue: sort,
+              onSelected: onSort,
+              itemBuilder: (context) => [
+                for (final s in LibrarySort.values)
+                  PopupMenuItem(
+                    value: s,
+                    child: Text(s.label, style: AppType.body),
+                  ),
+              ],
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                    minHeight: Dim.tapMin, minWidth: Dim.tapMin),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.sort_rounded, color: c.textSecondary),
+                      const SizedBox(width: Sp.x2),
+                      Text('Sort: ${sort.label}',
+                          style: AppType.label.copyWith(color: c.text)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: Sp.x2),
+            for (final f in LibraryFilter.values)
+              Padding(
+                padding: const EdgeInsets.only(right: Sp.x2),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: Dim.tapMin),
+                  child: Center(
+                    child: ChoiceChip(
+                      label: Text(f.label),
+                      selected: f == filter,
+                      materialTapTargetSize: MaterialTapTargetSize.padded,
+                      onSelected: (_) => onFilter(f),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

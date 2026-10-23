@@ -131,7 +131,8 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsNWidgets(2));
     expect(find.text('1 chapter'), findsOneWidget); // the untouched book
     // Header and section titles are still there, full width.
-    expect(find.text('In progress'), findsOneWidget);
+    // The section title and the filter chip share the label.
+    expect(find.text('In progress'), findsNWidgets(2));
     expect(find.text('All books'), findsOneWidget);
   });
 

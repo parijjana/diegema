@@ -22,10 +22,18 @@ import 'services/ambience_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/diegema_audio_handler.dart';
 import 'services/download_manager.dart';
+import 'services/sync/sync_controller.dart';
+import 'services/sync/sync_scheduler.dart';
 import 'services/folder_access.dart';
 import 'services/demo_seed.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
+
+/// Kept alive for the app's lifetime; see the sync setup in [main].
+// ignore: unused_element
+AppLifecycleListener? _syncLifecycle;
+// ignore: unused_element
+SyncScheduler? _syncScheduler;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,6 +86,7 @@ Future<void> main() async {
   AudioPlaybackService? audioService;
   AmbienceService? ambience;
   DownloadManager? downloads;
+  SyncController? sync;
   if (!kIsWeb) {
     // Before anything scans or plays from a library folder: on macOS/iOS
     // the sandbox forgets picked folders between launches.
@@ -97,6 +106,20 @@ Future<void> main() async {
       downloads = createDownloadManager(nativeDb);
       unawaited(downloads?.start());
     }
+    // Linked-device sync: publish what changed in the library and sync with
+    // linked devices on this network at launch and whenever the app goes to
+    // the background or comes back. Not awaited:
+    // working out a local book's key reads its files.
+    if (!kDemoMode) {
+      final s = sync = createSyncController(nativeDb);
+      if (s != null) {
+        unawaited(s.foreground());
+        _syncLifecycle = AppLifecycleListener(
+          onPause: () => unawaited(s.background()),
+          onResume: () => unawaited(s.foreground()),
+        );
+      }
+    }
     audioService =
         AudioPlaybackService(db: nativeDb, preferences: const UiPreferences());
     ambience = AmbienceService(book: audioService);
@@ -109,6 +132,14 @@ Future<void> main() async {
       // lock-screen/notification surface.
       debugPrint('main: audio_service init failed: $e');
     }
+    // Sync every 15 minutes and after playback pauses, stops or finishes.
+    // background() publishes and syncs, and never throws.
+    final s = sync;
+    if (s != null) {
+      _syncScheduler = SyncScheduler(
+          sync: s.background, playback: audioService.stateNotifier)
+        ..start();
+    }
   }
 
   runApp(AudiobookApp(
@@ -118,6 +149,7 @@ Future<void> main() async {
     audioService: audioService,
     ambience: ambience,
     downloads: downloads,
+    sync: sync,
     deepLink: deepLink,
     // `?theme=` overrides the stored choice when present, and only then —
     // absent a deep link this stays null so the persisted preference (or

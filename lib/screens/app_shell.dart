@@ -194,6 +194,9 @@ class _AppShellState extends State<AppShell> {
     super.dispose();
   }
 
+  /// A book Library asked Discover to open (archive id, fallback search).
+  (String, String)? _discoverOpen;
+
   void _go(int index) => setState(() => _index = index);
 
   /// Order is load-bearing: the demo deep link addresses screens by index
@@ -264,10 +267,18 @@ class _AppShellState extends State<AppShell> {
           db: widget.db,
           audioService: _audioService,
           onGoToDiscover: () => _go(2),
+          onOpenInDiscover: (id, query) {
+            _discoverOpen = (id, query);
+            _go(2);
+          },
           scanLibrary: widget.libraryScanner,
         );
       case _Tab.discover:
+        final open = _discoverOpen;
+        _discoverOpen = null; // Discover reads it once, when it is built.
         return DiscoverScreen(
+          openArchiveId: open?.$1,
+          openFallbackQuery: open?.$2,
           db: widget.db,
           openBookId: kDemoMode ? widget.deepLink.book : null,
           audioService: _audioService,

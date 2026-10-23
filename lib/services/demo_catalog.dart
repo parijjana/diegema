@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import '../domain/models/librivox_book.dart';
+import '../screenshot_mode.dart';
 
 /// One chapter of a [DemoBookEntry]. For playable books, [filename] is
 /// resolved against `kDemoAudioBase` (see `core/demo_mode.dart`) to build
@@ -65,7 +66,9 @@ class DemoBookEntry {
       narrators:
           (json['narrators'] as List? ?? []).map((n) => n.toString()).toList(),
       category: json['category']?.toString() ?? '',
-      playable: json['playable'] == true,
+      // Store screenshots show the full app, not the web demo's two
+      // playable books (kScreenshotCaptureMode is false in every shipped build).
+      playable: json['playable'] == true || kScreenshotCaptureMode,
       coverUrl: json['coverUrl']?.toString() ?? '',
       chapters: chaptersJson
           .map((c) => DemoChapterEntry.fromJson(c as Map<String, dynamic>))

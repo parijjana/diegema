@@ -8,6 +8,7 @@ import '../core/player_controls_style.dart';
 import '../core/ui_preferences.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
+import '../services/hidden_books_store.dart';
 import '../services/audio_playback_service.dart';
 import '../services/download_manager.dart';
 import '../services/redownload.dart';
@@ -15,6 +16,8 @@ import '../theme/app_theme.dart';
 import '../widgets/download_controls.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
+import '../widgets/continue_from_banner.dart';
+import '../widgets/listeners_sheet.dart';
 import '../widgets/player_scrubber.dart';
 import '../widgets/player_transport.dart';
 import '../services/ambience_service.dart';
@@ -173,7 +176,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     if (!mounted) return;
     setState(() => _loadError = null);
     try {
-      final continueListening = await widget.db.getContinueListening(limit: 5);
+      // Books hidden from the Library stay out of this shortlist too.
+      final hidden = await const HiddenBooksStore().read();
+      final continueListening =
+          (await widget.db.getContinueListening(limit: 5 + hidden.length))
+              .where((b) => !hidden.contains(b.id))
+              .take(5)
+              .toList();
       final pinned = await widget.db.getPinnedBooks();
       final visible = await widget.preferences.getPinnedRowVisible();
       if (!mounted) return;
@@ -346,6 +355,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                           scale: 0.97 + 0.03 * playerVis,
                           child: _ActiveView(
                             book: book,
+                            db: widget.db,
                             audioService: widget.audioService,
                             onShowUpNext: _showUpNext,
                             headerAction: widget.headerAction,
@@ -845,6 +855,7 @@ class _DismissBackground extends StatelessWidget {
 
 class _ActiveView extends StatelessWidget {
   final UnifiedAudiobook book;
+  final AppDatabase db;
   final AudioPlaybackService audioService;
   final VoidCallback onShowUpNext;
 
@@ -860,6 +871,7 @@ class _ActiveView extends StatelessWidget {
 
   const _ActiveView({
     required this.book,
+    required this.db,
     required this.audioService,
     required this.onShowUpNext,
     this.headerAction,
@@ -1018,6 +1030,12 @@ class _ActiveView extends StatelessWidget {
                       );
                     },
                   ),
+                  // Linked devices: only when another one saved a newer place
+                  // in this book. Nothing seeks until Continue is tapped.
+                  ContinueFromBanner(
+                      book: book, audioService: audioService, db: db),
+                  ListenersButton(
+                      book: book, audioService: audioService, db: db),
                   if (wide)
                     Expanded(
                       child: SingleChildScrollView(

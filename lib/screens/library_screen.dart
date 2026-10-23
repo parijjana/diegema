@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 
+import '../core/app_settings.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/audio_playback_service.dart';
+import '../services/hidden_books_store.dart';
 import '../services/local_library_scanner.dart';
+import '../services/sync/sync_controller.dart';
+import '../sync/sync_view.dart';
+import '../core/utils/sync_format.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
+import '../widgets/hide_book_action.dart';
 import '../widgets/library_book_detail_overlay.dart';
+import '../widgets/library_tiles.dart';
 import '../widgets/local_audiobook_importer.dart';
+import '../widgets/remote_books_section.dart';
 
 /// Screen 2 — **Library**: books the user owns, whether downloaded through
 /// the in-app store or added manually.
@@ -30,12 +38,27 @@ class LibraryScreen extends StatefulWidget {
   /// Defaults to the platform [scanDownloadedLibrary].
   final LibraryScanner? scanLibrary;
 
+  /// Per-device list of books hidden from this screen. Injectable for tests.
+  final HiddenBooksStore hiddenStore;
+
+  /// Opens a LibriVox book's Discover detail by its archive.org id (the
+  /// fallback query is "title author", used if the id lookup fails).
+  /// Without it, "On your other devices" taps just go to Discover.
+  final void Function(String archiveId, String fallbackQuery)? onOpenInDiscover;
+
+  /// The local import flow "Add to this device" runs. Defaults to the
+  /// import options sheet; injectable for tests.
+  final void Function(BuildContext, AppDatabase, VoidCallback)? importRunner;
+
   const LibraryScreen({
     super.key,
     required this.db,
     required this.audioService,
     required this.onGoToDiscover,
     this.scanLibrary,
+    this.hiddenStore = const HiddenBooksStore(),
+    this.onOpenInDiscover,
+    this.importRunner,
   });
 
   @override
@@ -43,7 +66,18 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  List<UnifiedAudiobook> _books = [];
+  List<UnifiedAudiobook> _allBooks = [];
+  List<UnifiedAudiobook> _allInProgress = [];
+
+  /// Ids the user hid on this device; both lists below leave them out.
+  Set<String> _hidden = {};
+
+  /// Portable keys of this device's own books; what "On your other
+  /// devices" is measured against. Empty without sync.
+  Set<String> _localKeys = {};
+
+  List<UnifiedAudiobook> get _books =>
+      _allBooks.where((b) => !_hidden.contains(b.id)).toList();
 
   /// Books with saved progress, most-recent first — the same rule
   /// `AppDatabase.getContinueListening` applies for Now Playing's idle
@@ -51,7 +85,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   /// list intentionally overlaps `_books`: a book in progress belongs in
   /// both sections, since "in progress" is meant to be found here even
   /// once the player has replaced Now Playing's idle state.
-  List<UnifiedAudiobook> _inProgress = [];
+  List<UnifiedAudiobook> get _inProgress =>
+      _allInProgress.where((b) => !_hidden.contains(b.id)).toList();
 
   /// Fraction complete (0.0-1.0) per in-progress book id, keyed off
   /// [PlaybackProgress] (`chapterIndex` + `positionSeconds`) against the
@@ -75,32 +110,52 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   void initState() {
     super.initState();
+    HiddenBooksStore.changes.addListener(_onHiddenChanged);
     _load();
+  }
+
+  /// Hiding/unhiding only changes what is shown, so no rescan: re-read the
+  /// set and rebuild.
+  Future<void> _onHiddenChanged() async {
+    final hidden = await widget.hiddenStore.read();
+    if (!mounted) return;
+    setState(() => _hidden = hidden);
   }
 
   @override
   void dispose() {
+    HiddenBooksStore.changes.removeListener(_onHiddenChanged);
     _openOverlayNavigator?.maybePop();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final sync = context.getInheritedWidgetOfExactType<SyncScope>()?.controller;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       await (widget.scanLibrary ?? scanDownloadedLibrary)(widget.db);
+      final hidden = await widget.hiddenStore.read();
       final books = await widget.db.getAllAudiobooks();
       final inProgress = await widget.db.getContinueListening();
+      var localKeys = <String>{};
+      if (sync != null) {
+        try {
+          localKeys = (await sync.portableKeys()).values.toSet();
+        } catch (_) {}
+      }
       final progressById = <String, double?>{};
       for (final book in inProgress) {
         progressById[book.id] = await _fractionComplete(book);
       }
       if (!mounted) return;
       setState(() {
-        _books = books;
-        _inProgress = inProgress;
+        _hidden = hidden;
+        _localKeys = localKeys;
+        _allBooks = books;
+        _allInProgress = inProgress;
         _progressById
           ..clear()
           ..addAll(progressById);
@@ -167,6 +222,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               db: widget.db,
               onRemoved: _load,
               onProgressChanged: _load,
+              hiddenStore: widget.hiddenStore,
               wide: true,
             ),
           ),
@@ -186,6 +242,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             db: widget.db,
             onRemoved: _load,
             onProgressChanged: _load,
+            hiddenStore: widget.hiddenStore,
           ),
         ),
       );
@@ -197,9 +254,188 @@ class _LibraryScreenState extends State<LibraryScreen> {
     });
   }
 
+  /// What the other devices have that this one does not, minus what the
+  /// user hid here (by portable key). Empty without sync.
+  List<RemoteBook> _remoteBooks(SyncView? view) => view == null
+      ? const []
+      : view
+          .remoteOnly(_localKeys)
+          .where((b) => !_hidden.contains(b.key))
+          .toList();
+
+  void _openRemote(SyncView view, RemoteBook book) {
+    if (book.isLibrivox) {
+      final open = widget.onOpenInDiscover;
+      if (open != null) {
+        open(book.archiveId!, '${book.title} ${book.author}'.trim());
+      } else {
+        widget.onGoToDiscover();
+      }
+      return;
+    }
+    _showAddHereSheet(view, book);
+  }
+
+  Future<void> _showAddHereSheet(SyncView view, RemoteBook book) async {
+    final device = deviceListLabel(view, book.deviceIds);
+    final add = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final c = sheetContext.colors;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${book.title} is on $device. Add it to this device to '
+                  'listen here.',
+                  style: AppType.body.copyWith(color: c.text),
+                ),
+                const SizedBox(height: Sp.x4),
+                FilledButton.icon(
+                  style: _pairedButton,
+                  onPressed: () => Navigator.of(sheetContext).pop(true),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add to this device'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (add != true || !mounted) return;
+    await _addHere(view, book, device);
+  }
+
+  /// Runs the normal local import, then checks whether what came in is the
+  /// same book (same portable key). A different-looking copy is only linked
+  /// if the user says so.
+  Future<void> _addHere(SyncView view, RemoteBook book, String device) async {
+    final sync = SyncScope.maybeOf(context);
+    if (sync == null) return;
+    final before = {for (final b in await widget.db.getAllAudiobooks()) b.id};
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final run = widget.importRunner ?? LocalAudiobookImporter.showOptionsModal;
+    run(context, widget.db, () async {
+      await _load();
+      await _afterImport(sync, messenger, book, device, before);
+    });
+  }
+
+  Future<void> _afterImport(
+      SyncController sync,
+      ScaffoldMessengerState messenger,
+      RemoteBook book,
+      String device,
+      Set<String> before) async {
+    await sync.refresh();
+    final keys = await sync.portableKeys();
+    final added = [
+      for (final b in await widget.db.getAllAudiobooks())
+        if (!before.contains(b.id) && keys.containsKey(b.id)) b,
+    ];
+    if (added.isEmpty) return;
+    void linked() => messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('Linked with $device')));
+    if (added.any((b) => keys[b.id] == book.key)) {
+      linked();
+      return;
+    }
+    if (!mounted) return;
+    final link = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Different copy'),
+        content: Text('This looks like a different copy of ${book.title}. '
+            'Link it anyway?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Keep separate')),
+          FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Link anyway')),
+        ],
+      ),
+    );
+    if (link != true) return;
+    await sync.linkBook(added.first.id, book.key);
+    linked();
+    if (mounted) await _load();
+  }
+
+  Future<void> _showRemoteMenu(RemoteBook book) {
+    final messenger = ScaffoldMessenger.of(context);
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final c = sheetContext.colors;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                minTileHeight: Dim.tapComfy,
+                leading: Icon(Icons.visibility_off_outlined, color: c.text),
+                title: Text('Hide from library',
+                    style: AppType.body.copyWith(color: c.text)),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  // Not on this device, so the portable key is the id.
+                  hideBookWithUndo(messenger, widget.hiddenStore, book.key);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Long-press on a tile: a small sheet with "Hide from library".
+  Future<void> _showTileMenu(BuildContext context, UnifiedAudiobook book) {
+    final messenger = ScaffoldMessenger.of(context);
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final c = sheetContext.colors;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                minTileHeight: Dim.tapComfy,
+                leading: Icon(Icons.visibility_off_outlined, color: c.text),
+                title: Text('Hide from library',
+                    style: AppType.body.copyWith(color: c.text)),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  hideBookWithUndo(messenger, widget.hiddenStore, book.id);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final syncView = SyncScope.viewOf(context);
+    final remote = _remoteBooks(syncView);
+    final settings = SettingsScope.maybeOf(context);
+    final tiles = settings?.libraryLayout == LibraryLayout.tiles;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -219,12 +455,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
               label: const Text('Try again'),
             ),
           );
-        } else if (_books.isEmpty) {
+        } else if (_books.isEmpty && remote.isEmpty) {
           body = AppStateView.empty(
             icon: Icons.collections_bookmark_rounded,
-            headline: 'Your library is empty',
-            body: 'Import audiobooks you already have, or download something '
-                'free from Discover.',
+            headline: _allBooks.isNotEmpty
+                ? 'All your books are hidden'
+                : 'Your library is empty',
+            body: _allBooks.isNotEmpty
+                ? 'Unhide them in Settings, under Hidden books.'
+                : 'Import audiobooks you already have, or download '
+                    'something free from Discover.',
             action: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 320),
               child: Column(
@@ -258,32 +498,98 @@ class _LibraryScreenState extends State<LibraryScreen> {
             if (_inProgress.isNotEmpty) ...[
               const _SectionHeader(title: 'In progress'),
               const SizedBox(height: Sp.x3),
-              ..._inProgress.map(
-                (book) => Padding(
-                  padding: const EdgeInsets.only(bottom: Sp.listGap),
-                  child: _InProgressRow(
-                    book: book,
-                    progress: _progressById[book.id],
-                    compact: !wide,
-                    onTap: () => _openDetail(context, book, wide: wide),
+              if (tiles)
+                LibraryTileGrid(
+                  count: _inProgress.length,
+                  itemBuilder: (context, i, size) {
+                    final book = _inProgress[i];
+                    final p = _progressById[book.id];
+                    return _BookTile(
+                      book: book,
+                      coverSize: size,
+                      progress: p,
+                      caption: p == null
+                          ? 'In progress'
+                          : '${(p * 100).round()}% listened',
+                      semanticsLabel: p == null
+                          ? 'View details for ${book.title}'
+                          : 'View details for ${book.title}, '
+                              '${(p * 100).round()}% complete',
+                      onTap: () => _openDetail(context, book, wide: wide),
+                      onLongPress: () => _showTileMenu(context, book),
+                    );
+                  },
+                )
+              else
+                ..._inProgress.map(
+                  (book) => Padding(
+                    padding: const EdgeInsets.only(bottom: Sp.listGap),
+                    child: _InProgressRow(
+                      book: book,
+                      progress: _progressById[book.id],
+                      compact: !wide,
+                      onTap: () => _openDetail(context, book, wide: wide),
+                      onLongPress: () => _showTileMenu(context, book),
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: Sp.sectionGap),
               const _SectionHeader(title: 'All books'),
               const SizedBox(height: Sp.x3),
             ],
-            ..._books.map(
-              (book) => Padding(
-                padding: const EdgeInsets.only(bottom: Sp.listGap),
-                child: _BookRow(
-                  book: book,
-                  inProgress: _inProgress.any((b) => b.id == book.id),
-                  progress: _progressById[book.id],
-                  onTap: () => _openDetail(context, book, wide: wide),
+            if (tiles)
+              LibraryTileGrid(
+                count: _books.length,
+                itemBuilder: (context, i, size) {
+                  final book = _books[i];
+                  final isInProgress = _inProgress.any((b) => b.id == book.id);
+                  final p = isInProgress ? _progressById[book.id] : null;
+                  final chapters = book.chapters.length;
+                  return _BookTile(
+                    book: book,
+                    coverSize: size,
+                    progress: p,
+                    caption: isInProgress
+                        ? (p == null
+                            ? 'In progress'
+                            : 'In progress \u00b7 ${(p * 100).round()}%')
+                        : (chapters == 0
+                            ? (book.source ?? 'Local')
+                            : '$chapters '
+                                '${chapters == 1 ? 'chapter' : 'chapters'}'),
+                    captionAccent: isInProgress,
+                    semanticsLabel: p != null
+                        ? 'View details for ${book.title}, '
+                            '${(p * 100).round()}% complete'
+                        : 'View details for ${book.title}',
+                    onTap: () => _openDetail(context, book, wide: wide),
+                    onLongPress: () => _showTileMenu(context, book),
+                  );
+                },
+              )
+            else
+              ..._books.map(
+                (book) => Padding(
+                  padding: const EdgeInsets.only(bottom: Sp.listGap),
+                  child: _BookRow(
+                    book: book,
+                    inProgress: _inProgress.any((b) => b.id == book.id),
+                    progress: _progressById[book.id],
+                    onTap: () => _openDetail(context, book, wide: wide),
+                    onLongPress: () => _showTileMenu(context, book),
+                  ),
                 ),
               ),
-            ),
+            if (remote.isNotEmpty) ...[
+              const SizedBox(height: Sp.sectionGap),
+              RemoteBooksSection(
+                view: syncView!,
+                tiles: tiles,
+                books: remote,
+                onTap: (b) => _openRemote(syncView, b),
+                onLongPress: _showRemoteMenu,
+              ),
+            ],
           ];
 
           if (wide) {
@@ -348,6 +654,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           ),
                         ),
                       ),
+                      if (settings != null)
+                        Semantics(
+                          button: true,
+                          label: tiles ? 'Show as list' : 'Show as tiles',
+                          excludeSemantics: true,
+                          child: IconButton(
+                            tooltip: tiles ? 'Show as list' : 'Show as tiles',
+                            onPressed: () => settings.setLibraryLayout(tiles
+                                ? LibraryLayout.list
+                                : LibraryLayout.tiles),
+                            icon: Icon(tiles
+                                ? Icons.view_list_rounded
+                                : Icons.grid_view_rounded),
+                          ),
+                        ),
                       // Wide only: on phone, Import moves to the floating
                       // button below (in the thumb zone, above the mini
                       // player) and Refresh becomes pull-to-refresh on the
@@ -547,6 +868,7 @@ class _InProgressRow extends StatelessWidget {
   /// (see `_LibraryScreenState._fractionComplete`).
   final double? progress;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   /// Phone gets a tighter card (per the approved mockup: a 64x64 cover
   /// rather than the 56x56 one wide keeps).
@@ -556,6 +878,7 @@ class _InProgressRow extends StatelessWidget {
     required this.book,
     required this.progress,
     required this.onTap,
+    this.onLongPress,
     this.compact = false,
   });
 
@@ -573,6 +896,7 @@ class _InProgressRow extends StatelessWidget {
       borderRadius: R.md,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: R.md,
         child: Semantics(
           button: true,
@@ -649,6 +973,54 @@ class _InProgressRow extends StatelessWidget {
   }
 }
 
+/// A library book as a [LibraryTile]; the tile counterpart of `_BookRow`
+/// and `_InProgressRow`, taking the same callbacks so tap and long-press
+/// behave identically in either layout.
+class _BookTile extends StatelessWidget {
+  final UnifiedAudiobook book;
+  final double coverSize;
+  final double? progress;
+  final String caption;
+  final bool captionAccent;
+  final String semanticsLabel;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const _BookTile({
+    required this.book,
+    required this.coverSize,
+    required this.progress,
+    required this.caption,
+    required this.semanticsLabel,
+    required this.onTap,
+    this.onLongPress,
+    this.captionAccent = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LibraryTile(
+      cover: AppBookCover(
+        bookId: book.id,
+        title: book.title,
+        coverUrl: book.coverArtUrlOrPath,
+        width: coverSize,
+        height: coverSize,
+      ),
+      title: book.title,
+      author: book.author,
+      progress: progress,
+      caption: caption,
+      captionAccent: captionAccent,
+      semanticsLabel: book.author.isEmpty
+          ? semanticsLabel
+          : '$semanticsLabel, by ${book.author}',
+      onTap: onTap,
+      onLongPress: onLongPress,
+    );
+  }
+}
+
 class _BookRow extends StatelessWidget {
   final UnifiedAudiobook book;
 
@@ -662,10 +1034,12 @@ class _BookRow extends StatelessWidget {
   /// shows its progress so the two entries read as the same book.
   final bool inProgress;
   final double? progress;
+  final VoidCallback? onLongPress;
 
   const _BookRow({
     required this.book,
     required this.onTap,
+    this.onLongPress,
     this.inProgress = false,
     this.progress,
   });
@@ -683,6 +1057,7 @@ class _BookRow extends StatelessWidget {
       borderRadius: R.md,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: R.md,
         child: Semantics(
           button: true,

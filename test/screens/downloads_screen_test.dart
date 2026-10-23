@@ -168,7 +168,8 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await setSurface(
           tester, wide ? const Size(1280, 800) : const Size(390, 844));
-      final settings = AppSettings(preferences: const UiPreferences(overrides: {}));
+      final settings =
+          AppSettings(preferences: const UiPreferences(overrides: {}));
       addTearDown(settings.dispose);
       await tester.pumpWidget(SettingsScope(
         settings: settings,

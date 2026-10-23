@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../database/app_database.dart';
@@ -38,6 +40,12 @@ class DiscoverScreen extends StatefulWidget {
   /// featured book". See `core/demo_deeplink.dart` for why this exists.
   final String? openBookId;
 
+  /// Library's "On your other devices": open this archive.org book's detail
+  /// as soon as it is fetched (where the normal Download button lives). If
+  /// the lookup fails, [openFallbackQuery] is searched instead.
+  final String? openArchiveId;
+  final String? openFallbackQuery;
+
   const DiscoverScreen({
     super.key,
     required this.db,
@@ -47,6 +55,8 @@ class DiscoverScreen extends StatefulWidget {
     required this.downloader,
     this.headerAction,
     this.openBookId,
+    this.openArchiveId,
+    this.openFallbackQuery,
   });
 
   @override
@@ -99,11 +109,37 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   /// first time the sheet is shown so it cannot reopen on every rebuild.
   bool _pendingOpen = false;
 
+  /// A book fetched by archive id (see [DiscoverScreen.openArchiveId]),
+  /// opened on the next frame.
+  LibriVoxBook? _linkedBook;
+
   @override
   void initState() {
     super.initState();
     _pendingOpen = widget.openBookId != null;
     _loadShelves();
+    final id = widget.openArchiveId;
+    if (id != null) _openArchiveBook(id);
+  }
+
+  Future<void> _openArchiveBook(String id) async {
+    LibriVoxBook? book;
+    try {
+      book = await widget.libriVoxService.getBookById(id);
+    } catch (_) {}
+    if (!mounted) return;
+    if (book != null) {
+      setState(() {
+        _selected = book;
+        _linkedBook = book;
+      });
+      return;
+    }
+    final query = widget.openFallbackQuery;
+    if (query != null && query.trim().isNotEmpty) {
+      _search.text = query;
+      unawaited(_performSearch(query));
+    }
   }
 
   @override
@@ -266,6 +302,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           _pendingOpen = false;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _openDetailSurface(context, book, wide: wide);
+          });
+        }
+
+        final linked = _linkedBook;
+        if (linked != null) {
+          _linkedBook = null;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _openDetailSurface(context, linked, wide: wide);
           });
         }
 

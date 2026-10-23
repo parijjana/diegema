@@ -5,6 +5,20 @@ import 'player_controls_style.dart';
 import '../theme/app_palettes.dart';
 import 'ui_preferences.dart';
 
+/// How the Library screen lays its books out. Stored by name, so reordering
+/// or adding a value never reinterprets a saved choice; an unknown stored
+/// name falls back to [list].
+enum LibraryLayout {
+  list('List'),
+  tiles('Grid');
+
+  final String label;
+  const LibraryLayout(this.label);
+
+  static LibraryLayout fromName(String? name) => LibraryLayout.values
+      .firstWhere((l) => l.name == name, orElse: () => LibraryLayout.list);
+}
+
 /// Every user-adjustable preference, in one place, read from and written
 /// back to [UiPreferences].
 ///
@@ -37,6 +51,7 @@ class AppSettings extends ChangeNotifier {
   BackgroundPair _background = BackgroundPair.fallback;
   ShadowStyle _shadows = ShadowStyle.off;
   bool _downloadsWifiOnly = false;
+  LibraryLayout _libraryLayout = LibraryLayout.list;
 
   AppSettings({
     required UiPreferences preferences,
@@ -74,6 +89,9 @@ class AppSettings extends ChangeNotifier {
   /// Whether downloads wait for Wi-Fi (Settings > Downloads).
   bool get downloadsWifiOnly => _downloadsWifiOnly;
 
+  /// List or tiles in the Library (header toggle and Settings > Appearance).
+  LibraryLayout get libraryLayout => _libraryLayout;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
@@ -87,6 +105,8 @@ class AppSettings extends ChangeNotifier {
     final storedShadows =
         ShadowStyle.fromName(await _preferences.getShadowsName());
     final storedWifiOnly = await _preferences.getDownloadsWifiOnly();
+    final storedLayout =
+        LibraryLayout.fromName(await _preferences.getLibraryLayoutName());
 
     if (storedTheme == _themeMode &&
         storedSkip == _skipSeconds &&
@@ -96,7 +116,8 @@ class AppSettings extends ChangeNotifier {
         storedAccent == _accent &&
         storedBackground == _background &&
         storedShadows == _shadows &&
-        storedWifiOnly == _downloadsWifiOnly) {
+        storedWifiOnly == _downloadsWifiOnly &&
+        storedLayout == _libraryLayout) {
       return;
     }
     _themeMode = storedTheme;
@@ -108,6 +129,7 @@ class AppSettings extends ChangeNotifier {
     _background = storedBackground;
     _shadows = storedShadows;
     _downloadsWifiOnly = storedWifiOnly;
+    _libraryLayout = storedLayout;
     notifyListeners();
   }
 
@@ -169,6 +191,13 @@ class AppSettings extends ChangeNotifier {
     _shadows = shadows;
     notifyListeners();
     await _preferences.setShadowsName(shadows.name);
+  }
+
+  Future<void> setLibraryLayout(LibraryLayout layout) async {
+    if (layout == _libraryLayout) return;
+    _libraryLayout = layout;
+    notifyListeners();
+    await _preferences.setLibraryLayoutName(layout.name);
   }
 
   Future<void> setDownloadsWifiOnly(bool value) async {

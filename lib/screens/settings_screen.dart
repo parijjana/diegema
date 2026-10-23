@@ -8,9 +8,12 @@ import '../core/playback_constants.dart';
 import '../core/player_controls_style.dart';
 import '../database/app_database.dart';
 import '../services/download_manager.dart';
+import '../services/sync/sync_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/library_folders_section.dart';
 import 'downloads_screen.dart';
+import 'hidden_books_screen.dart';
+import 'linked_devices_screen.dart';
 
 /// The settings panel — Phase 1 of `settings_panel_plan.md`.
 ///
@@ -77,6 +80,17 @@ class SettingsScreen extends StatelessWidget {
                     _Choice(ThemeMode.dark, 'Dark'),
                   ],
                   onChanged: settings.setThemeMode,
+                ),
+                const SizedBox(height: Sp.x5),
+                _ThreeWayToggle<LibraryLayout>(
+                  label: 'Library layout',
+                  description: 'Books as a list, or as a grid of covers.',
+                  value: settings.libraryLayout,
+                  options: [
+                    for (final layout in LibraryLayout.values)
+                      _Choice(layout, layout.label),
+                  ],
+                  onChanged: settings.setLibraryLayout,
                 ),
                 const SizedBox(height: Sp.x5),
                 _ThreeWayToggle<PlayerControlsStyle>(
@@ -189,6 +203,29 @@ class SettingsScreen extends StatelessWidget {
               _Section(
                 title: 'Library folders',
                 children: [LibraryFoldersSection(db: db!)],
+              ),
+            // Only where linked-device sync exists (not the web demo).
+            if (SyncScope.maybeOf(context) != null)
+              _Section(
+                title: 'Devices',
+                children: [
+                  _LinkRow(
+                    label: 'Linked devices',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const LinkedDevicesScreen())),
+                  ),
+                ],
+              ),
+            if (db != null)
+              _Section(
+                title: 'Library',
+                children: [
+                  _LinkRow(
+                    label: 'Hidden books',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => HiddenBooksScreen(db: db!))),
+                  ),
+                ],
               ),
             _Section(
               title: 'About',

@@ -35,6 +35,14 @@ dependencies:
   # Queued, resumable downloads that survive the app being backgrounded or
   # killed (BSD-3). Pinned: 9.6.x needs Flutter >= 3.47 and we pin 3.44.5.
   background_downloader: 9.5.9
+  cryptography: ^2.9.0
+  bonsoir: 7.1.5
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.4.2
+  flutter_secure_storage: ^10.3.4
+  multicast_dns: ^0.3.3+1
+  args: ^2.7.0
+  sqlite3: ^3.5.2
 
 dev_dependencies:
   flutter_test:
@@ -47,6 +55,7 @@ dev_dependencies:
   # services' tests).
   path_provider_platform_interface: ^2.1.2
   plugin_platform_interface: ^2.1.8
+  fake_async: ^1.3.3
 
 flutter:
   uses-material-design: true

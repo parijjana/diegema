@@ -9,10 +9,15 @@ import '../domain/models/audiobook.dart';
 import '../database/app_database.dart';
 import '../services/audio_playback_service.dart';
 import '../services/book_removal.dart';
+import '../services/hidden_books_store.dart';
+import '../services/sync/sync_controller.dart';
+import '../sync/sync_view.dart';
 import '../theme/app_theme.dart';
 import 'app_book_cover.dart';
 import 'book_detail_pane.dart' show EmptyChaptersNote;
 import 'book_detail_parts.dart';
+import 'hide_book_action.dart';
+import 'other_devices_section.dart';
 
 /// The Library-screen counterpart of Discover's `BookDetailPane`: the same
 /// family of layout (see `book_detail_parts.dart`) - one primary action,
@@ -46,6 +51,9 @@ class LibraryBookDetailOverlay extends StatefulWidget {
   /// width; this widget's own constraints are capped by the dialog.
   final bool wide;
 
+  /// Where "Hide from library" records the hidden id (per device).
+  final HiddenBooksStore hiddenStore;
+
   const LibraryBookDetailOverlay({
     super.key,
     required this.book,
@@ -55,6 +63,7 @@ class LibraryBookDetailOverlay extends StatefulWidget {
     this.documentsPath,
     this.onProgressChanged,
     this.wide = false,
+    this.hiddenStore = const HiddenBooksStore(),
   });
 
   @override
@@ -65,7 +74,63 @@ class LibraryBookDetailOverlay extends StatefulWidget {
 class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
   BookProgress? _progress;
 
+  /// This book's portable key, when linked-device sync is on.
+  String? _syncKey;
+
   UnifiedAudiobook get book => widget.book;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadSyncKey();
+  }
+
+  Future<void> _loadSyncKey() async {
+    final sync = SyncScope.maybeOf(context);
+    if (sync == null) return;
+    String? key;
+    try {
+      key = (await sync.portableKeys())[book.id];
+    } catch (_) {}
+    if (mounted && key != _syncKey) setState(() => _syncKey = key);
+  }
+
+  /// The "On your other devices" section, or null when sync is off or no
+  /// other device has anything on this book.
+  Widget? _otherDevices() {
+    final view = SyncScope.viewOf(context);
+    final key = _syncKey;
+    if (view == null ||
+        key == null ||
+        !OtherDevicesSection.hasContent(view, key)) {
+      return null;
+    }
+    final progress = _progress;
+    return OtherDevicesSection(
+      view: view,
+      bookKey: key,
+      // A finished book is past every position.
+      local: progress == null
+          ? null
+          : DevicePosition(
+              '',
+              progress.finished ? progress.chapterCount : progress.chapterIndex,
+              progress.positionSeconds,
+              0),
+      onJump: _jumpTo,
+    );
+  }
+
+  /// Only ever called from a tap on a button in the section.
+  void _jumpTo(DevicePosition p) {
+    if (book.chapters.isEmpty) return;
+    widget.audioService.loadBook(
+      book,
+      initialChapterIndex: p.chapter.clamp(0, book.chapters.length - 1),
+      initialPosition: Duration(seconds: p.seconds),
+    );
+    Navigator.of(context).pop();
+  }
 
   @override
   void initState() {
@@ -111,6 +176,13 @@ class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
           : 'Removed "${book.title}" from your library'),
     ));
     widget.onRemoved?.call();
+  }
+
+  Future<void> _hide(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    await hideBookWithUndo(messenger, widget.hiddenStore, book.id);
   }
 
   Future<void> _markFinished(BuildContext context) async {
@@ -228,6 +300,7 @@ class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
           ? () => openFolder(folder)
           : null,
       showFolderLabel: folderLabel ?? 'Show folder',
+      onHide: () => _hide(context),
       onRemove: widget.db == null ? null : () => _remove(context),
     );
   }
@@ -289,6 +362,7 @@ class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final progress = _progress;
+    final others = _otherDevices();
     final about = ParsedAbout.from(book.description);
     final credit = [
       if (about.credit != null) about.credit!,
@@ -366,6 +440,10 @@ class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
                       padding:
                           const EdgeInsets.fromLTRB(Sp.x8, 0, Sp.x8, Sp.x6),
                       children: [
+                        if (others != null) ...[
+                          others,
+                          const SizedBox(height: Sp.x6),
+                        ],
                         if (about.text != null) ...[
                           ExpandableAbout(text: about.text!),
                           const SizedBox(height: Sp.x6),
@@ -410,6 +488,10 @@ class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
               const SizedBox(height: Sp.x5),
               if (progress != null) ...[
                 BookProgressSummary(progress: progress),
+                const SizedBox(height: Sp.x5),
+              ],
+              if (others != null) ...[
+                others,
                 const SizedBox(height: Sp.x5),
               ],
               BookMetaRow(items: _meta(about, wide: false)),

@@ -168,6 +168,65 @@ void main() {
     });
   });
 
+  group('skip back when a started book is loaded', () {
+    late AppDatabase db;
+    late _FakePlayer player;
+    late AudioPlaybackService service;
+
+    setUp(() {
+      db = AppDatabase(NativeDatabase.memory());
+      player = _FakePlayer();
+      service = AudioPlaybackService(
+          player: player,
+          db: db,
+          preferences: UiPreferences(overrides: <String, Object>{}),
+          hiddenStore: HiddenBooksStore(overrides: <String, List<String>>{}));
+    });
+
+    tearDown(() async {
+      await service.dispose().catchError((_) {});
+      await db.close();
+    });
+
+    test('resume by Play rewinds the saved position', () async {
+      final book = await seedBook(db, id: 'r', positionSeconds: 100);
+      await service.loadBook(book);
+      expect(player.seeks, [const Duration(seconds: 95)]);
+    });
+
+    test('the first play after a relaunch rewinds', () async {
+      final book = await seedBook(db, id: 'r', positionSeconds: 100);
+      await service.loadBook(book, autoPlay: false);
+      expect(player.seeks, [const Duration(seconds: 100)]);
+      await service.play();
+      expect(player.seeks.last, const Duration(seconds: 95));
+    });
+
+    test('a fresh start does not rewind', () async {
+      final book = await seedBook(db, id: 'f');
+      await service.loadBook(book);
+      expect(player.seeks, isEmpty);
+      await service.loadBook(book, autoPlay: false);
+      await service.play();
+      expect(player.seeks, isEmpty);
+    });
+
+    test('a jump (bookmark or chapter) does not rewind', () async {
+      final book = await seedBook(db, id: 'j', positionSeconds: 100);
+      await service.loadBook(book,
+          initialChapterIndex: 0, initialPosition: const Duration(seconds: 50));
+      expect(player.seeks, [const Duration(seconds: 50)]);
+      await service.loadBook(book, initialChapterIndex: 0);
+      expect(player.seeks, hasLength(1));
+    });
+
+    test('never rewinds before the chapter start', () async {
+      final book = await seedBook(db, id: 'c', positionSeconds: 3);
+      await service.loadBook(book);
+      expect(player.seeks, isEmpty); // resumed at 0, the chapter start
+    });
+  });
+
   test('settings persist by name; unknown values fall back', () async {
     final store = <String, Object>{};
     final s = AppSettings(preferences: UiPreferences(overrides: store));

@@ -211,6 +211,10 @@ class AudioPlaybackService {
     int targetChapter = initialChapterIndex ?? 0;
     Duration targetPosition = initialPosition ?? Duration.zero;
 
+    // True only when the position came from saved progress: a resume. An
+    // explicit chapter/position (bookmark, chapter pick) is a jump and never
+    // rewinds, and neither does a start from 0.
+    var resumed = false;
     if (initialChapterIndex == null && _db != null) {
       try {
         final savedProgress = await _db!.getProgress(book.id);
@@ -220,6 +224,7 @@ class AudioPlaybackService {
                 AppDatabase.finishedPositionSeconds) {
           targetChapter = savedProgress.chapterIndex;
           targetPosition = Duration(seconds: savedProgress.positionSeconds);
+          resumed = targetPosition > Duration.zero;
         }
       } catch (_) {}
     }
@@ -229,8 +234,22 @@ class AudioPlaybackService {
 
     if (book.chapters.isEmpty) return;
 
+    // Skip back on resume. Playing now: rewind the seek. Loaded paused (cold
+    // start): treat it as a long pause, so the first play() rewinds.
+    if (resumed && autoPlay) {
+      final choice = SkipBackOnResume.fromName(
+          await _preferences?.getSkipBackOnResumeName());
+      targetPosition = resumePosition(
+          position: targetPosition,
+          pausedFor: const Duration(hours: 1),
+          rewindSeconds: choice.seconds);
+    }
+
     await _playCurrentChapter(
         seekToPosition: targetPosition, autoPlay: autoPlay);
+    if (resumed && !autoPlay) {
+      _pausedAt = _now().subtract(const Duration(hours: 1));
+    }
   }
 
   Future<void> _playCurrentChapter(

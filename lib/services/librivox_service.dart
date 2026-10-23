@@ -118,9 +118,12 @@ class LibriVoxService {
       call: () async {
         if (term.isNotEmpty) {
           // Use Internet Archive LibriVox collection search for keyword queries
-          final searchResults =
-              await _searchInternetArchiveLibriVox(term, limit: limit);
+          final searchResults = await _searchInternetArchiveLibriVox(term,
+              limit: limit, offset: offset);
           if (searchResults.isNotEmpty) return searchResults;
+          // Past the first page an empty answer means "no more results", not
+          // "try the unrelated featured feed", which would pad the list.
+          if (offset > 0) return const <LibriVoxBook>[];
         }
 
         // Fetch direct LibriVox API feed
@@ -162,10 +165,13 @@ class LibriVoxService {
   }
 
   Future<List<LibriVoxBook>> _searchInternetArchiveLibriVox(String term,
-      {int limit = 20}) async {
+      {int limit = 20, int offset = 0}) async {
     try {
+      // archive.org pages by whole pages of [limit] rows, so [offset] is
+      // expected to be a multiple of it (Discover pages by its page size).
+      final page = limit > 0 ? offset ~/ limit + 1 : 1;
       final archiveQuery =
-          '$_archiveUrl?q=collection:(librivoxaudio) AND mediatype:(audio) AND (title:(${Uri.encodeComponent(term)}) OR creator:(${Uri.encodeComponent(term)}))&fl[]=identifier,title,creator,description,publicdate&sort[]=downloads+desc&rows=$limit&output=json';
+          '$_archiveUrl?q=collection:(librivoxaudio) AND mediatype:(audio) AND (title:(${Uri.encodeComponent(term)}) OR creator:(${Uri.encodeComponent(term)}))&fl[]=identifier,title,creator,description,publicdate&sort[]=downloads+desc&rows=$limit&page=$page&output=json';
 
       final response = await _client
           .get(Uri.parse(archiveQuery), headers: _headers)

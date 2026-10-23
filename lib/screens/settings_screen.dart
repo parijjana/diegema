@@ -181,6 +181,29 @@ class SettingsScreen extends StatelessWidget {
                   ],
                   onChanged: settings.setDefaultSpeed,
                 ),
+                const SizedBox(height: Sp.x5),
+                _ChoiceGroup<SkipBackOnResume>(
+                  label: 'Skip back on resume',
+                  description: 'After a pause of more than a few seconds, '
+                      'playback steps back this far when you resume.',
+                  value: settings.skipBackOnResume,
+                  options: [
+                    for (final v in SkipBackOnResume.values)
+                      _Choice(v, v.label),
+                  ],
+                  onChanged: settings.setSkipBackOnResume,
+                ),
+                const SizedBox(height: Sp.x5),
+                _ChoiceGroup<AutoAdvance>(
+                  label: 'When a book ends',
+                  description: 'Stop, or carry on with the next unfinished '
+                      'book in your library.',
+                  value: settings.autoAdvance,
+                  options: [
+                    for (final v in AutoAdvance.values) _Choice(v, v.label),
+                  ],
+                  onChanged: settings.setAutoAdvance,
+                ),
               ],
             ),
             if (db != null && downloads != null && !kIsWeb)

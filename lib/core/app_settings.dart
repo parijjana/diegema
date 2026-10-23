@@ -53,9 +53,9 @@ enum LibraryFilter {
 /// How far playback rewinds when resumed after a pause. Stored by name.
 enum SkipBackOnResume {
   off('Off', 0),
-  s5('5 seconds', 5),
-  s10('10 seconds', 10),
-  s30('30 seconds', 30);
+  s5('Back 5 seconds', 5),
+  s10('Back 10 seconds', 10),
+  s30('Back 30 seconds', 30);
 
   final String label;
   final int seconds;

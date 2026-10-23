@@ -11,6 +11,7 @@ import '../services/download_manager.dart';
 import '../services/sync/sync_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/library_folders_section.dart';
+import '../widgets/storage_section.dart';
 import 'downloads_screen.dart';
 import 'hidden_books_screen.dart';
 import 'linked_devices_screen.dart';
@@ -80,6 +81,17 @@ class SettingsScreen extends StatelessWidget {
                     _Choice(ThemeMode.dark, 'Dark'),
                   ],
                   onChanged: settings.setThemeMode,
+                ),
+                const SizedBox(height: Sp.x5),
+                _ChoiceGroup<TextSizeChoice>(
+                  label: 'Text size',
+                  description: 'Scales text on top of your device setting. '
+                      'Device setting uses it as is.',
+                  value: settings.textSize,
+                  options: [
+                    for (final v in TextSizeChoice.values) _Choice(v, v.label),
+                  ],
+                  onChanged: settings.setTextSize,
                 ),
                 const SizedBox(height: Sp.x5),
                 _ThreeWayToggle<LibraryLayout>(
@@ -221,6 +233,11 @@ class SettingsScreen extends StatelessWidget {
                             DownloadsScreen(db: db!, manager: downloads))),
                   ),
                 ],
+              ),
+            if (db != null && !kIsWeb)
+              _Section(
+                title: 'Storage',
+                children: [StorageSection(db: db!)],
               ),
             if (db != null && !kIsWeb)
               _Section(

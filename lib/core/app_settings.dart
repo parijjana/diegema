@@ -80,7 +80,7 @@ enum AutoAdvance {
 /// In-app text size, applied on top of the system text scale. Stored by
 /// name; unknown falls back to [system].
 enum TextSizeChoice {
-  system('System', 1.0),
+  system('Device setting', 1.0),
   small('Small', 0.9),
   large('Large', 1.15),
   larger('Larger', 1.3);
@@ -204,8 +204,8 @@ class AppSettings extends ChangeNotifier {
         LibrarySort.fromName(await _preferences.getLibrarySortName());
     final storedFilter =
         LibraryFilter.fromName(await _preferences.getLibraryFilterName());
-    final storedSkipBack = SkipBackOnResume.fromName(
-        await _preferences.getSkipBackOnResumeName());
+    final storedSkipBack =
+        SkipBackOnResume.fromName(await _preferences.getSkipBackOnResumeName());
     final storedAdvance =
         AutoAdvance.fromName(await _preferences.getAutoAdvanceName());
     final storedTextSize =

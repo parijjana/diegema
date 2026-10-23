@@ -6,6 +6,7 @@ import 'core/app_settings.dart';
 import 'core/demo_deeplink.dart';
 import 'core/demo_mode.dart';
 import 'core/host_page_demo_notice.dart';
+import 'core/text_size.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'main.dart';
@@ -235,6 +236,16 @@ class _AudiobookAppState extends State<AudiobookApp>
             background: _settings.background,
             shadows: _settings.shadows),
         themeMode: _settings.themeMode,
+        builder: (context, child) {
+          final choice = _settings.textSize;
+          if (choice == TextSizeChoice.system) return child!;
+          final media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(
+                textScaler: AppTextScaler(media.textScaler, choice.factor)),
+            child: child!,
+          );
+        },
         home: HomeScreen(
           db: _db,
           preferences: widget.preferences,

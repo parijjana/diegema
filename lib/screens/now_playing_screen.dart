@@ -16,6 +16,7 @@ import '../theme/app_theme.dart';
 import '../widgets/download_controls.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
+import '../widgets/bookmarks_sheet.dart';
 import '../widgets/continue_from_banner.dart';
 import '../widgets/listeners_sheet.dart';
 import '../widgets/player_scrubber.dart';
@@ -963,11 +964,14 @@ class _ActiveView extends StatelessWidget {
                       children: [
                         SpeedSelector(audioService: audioService),
                         SleepTimerSelector(audioService: audioService),
+                        BookmarksButton(
+                            book: book, audioService: audioService, db: db),
                       ],
                     )
                   : _ActionRow(
                       audioService: audioService,
                       book: book,
+                      db: db,
                       onShowUpNext: onShowUpNext,
                     ),
             ],
@@ -1179,10 +1183,12 @@ class _CoverBackdrop extends StatelessWidget {
 class _ActionRow extends StatelessWidget {
   final AudioPlaybackService audioService;
   final UnifiedAudiobook book;
+  final AppDatabase db;
   final VoidCallback onShowUpNext;
   const _ActionRow({
     required this.audioService,
     required this.book,
+    required this.db,
     required this.onShowUpNext,
   });
 
@@ -1211,6 +1217,12 @@ class _ActionRow extends StatelessWidget {
       ),
       SpeedSelector(audioService: audioService, face: face),
       SleepTimerSelector(audioService: audioService, face: face),
+      BookmarksButton(
+          book: book,
+          audioService: audioService,
+          db: db,
+          face: face,
+          radius: radius),
     ];
     final count = children.length;
 

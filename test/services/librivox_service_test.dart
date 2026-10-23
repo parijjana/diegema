@@ -44,8 +44,7 @@ void main() {
           equals('https://archive.org/services/img/dracula_librivox'));
     });
 
-    test(
-        'searchBooks falls back to Internet Archive search when LibriVox returns empty',
+    test('searchBooks parses Internet Archive results for a keyword search',
         () async {
       final mockClient = MockClient((request) async {
         if (request.url.host == 'librivox.org') {
@@ -250,6 +249,62 @@ void main() {
 
       expect(books.single.title, 'Dracula');
       expect(calls, 1);
+    });
+  });
+
+  group('LibriVoxService paging', () {
+    late List<Uri> requests;
+    late LibriVoxService service;
+
+    // Archive.org answers `page=1` with two books, `page=2` with one and
+    // anything later with none; the featured feed is never expected.
+    String docs(List<String> ids) =>
+        '{"response":{"docs":[${ids.map((i) => '{"identifier":"$i","title":"$i","creator":"X"}').join(',')}]}}';
+
+    setUp(() {
+      requests = [];
+      final disk = <String, String>{};
+      service = LibriVoxService(
+        client: MockClient((request) async {
+          requests.add(request.url);
+          if (request.url.host != 'archive.org') {
+            return http.Response('{"books": []}', 200);
+          }
+          return switch (request.url.queryParameters['page']) {
+            '1' => http.Response(docs(['a', 'b']), 200),
+            '2' => http.Response(docs(['c']), 200),
+            _ => http.Response(docs([]), 200),
+          };
+        }),
+        rateLimiter: RateLimitDispatcher(cooldownOverride: Duration.zero),
+        cacheStore: SearchCacheStore(overrides: disk),
+      );
+    });
+
+    test('offset becomes the archive.org page of that many rows', () async {
+      final first = await service.searchBooks('tales', limit: 2);
+      final second = await service.searchBooks('tales', limit: 2, offset: 2);
+
+      expect(first.map((b) => b.id), ['a', 'b']);
+      expect(second.map((b) => b.id), ['c']);
+      expect(requests.map((u) => u.queryParameters['page']), ['1', '2']);
+      expect(requests.map((u) => u.queryParameters['rows']), ['2', '2']);
+    });
+
+    test('each page is cached on its own', () async {
+      await service.searchBooks('tales', limit: 2);
+      await service.searchBooks('tales', limit: 2, offset: 2);
+      await service.searchBooks('tales', limit: 2);
+      await service.searchBooks('tales', limit: 2, offset: 2);
+
+      expect(requests, hasLength(2));
+    });
+
+    test('past the last page is empty, not the featured feed', () async {
+      final past = await service.searchBooks('tales', limit: 2, offset: 4);
+
+      expect(past, isEmpty);
+      expect(requests.every((u) => u.host == 'archive.org'), isTrue);
     });
   });
 }

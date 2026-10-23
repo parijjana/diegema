@@ -111,3 +111,30 @@ String primaryActionLabel(BookProgress? p) {
   return 'Resume · Ch ${p.chapterNumber}, '
       '${formatTimecode(Duration(seconds: p.positionSeconds))}';
 }
+
+/// Whether a saved position means the listener has finished the book: the
+/// explicit "finished" marker, or 95% of a known runtime
+/// (`AppDatabase.continueListeningMaxProgressFraction`).
+bool isBookFinished(
+  List<AudiobookChapter> chapters, {
+  required int chapterIndex,
+  required int positionSeconds,
+}) {
+  final p = BookProgress.from(chapters,
+      savedChapterIndex: chapterIndex, savedPositionSeconds: positionSeconds);
+  if (p == null) return false;
+  return p.finished || (p.fraction ?? 0) >= 0.95;
+}
+
+/// Where resuming should start: [position] rewound by [rewindSeconds] after
+/// a pause longer than [threshold], never before the chapter's start.
+Duration resumePosition({
+  required Duration position,
+  required Duration pausedFor,
+  required int rewindSeconds,
+  Duration threshold = const Duration(seconds: 5),
+}) {
+  if (rewindSeconds <= 0 || pausedFor <= threshold) return position;
+  final target = position - Duration(seconds: rewindSeconds);
+  return target < Duration.zero ? Duration.zero : target;
+}

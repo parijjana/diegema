@@ -26,6 +26,11 @@ class UiPreferences {
   static const String _backgroundKey = 'appearance.background';
   static const String _shadowsKey = 'appearance.shadows';
   static const String _libraryLayoutKey = 'library.layout';
+  static const String _librarySortKey = 'library.sort';
+  static const String _libraryFilterKey = 'library.filter';
+  static const String _skipBackOnResumeKey = 'playback.skip_back_on_resume';
+  static const String _autoAdvanceKey = 'playback.auto_advance';
+  static const String _textSizeKey = 'appearance.text_size';
   static const String _ambienceKey = 'ambience.v1';
   static const String _downloadsWifiOnlyKey = 'downloads.wifi_only';
 
@@ -279,6 +284,29 @@ class UiPreferences {
   Future<String?> getLibraryLayoutName() => _getString(_libraryLayoutKey);
   Future<void> setLibraryLayoutName(String name) =>
       _setString(_libraryLayoutKey, name);
+
+  /// The Library sort and filter, by enum name; null when never chosen.
+  /// Unknown names are resolved to the defaults by `LibrarySort.fromName`
+  /// and `LibraryFilter.fromName`.
+  Future<String?> getLibrarySortName() => _getString(_librarySortKey);
+  Future<void> setLibrarySortName(String name) =>
+      _setString(_librarySortKey, name);
+  Future<String?> getLibraryFilterName() => _getString(_libraryFilterKey);
+  Future<void> setLibraryFilterName(String name) =>
+      _setString(_libraryFilterKey, name);
+
+  /// Skip-back-on-resume and auto-advance, by enum name (see
+  /// `SkipBackOnResume` and `AutoAdvance`).
+  Future<String?> getSkipBackOnResumeName() => _getString(_skipBackOnResumeKey);
+  Future<void> setSkipBackOnResumeName(String name) =>
+      _setString(_skipBackOnResumeKey, name);
+  Future<String?> getAutoAdvanceName() => _getString(_autoAdvanceKey);
+  Future<void> setAutoAdvanceName(String name) =>
+      _setString(_autoAdvanceKey, name);
+
+  /// The in-app text size, by enum name (see `TextSizeChoice`).
+  Future<String?> getTextSizeName() => _getString(_textSizeKey);
+  Future<void> setTextSizeName(String name) => _setString(_textSizeKey, name);
 
   /// The ambience mixer's saved settings, as JSON (see `AmbienceState`).
   Future<String?> getAmbienceJson() => _getString(_ambienceKey);

@@ -2,10 +2,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
+import '../core/app_settings.dart';
 import '../core/playback_constants.dart';
+import '../core/utils/book_progress.dart';
 import '../core/ui_preferences.dart';
 import '../domain/models/audiobook.dart';
 import '../database/app_database.dart';
+import 'hidden_books_store.dart';
 import 'local_file_playback.dart';
 
 enum PlaybackState {
@@ -24,6 +27,12 @@ class AudioPlaybackService {
   /// The library database, for screens that change a book in place.
   AppDatabase? get database => _db;
   final UiPreferences? _preferences;
+  final HiddenBooksStore _hiddenStore;
+  final DateTime Function() _now;
+
+  /// When playback last stopped for a pause (not a chapter end); `null`
+  /// while playing. Drives skip-back-on-resume.
+  DateTime? _pausedAt;
   bool _isInitialized = false;
 
   UnifiedAudiobook? _currentBook;
@@ -68,10 +77,16 @@ class AudioPlaybackService {
   /// [preferences] remembers each book's speed and supplies the global
   /// default; without it speed is not persisted (tests, demo).
   AudioPlaybackService(
-      {AudioPlayer? player, AppDatabase? db, UiPreferences? preferences})
+      {AudioPlayer? player,
+      AppDatabase? db,
+      UiPreferences? preferences,
+      HiddenBooksStore? hiddenStore,
+      DateTime Function()? now})
       : _player = player ?? AudioPlayer(),
         _db = db,
-        _preferences = preferences {
+        _preferences = preferences,
+        _hiddenStore = hiddenStore ?? const HiddenBooksStore(),
+        _now = now ?? DateTime.now {
     _listenToPlayerStreams();
     _startProgressAutoSave();
   }
@@ -100,9 +115,11 @@ class AudioPlaybackService {
         _onChapterCompleted();
       } else if (playing) {
         _progressFrozenBookId = null;
+        _pausedAt = null;
         stateNotifier.value = PlaybackState.playing;
       } else if (!playing && processingState == ProcessingState.ready) {
         stateNotifier.value = PlaybackState.paused;
+        _pausedAt ??= _now();
         _persistCurrentProgress();
       } else if (processingState == ProcessingState.idle) {
         stateNotifier.value = PlaybackState.idle;
@@ -194,6 +211,10 @@ class AudioPlaybackService {
     int targetChapter = initialChapterIndex ?? 0;
     Duration targetPosition = initialPosition ?? Duration.zero;
 
+    // True only when the position came from saved progress: a resume. An
+    // explicit chapter/position (bookmark, chapter pick) is a jump and never
+    // rewinds, and neither does a start from 0.
+    var resumed = false;
     if (initialChapterIndex == null && _db != null) {
       try {
         final savedProgress = await _db!.getProgress(book.id);
@@ -203,6 +224,7 @@ class AudioPlaybackService {
                 AppDatabase.finishedPositionSeconds) {
           targetChapter = savedProgress.chapterIndex;
           targetPosition = Duration(seconds: savedProgress.positionSeconds);
+          resumed = targetPosition > Duration.zero;
         }
       } catch (_) {}
     }
@@ -212,8 +234,22 @@ class AudioPlaybackService {
 
     if (book.chapters.isEmpty) return;
 
+    // Skip back on resume. Playing now: rewind the seek. Loaded paused (cold
+    // start): treat it as a long pause, so the first play() rewinds.
+    if (resumed && autoPlay) {
+      final choice = SkipBackOnResume.fromName(
+          await _preferences?.getSkipBackOnResumeName());
+      targetPosition = resumePosition(
+          position: targetPosition,
+          pausedFor: const Duration(hours: 1),
+          rewindSeconds: choice.seconds);
+    }
+
     await _playCurrentChapter(
         seekToPosition: targetPosition, autoPlay: autoPlay);
+    if (resumed && !autoPlay) {
+      _pausedAt = _now().subtract(const Duration(hours: 1));
+    }
   }
 
   Future<void> _playCurrentChapter(
@@ -298,6 +334,46 @@ class AudioPlaybackService {
       nextChapter();
     } else {
       stateNotifier.value = PlaybackState.completed;
+      _advanceToNextBook();
+    }
+  }
+
+  /// When the last chapter of a book ends and Settings > Playback says
+  /// "Next book": marks it finished and loads the next unfinished,
+  /// un-hidden book after it in library order (the order of
+  /// `getAllAudiobooks`). There is no book queue ("Up next" is the chapter
+  /// list), so the library order is the queue. With "Stop" (the default),
+  /// or nothing left to play, playback just ends.
+  Future<void> _advanceToNextBook() async {
+    final db = _db, current = _currentBook;
+    if (db == null || current == null) return;
+    try {
+      final choice =
+          AutoAdvance.fromName(await _preferences?.getAutoAdvanceName());
+      if (choice != AutoAdvance.nextBook) return;
+      // The listener may have moved on while the settings were read.
+      if (_currentBook?.id != current.id) return;
+      await db.markFinished(current.id,
+          lastChapterIndex: current.chapters.length - 1);
+      final all = await db.getAllAudiobooks();
+      final hidden = await _hiddenStore.read();
+      final at = all.indexWhere((b) => b.id == current.id);
+      for (final candidate in all.skip(at < 0 ? all.length : at + 1)) {
+        if (hidden.contains(candidate.id) || candidate.chapters.isEmpty) {
+          continue;
+        }
+        final saved = await db.getProgress(candidate.id);
+        if (saved != null &&
+            isBookFinished(candidate.chapters,
+                chapterIndex: saved.chapterIndex,
+                positionSeconds: saved.positionSeconds)) {
+          continue;
+        }
+        await loadBook(candidate);
+        return;
+      }
+    } catch (e) {
+      debugPrint('AudioPlaybackService: auto-advance failed: $e');
     }
   }
 
@@ -324,15 +400,45 @@ class AudioPlaybackService {
   @visibleForTesting
   void debugCompleteChapter() => _onChapterCompleted();
 
+  @visibleForTesting
+  void debugPausedAt(DateTime at) => _pausedAt = at;
+
   /// Resumes playback. A refused start leaves the book paused rather than
   /// raising — same reasoning as `_playCurrentChapter`: the media is loaded,
   /// only the start was declined.
   Future<void> play() async {
     try {
+      await _rewindForResume();
       await _player.play();
     } catch (e) {
       debugPrint('AudioPlaybackService: start refused, leaving paused: $e');
       stateNotifier.value = PlaybackState.paused;
+    }
+  }
+
+  /// Settings > Playback > Skip back on resume: after a pause of more than
+  /// a few seconds, step back so the listener catches the thread. Never
+  /// before the chapter's start, and not after a chapter has ended.
+  Future<void> _rewindForResume() async {
+    final pausedAt = _pausedAt;
+    _pausedAt = null;
+    if (pausedAt == null ||
+        _player.playing ||
+        stateNotifier.value == PlaybackState.completed) {
+      return;
+    }
+    try {
+      final choice = SkipBackOnResume.fromName(
+          await _preferences?.getSkipBackOnResumeName());
+      final position = _player.position;
+      final target = resumePosition(
+        position: position,
+        pausedFor: _now().difference(pausedAt),
+        rewindSeconds: choice.seconds,
+      );
+      if (target != position) await _player.seek(target);
+    } catch (e) {
+      debugPrint('AudioPlaybackService: skip back on resume failed: $e');
     }
   }
 

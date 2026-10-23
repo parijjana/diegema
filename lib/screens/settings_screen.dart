@@ -187,8 +187,10 @@ class SettingsScreen extends StatelessWidget {
               _Section(
                 title: 'Downloads',
                 children: [
-                  const DownloadsWifiToggle(),
-                  const SizedBox(height: Sp.x2),
+                  if (DownloadsWifiToggle.applies) ...[
+                    const DownloadsWifiToggle(),
+                    const SizedBox(height: Sp.x2),
+                  ],
                   _LinkRow(
                     label: active == 0
                         ? 'Manage downloads'

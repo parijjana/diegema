@@ -14,7 +14,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// The real front door: the CLI run as a process, as from a terminal.
 Future<ProcessResult> cli(List<String> args) =>
     Process.run('dart', ['run', 'bin/diegema_sync.dart', ...args],
-        environment: {'DIEGEMA_DEVICE_ID': 'aaaa1111'});
+        environment: {'DIEGEMA_DEVICE_ID': 'aaaa1111'},
+        // `dart` is a .bat on Windows, which only a shell can find.
+        runInShell: Platform.isWindows);
 
 void main() {
   late Directory dir;

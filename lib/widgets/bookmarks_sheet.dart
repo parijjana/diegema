@@ -441,8 +441,13 @@ Future<void> showBookmarks(
       context: context,
       builder: (context) => Dialog(
         clipBehavior: Clip.antiAlias,
+        // 640 wide, the same as Now Playing's player column behind it
+        // (`now_playing_screen.dart`, maxWidth 640). A narrower dialog left
+        // the edges of the scrubber's timecodes ("00:00", the total)
+        // poking out beside it under the scrim, which read as stray "0"
+        // glyphs at both sides. Matching the column covers them fully.
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 720),
           child: sheet,
         ),
       ),

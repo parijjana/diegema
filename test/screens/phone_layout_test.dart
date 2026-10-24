@@ -19,6 +19,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:diegema/sync/sync_record.dart';
+import 'package:diegema/widgets/bookmarks_sheet.dart';
+import 'package:diegema/widgets/player_scrubber.dart';
 import '../helpers/fake_sync_controller.dart';
 import '../services/ambience_service_test.dart' show FakeChannel;
 import '../support/fake_playback_service.dart';
@@ -344,6 +346,43 @@ void main() {
           await unmount(tester);
         });
       }
+    }
+  });
+
+  group('Bookmarks dialog', () {
+    for (final size in const [
+      Size(1280, 800),
+      Size(1440, 900),
+      Size(1032, 1376),
+      Size(1280, 720),
+    ]) {
+      testWidgets('leaves no scrubber fragments beside it: $size',
+          (tester) async {
+        final db = await pumpApp(tester, size, 1.0);
+        final book = await seedBook(db, id: 'z', title: 'Persuasion');
+        await audio.loadBook(book);
+        await pumpFrames(tester);
+        final timecodes = find.descendant(
+            of: find.byType(PlayerScrubber),
+            matching: find.textContaining(RegExp(r'^\d\d:\d\d')));
+        expect(timecodes, findsWidgets);
+        final before = [
+          for (final e in timecodes.evaluate())
+            tester.getRect(find.byWidget(e.widget))
+        ];
+        await tester.tap(find.text('Bookmarks').first);
+        await pumpFrames(tester);
+        final dialog = tester.getRect(find.byType(BookmarksSheet));
+        for (final r in before) {
+          // Each timecode is wholly under the dialog or wholly clear of
+          // it; a sliver showing past its edge is the stray "0".
+          final partly = r.overlaps(dialog) &&
+              !(r.left >= dialog.left && r.right <= dialog.right);
+          expect(partly, isFalse,
+              reason: 'a timecode at $r pokes out of the dialog $dialog');
+        }
+        await unmount(tester);
+      });
     }
   });
 

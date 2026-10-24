@@ -1235,31 +1235,53 @@ class _ActionRow extends StatelessWidget {
     // `SizedBox`es sidestep flex layout entirely.
     return LayoutBuilder(
       builder: (context, constraints) {
+        final scale = MediaQuery.textScalerOf(context).scale(1);
+        // Four across while the longest label (seven characters: "Up next",
+        // "Chapter") fits a quarter of the row on one line; otherwise the
+        // row folds into two rows of two instead of clipping or breaking
+        // words. An estimate, not a measurement, so the layout does not
+        // depend on which font is loaded (0.6 em a character errs wide).
+        final quarter = (constraints.maxWidth - Sp.x2 * (count - 1)) / count;
+        final needed = 7 * 0.6 * 13 * scale + 2 * Sp.x1;
+        final cols = needed > quarter ? 2 : count;
+        final rows = (count / cols).ceil();
+        List<Widget> rowOf(int r, double width, double? height,
+                {Widget? divider}) =>
+            [
+              for (var i = r * cols;
+                  i < math.min(count, (r + 1) * cols);
+                  i++) ...[
+                if (i > r * cols) divider ?? const SizedBox(width: Sp.x2),
+                SizedBox(width: width, height: height, child: children[i]),
+              ],
+            ];
         switch (style) {
           case PlayerControlsStyle.tiles:
           case PlayerControlsStyle.round:
-            // A tile holds two lines (caption over value), so it grows
-            // with the text scale rather than clipping them at 2x.
-            final scale = MediaQuery.textScalerOf(context).scale(1);
+            // Icon, then the caption, then the value: three lines that grow
+            // with the text scale.
             final height = style == PlayerControlsStyle.tiles
-                ? math.max(56.0, 20 + 37 * scale)
+                ? math.max(Dim.tapMin + 8, 12 + 16 + 2 + (18 + 20) * scale)
                 : null;
-            final width = (constraints.maxWidth - Sp.x2 * (count - 1)) / count;
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            final width = (constraints.maxWidth - Sp.x2 * (cols - 1)) / cols;
+            return Column(
               children: [
-                for (var i = 0; i < children.length; i++) ...[
-                  if (i > 0) const SizedBox(width: Sp.x2),
-                  SizedBox(width: width, height: height, child: children[i]),
+                for (var r = 0; r < rows; r++) ...[
+                  if (r > 0) const SizedBox(height: Sp.x2),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: rowOf(r, width, height),
+                  ),
                 ],
               ],
             );
           case PlayerControlsStyle.bar:
             // Icon over label, so four segments still fit; grows with text.
-            final scale = MediaQuery.textScalerOf(context).scale(1);
-            final height = math.max(56.0, 32 + 18 * scale);
+            final height = math.max(56.0, 8 + 20 + 2 + 18 * scale);
             // 1px border each side, a 1px divider between segments.
-            final width = (constraints.maxWidth - 2 - (count - 1)) / count;
+            final width = (constraints.maxWidth - 2 - (cols - 1)) / cols;
+            final vDivider =
+                Container(width: 1, height: height - 20, color: c.border);
             return Container(
               decoration: BoxDecoration(
                 color: c.glassSurface,
@@ -1268,12 +1290,11 @@ class _ActionRow extends StatelessWidget {
                 boxShadow: c.shadowUi,
               ),
               clipBehavior: Clip.antiAlias,
-              child: Row(
+              child: Column(
                 children: [
-                  for (var i = 0; i < children.length; i++) ...[
-                    if (i > 0)
-                      Container(width: 1, height: height - 20, color: c.border),
-                    SizedBox(width: width, height: height, child: children[i]),
+                  for (var r = 0; r < rows; r++) ...[
+                    if (r > 0) Container(height: 1, color: c.border),
+                    Row(children: rowOf(r, width, height, divider: vDivider)),
                   ],
                 ],
               ),
@@ -1406,32 +1427,29 @@ class _TileFace extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
+      padding: const EdgeInsets.symmetric(horizontal: Sp.x1, vertical: 6),
       decoration: BoxDecoration(
         color: face.active ? c.accentWash : c.glassSurface,
         borderRadius: R.md,
         border: Border.all(color: face.active ? c.accent : c.border),
         boxShadow: c.shadowUi,
       ),
+      // Icon above the caption above the value: the narrow slot (a quarter
+      // of a phone's width) is spent on height, not on an icon beside the
+      // word, so the caption reads in full. It wraps rather than clips.
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(face.icon, size: 16, color: c.accentText),
-              const SizedBox(width: Sp.x1),
-              Flexible(
-                child: Text(face.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppType.caption.copyWith(color: c.textSecondary)),
-              ),
-            ],
-          ),
+          Icon(face.icon, size: 16, color: c.accentText),
+          Text(face.caption,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppType.caption.copyWith(color: c.textSecondary)),
           Text(face.value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: AppType.label
                   .copyWith(color: c.text, fontWeight: FontWeight.w700)),
         ],
@@ -1497,6 +1515,7 @@ class _BarFace extends StatelessWidget {
           Text(face.short,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: AppType.caption
                   .copyWith(color: c.text, fontWeight: FontWeight.w600)),
         ],

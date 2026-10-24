@@ -145,6 +145,7 @@ Future<void> main() async {
   runApp(AudiobookApp(
     database: demoDb ?? nativeDb,
     runCoverBackfill: nativeDb != null,
+    runNarratorBackfill: nativeDb != null,
     runImportMigration: nativeDb != null,
     audioService: audioService,
     ambience: ambience,

@@ -98,6 +98,12 @@ class $AudiobooksTable extends Audiobooks
   late final GeneratedColumn<String> portableKey = GeneratedColumn<String>(
       'portable_key', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _narratorsMeta =
+      const VerificationMeta('narrators');
+  @override
+  late final GeneratedColumn<String> narrators = GeneratedColumn<String>(
+      'narrators', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -121,6 +127,7 @@ class $AudiobooksTable extends Audiobooks
         pinOrder,
         hiddenFromContinue,
         portableKey,
+        narrators,
         createdAt
       ];
   @override
@@ -202,6 +209,10 @@ class $AudiobooksTable extends Audiobooks
           portableKey.isAcceptableOrUnknown(
               data['portable_key']!, _portableKeyMeta));
     }
+    if (data.containsKey('narrators')) {
+      context.handle(_narratorsMeta,
+          narrators.isAcceptableOrUnknown(data['narrators']!, _narratorsMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -241,6 +252,8 @@ class $AudiobooksTable extends Audiobooks
           DriftSqlType.bool, data['${effectivePrefix}hidden_from_continue'])!,
       portableKey: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}portable_key']),
+      narrators: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}narrators']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
     );
@@ -292,6 +305,11 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
   /// `services/portable_key_io.dart`). Null until worked out — a local
   /// book's needs its files read.
   final String? portableKey;
+
+  /// Readers, as a JSON array of names (schema v5). Null for rows that
+  /// predate the column and for local books; see
+  /// [AppDatabase.saveAudiobook] for why an empty list never overwrites it.
+  final String? narrators;
   final DateTime createdAt;
   const Audiobook(
       {required this.id,
@@ -307,6 +325,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       this.pinOrder,
       required this.hiddenFromContinue,
       this.portableKey,
+      this.narrators,
       required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -331,6 +350,9 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
     map['hidden_from_continue'] = Variable<bool>(hiddenFromContinue);
     if (!nullToAbsent || portableKey != null) {
       map['portable_key'] = Variable<String>(portableKey);
+    }
+    if (!nullToAbsent || narrators != null) {
+      map['narrators'] = Variable<String>(narrators);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -359,6 +381,9 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       portableKey: portableKey == null && nullToAbsent
           ? const Value.absent()
           : Value(portableKey),
+      narrators: narrators == null && nullToAbsent
+          ? const Value.absent()
+          : Value(narrators),
       createdAt: Value(createdAt),
     );
   }
@@ -380,6 +405,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       pinOrder: serializer.fromJson<int?>(json['pinOrder']),
       hiddenFromContinue: serializer.fromJson<bool>(json['hiddenFromContinue']),
       portableKey: serializer.fromJson<String?>(json['portableKey']),
+      narrators: serializer.fromJson<String?>(json['narrators']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -400,6 +426,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       'pinOrder': serializer.toJson<int?>(pinOrder),
       'hiddenFromContinue': serializer.toJson<bool>(hiddenFromContinue),
       'portableKey': serializer.toJson<String?>(portableKey),
+      'narrators': serializer.toJson<String?>(narrators),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -418,6 +445,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           Value<int?> pinOrder = const Value.absent(),
           bool? hiddenFromContinue,
           Value<String?> portableKey = const Value.absent(),
+          Value<String?> narrators = const Value.absent(),
           DateTime? createdAt}) =>
       Audiobook(
         id: id ?? this.id,
@@ -434,6 +462,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
         pinOrder: pinOrder.present ? pinOrder.value : this.pinOrder,
         hiddenFromContinue: hiddenFromContinue ?? this.hiddenFromContinue,
         portableKey: portableKey.present ? portableKey.value : this.portableKey,
+        narrators: narrators.present ? narrators.value : this.narrators,
         createdAt: createdAt ?? this.createdAt,
       );
   Audiobook copyWithCompanion(AudiobooksCompanion data) {
@@ -459,6 +488,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           : this.hiddenFromContinue,
       portableKey:
           data.portableKey.present ? data.portableKey.value : this.portableKey,
+      narrators: data.narrators.present ? data.narrators.value : this.narrators,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -479,6 +509,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           ..write('pinOrder: $pinOrder, ')
           ..write('hiddenFromContinue: $hiddenFromContinue, ')
           ..write('portableKey: $portableKey, ')
+          ..write('narrators: $narrators, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -499,6 +530,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
       pinOrder,
       hiddenFromContinue,
       portableKey,
+      narrators,
       createdAt);
   @override
   bool operator ==(Object other) =>
@@ -517,6 +549,7 @@ class Audiobook extends DataClass implements Insertable<Audiobook> {
           other.pinOrder == this.pinOrder &&
           other.hiddenFromContinue == this.hiddenFromContinue &&
           other.portableKey == this.portableKey &&
+          other.narrators == this.narrators &&
           other.createdAt == this.createdAt);
 }
 
@@ -534,6 +567,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
   final Value<int?> pinOrder;
   final Value<bool> hiddenFromContinue;
   final Value<String?> portableKey;
+  final Value<String?> narrators;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const AudiobooksCompanion({
@@ -550,6 +584,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     this.pinOrder = const Value.absent(),
     this.hiddenFromContinue = const Value.absent(),
     this.portableKey = const Value.absent(),
+    this.narrators = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -567,6 +602,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     this.pinOrder = const Value.absent(),
     this.hiddenFromContinue = const Value.absent(),
     this.portableKey = const Value.absent(),
+    this.narrators = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -587,6 +623,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     Expression<int>? pinOrder,
     Expression<bool>? hiddenFromContinue,
     Expression<String>? portableKey,
+    Expression<String>? narrators,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -605,6 +642,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
       if (hiddenFromContinue != null)
         'hidden_from_continue': hiddenFromContinue,
       if (portableKey != null) 'portable_key': portableKey,
+      if (narrators != null) 'narrators': narrators,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -624,6 +662,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
       Value<int?>? pinOrder,
       Value<bool>? hiddenFromContinue,
       Value<String?>? portableKey,
+      Value<String?>? narrators,
       Value<DateTime>? createdAt,
       Value<int>? rowid}) {
     return AudiobooksCompanion(
@@ -640,6 +679,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
       pinOrder: pinOrder ?? this.pinOrder,
       hiddenFromContinue: hiddenFromContinue ?? this.hiddenFromContinue,
       portableKey: portableKey ?? this.portableKey,
+      narrators: narrators ?? this.narrators,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -687,6 +727,9 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
     if (portableKey.present) {
       map['portable_key'] = Variable<String>(portableKey.value);
     }
+    if (narrators.present) {
+      map['narrators'] = Variable<String>(narrators.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -712,6 +755,7 @@ class AudiobooksCompanion extends UpdateCompanion<Audiobook> {
           ..write('pinOrder: $pinOrder, ')
           ..write('hiddenFromContinue: $hiddenFromContinue, ')
           ..write('portableKey: $portableKey, ')
+          ..write('narrators: $narrators, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -2367,6 +2411,7 @@ typedef $$AudiobooksTableCreateCompanionBuilder = AudiobooksCompanion Function({
   Value<int?> pinOrder,
   Value<bool> hiddenFromContinue,
   Value<String?> portableKey,
+  Value<String?> narrators,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -2384,6 +2429,7 @@ typedef $$AudiobooksTableUpdateCompanionBuilder = AudiobooksCompanion Function({
   Value<int?> pinOrder,
   Value<bool> hiddenFromContinue,
   Value<String?> portableKey,
+  Value<String?> narrators,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -2436,6 +2482,9 @@ class $$AudiobooksTableFilterComposer
 
   ColumnFilters<String> get portableKey => $composableBuilder(
       column: $table.portableKey, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get narrators => $composableBuilder(
+      column: $table.narrators, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -2492,6 +2541,9 @@ class $$AudiobooksTableOrderingComposer
   ColumnOrderings<String> get portableKey => $composableBuilder(
       column: $table.portableKey, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get narrators => $composableBuilder(
+      column: $table.narrators, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 }
@@ -2544,6 +2596,9 @@ class $$AudiobooksTableAnnotationComposer
   GeneratedColumn<String> get portableKey => $composableBuilder(
       column: $table.portableKey, builder: (column) => column);
 
+  GeneratedColumn<String> get narrators =>
+      $composableBuilder(column: $table.narrators, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 }
@@ -2584,6 +2639,7 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             Value<int?> pinOrder = const Value.absent(),
             Value<bool> hiddenFromContinue = const Value.absent(),
             Value<String?> portableKey = const Value.absent(),
+            Value<String?> narrators = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2601,6 +2657,7 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             pinOrder: pinOrder,
             hiddenFromContinue: hiddenFromContinue,
             portableKey: portableKey,
+            narrators: narrators,
             createdAt: createdAt,
             rowid: rowid,
           ),
@@ -2618,6 +2675,7 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             Value<int?> pinOrder = const Value.absent(),
             Value<bool> hiddenFromContinue = const Value.absent(),
             Value<String?> portableKey = const Value.absent(),
+            Value<String?> narrators = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2635,6 +2693,7 @@ class $$AudiobooksTableTableManager extends RootTableManager<
             pinOrder: pinOrder,
             hiddenFromContinue: hiddenFromContinue,
             portableKey: portableKey,
+            narrators: narrators,
             createdAt: createdAt,
             rowid: rowid,
           ),

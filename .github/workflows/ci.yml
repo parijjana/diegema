@@ -1,8 +1,16 @@
 name: CI
 
+# Pull requests: analyze + test only. Pushes to main: also the macOS build.
+# Branch pushes are covered by their pull request, so they do not run twice.
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -28,4 +36,5 @@ jobs:
         run: flutter test --coverage
 
       - name: Build macOS (debug)
+        if: github.event_name != 'pull_request'
         run: flutter build macos --debug

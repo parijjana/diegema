@@ -138,6 +138,7 @@ class ScreenshotPlaybackService extends AudioPlaybackService {
     int? initialChapterIndex,
     Duration? initialPosition,
     bool autoPlay = true,
+    bool resume = false,
   }) async {
     final chapterIndex = initialChapterIndex ?? kHeroChapterIndex;
     currentBookNotifier.value = book;

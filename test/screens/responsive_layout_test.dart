@@ -146,7 +146,7 @@ void main() {
           ]) {
             await tester.tap(find.descendant(
               of: navFinder,
-              matching: find.text(label),
+              matching: find.byTooltip(label),
             ));
             await pumpFrames(tester);
             if (label == 'Discover') await drainRateLimiter(tester);

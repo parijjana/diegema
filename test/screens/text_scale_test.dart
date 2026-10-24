@@ -86,9 +86,10 @@ void main() {
       doubleText(tester);
       await pumpApp(tester);
 
+      // Labels are hidden at 2.0x when they cannot fit; tooltips remain.
       await tester.tap(find.descendant(
         of: find.byType(NavigationBar),
-        matching: find.text(destination),
+        matching: find.byTooltip(destination),
       ));
       await pumpFrames(tester);
       if (destination == 'Discover') await drainRateLimiter(tester);

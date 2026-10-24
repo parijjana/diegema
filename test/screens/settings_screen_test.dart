@@ -71,7 +71,7 @@ void main() {
   Future<void> goTo(WidgetTester tester, String destination) async {
     await tester.tap(find.descendant(
       of: find.byType(NavigationBar),
-      matching: find.text(destination),
+      matching: find.byTooltip(destination),
     ));
     await pumpFrames(tester);
   }

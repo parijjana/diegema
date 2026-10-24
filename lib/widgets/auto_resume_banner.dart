@@ -161,6 +161,7 @@ class _AutoResumeBannerState extends State<AutoResumeBanner> {
                   initialChapterIndex: chIdx,
                   initialPosition:
                       Duration(seconds: _progress!.positionSeconds),
+                  resume: true,
                 );
                 setState(() => _dismissed = true);
               },

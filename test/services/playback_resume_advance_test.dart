@@ -220,6 +220,25 @@ void main() {
       expect(player.seeks, hasLength(1));
     });
 
+    test('an explicit resume (auto-resume banner) rewinds', () async {
+      final book = await seedBook(db, id: 'e', positionSeconds: 100);
+      await service.loadBook(book,
+          initialChapterIndex: 0,
+          initialPosition: const Duration(seconds: 100),
+          resume: true);
+      expect(player.seeks, [const Duration(seconds: 95)]);
+    });
+
+    test('an explicit resume never rewinds before the chapter start',
+        () async {
+      final book = await seedBook(db, id: 'e2', positionSeconds: 3);
+      await service.loadBook(book,
+          initialChapterIndex: 0,
+          initialPosition: const Duration(seconds: 3),
+          resume: true);
+      expect(player.seeks, isEmpty);
+    });
+
     test('never rewinds before the chapter start', () async {
       final book = await seedBook(db, id: 'c', positionSeconds: 3);
       await service.loadBook(book);

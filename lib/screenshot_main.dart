@@ -130,6 +130,9 @@ import 'core/demo_deeplink.dart';
 import 'core/demo_mode.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
+import 'screens/linked_devices_screen.dart';
+import 'screens/settings_screen.dart';
+import 'widgets/bookmarks_sheet.dart';
 import 'screenshot_mode.dart';
 import 'screenshot_seed.dart';
 import 'services/demo_artwork_service.dart';
@@ -258,8 +261,18 @@ class _Target {
   final ScreenshotLayout layout;
   final ScreenshotWindowControls controls;
   final List<int> scenes; // scene numbers to render for this target
-  const _Target(this.store, this.device, this.dir, this.prefix, this.w, this.h,
-      this.ratio, this.layout, this.controls, this.scenes);
+  const _Target(
+    this.store,
+    this.device,
+    this.dir,
+    this.prefix,
+    this.w,
+    this.h,
+    this.ratio,
+    this.layout,
+    this.controls,
+    this.scenes,
+  );
 }
 
 // FILL: one row per screenshot_targets entry in store-fields.json.
@@ -284,59 +297,114 @@ const List<_Target> _targets = [
   // every size from the same macOS process.
   //
   // store             device               dir             prefix   w     h     ratio  layout                        controls                        scenes
-  _Target('mac-app-store', 'mac', 'mac', '', 1440, 900, 2.0,
-      ScreenshotLayout.desktop, ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
   _Target(
-      'ios-app-store',
-      'iphone-6.9',
-      'ios/iphone69',
-      '',
-      430,
-      932,
-      3.0,
-      ScreenshotLayout.mobilePhone,
-      ScreenshotWindowControls.none,
-      [1, 2, 3, 4, 5]),
+    'mac-app-store',
+    'mac',
+    'mac',
+    '',
+    1440,
+    900,
+    2.0,
+    ScreenshotLayout.desktop,
+    ScreenshotWindowControls.none,
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  ),
   _Target(
-      'ios-app-store',
-      'iphone-6.5',
-      'ios/iphone65',
-      '',
-      428,
-      926,
-      3.0,
-      ScreenshotLayout.mobilePhone,
-      ScreenshotWindowControls.none,
-      [1, 2, 3, 4, 5]),
-  _Target('ios-app-store', 'ipad-13', 'ios/ipad13', '', 1024, 1366, 2.0,
-      ScreenshotLayout.tablet, ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
+    'microsoft-store',
+    'desktop',
+    'microsoft',
+    '',
+    1280,
+    720,
+    2.0,
+    ScreenshotLayout.desktop,
+    ScreenshotWindowControls.none,
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  ),
   _Target(
-      'ios-app-store',
-      'ipad-13-landscape',
-      'ios/ipad13',
-      'land-',
-      1366,
-      1024,
-      2.0,
-      ScreenshotLayout.tablet,
-      ScreenshotWindowControls.none,
-      [1, 2, 3, 4, 5]),
-  _Target('google-play', 'phone', 'play/phone', '', 360, 800, 3.0,
-      ScreenshotLayout.mobilePhone, ScreenshotWindowControls.none,
-      [1, 2, 3, 4, 5]),
-  _Target('google-play', 'tablet', 'play/tablet', '', 800, 1280, 2.0,
-      ScreenshotLayout.tablet, ScreenshotWindowControls.none, [1, 2, 3, 4, 5]),
+    'ios-app-store',
+    'iphone-6.9',
+    'ios/iphone69',
+    '',
+    430,
+    932,
+    3.0,
+    ScreenshotLayout.mobilePhone,
+    ScreenshotWindowControls.none,
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  ),
   _Target(
-      'google-play',
-      'tablet-landscape',
-      'play/tablet',
-      'land-',
-      1280,
-      800,
-      2.0,
-      ScreenshotLayout.tablet,
-      ScreenshotWindowControls.none,
-      [1, 2, 3, 4, 5]),
+    'ios-app-store',
+    'iphone-6.5',
+    'ios/iphone65',
+    '',
+    428,
+    926,
+    3.0,
+    ScreenshotLayout.mobilePhone,
+    ScreenshotWindowControls.none,
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  ),
+  _Target(
+    'ios-app-store',
+    'ipad-13',
+    'ios/ipad13',
+    '',
+    1024,
+    1366,
+    2.0,
+    ScreenshotLayout.tablet,
+    ScreenshotWindowControls.none,
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  ),
+  _Target(
+    'ios-app-store',
+    'ipad-13-landscape',
+    'ios/ipad13',
+    'land-',
+    1366,
+    1024,
+    2.0,
+    ScreenshotLayout.tablet,
+    ScreenshotWindowControls.none,
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  ),
+  _Target(
+    'google-play',
+    'phone',
+    'play/phone',
+    '',
+    360,
+    800,
+    3.0,
+    ScreenshotLayout.mobilePhone,
+    ScreenshotWindowControls.none,
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  ),
+  _Target(
+    'google-play',
+    'tablet',
+    'play/tablet',
+    '',
+    800,
+    1280,
+    2.0,
+    ScreenshotLayout.tablet,
+    ScreenshotWindowControls.none,
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  ),
+  _Target(
+    'google-play',
+    'tablet-landscape',
+    'play/tablet',
+    'land-',
+    1280,
+    800,
+    2.0,
+    ScreenshotLayout.tablet,
+    ScreenshotWindowControls.none,
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  ),
 ];
 
 // FILL: human-readable, zero-padded, ordered filenames per scene number. These
@@ -353,8 +421,12 @@ const Map<int, String> _sceneNames = {
   1: '01-now-playing',
   2: '02-library',
   3: '03-discover',
-  4: '04-book-detail',
-  5: '05-settings',
+  4: '04-bookmarks',
+  5: '05-ambience',
+  6: '06-settings',
+  7: '07-linked-devices',
+  8: '08-now-playing-light',
+  9: '09-book-detail',
 };
 
 // FILL: scene number -> the NAME of the widget that must be MOUNTED inside the
@@ -407,12 +479,36 @@ const Map<int, String> _sceneNames = {
 // Matching on a type NAME would break under release obfuscation; this entry
 // point only ever runs in debug, so it is safe here.
 const Map<int, String> _expectedWidget = {
-  1: 'NowPlayingScreen', // e.g. 'DashboardScreen'
+  1: 'NowPlayingScreen',
   2: 'LibraryScreen',
   3: 'DiscoverScreen',
-  4: 'BookDetailPane',
-  5: 'SettingsScreen',
+  4: 'NowPlayingScreen', // the sheet is opened over it by _afterMount
+  5: 'AmbienceScreen',
+  6: 'SettingsScreen',
+  7: 'SettingsScreen', // Linked devices is pushed over it by _afterMount
+  8: 'NowPlayingScreen',
+  9: 'BookDetailPane',
 };
+
+/// Scenes that need a step AFTER their base screen mounts (open a sheet, push a
+/// route, type a search): scene number -> the widget that must be mounted once
+/// [_CaptureAppState._afterMount] has run. Same oracle idea as [_expectedWidget].
+const Map<int, String> _afterWidget = {
+  3: 'LibriVoxBookItem',
+  4: 'BookmarksSheet',
+  5: 'AmbienceScreen',
+  7: 'LinkedDevicesScreen',
+};
+
+/// This device's name on the Linked devices shot, by store.
+String _deviceName(_Target t) => switch (t.device) {
+      'mac' => 'MacBook Air',
+      'desktop' => 'Surface Laptop',
+      'iphone-6.9' || 'iphone-6.5' => 'iPhone',
+      'ipad-13' || 'ipad-13-landscape' => 'iPad',
+      'phone' => 'Pixel 9',
+      _ => 'Galaxy Tab',
+    };
 
 // ---------------------------------------------------------------------------
 // SELECTIVE CAPTURE — optional filters. BOTH EMPTY (the default) means capture
@@ -522,16 +618,20 @@ _CapturePlan _buildCapturePlan() {
   // not need one round trip per typo.
   for (final tok in targetTokens) {
     if (!_targets.any((t) => _targetMatchesToken(t, tok))) {
-      errors.add("CAPTURE_TARGETS token '$tok' matches no target. "
-          'Known store ids: ${_targets.map((t) => t.store).toSet().join(', ')} | '
-          'dirs: ${_targets.map((t) => t.dir).toSet().join(', ')} | '
-          'devices: ${_targets.map((t) => t.device).toSet().join(', ')}');
+      errors.add(
+        "CAPTURE_TARGETS token '$tok' matches no target. "
+        'Known store ids: ${_targets.map((t) => t.store).toSet().join(', ')} | '
+        'dirs: ${_targets.map((t) => t.dir).toSet().join(', ')} | '
+        'devices: ${_targets.map((t) => t.device).toSet().join(', ')}',
+      );
     }
   }
   for (final tok in sceneTokens) {
     if (!_sceneNames.keys.any((s) => _sceneMatchesToken(s, tok))) {
-      errors.add("CAPTURE_SCENES token '$tok' matches no scene. Known scenes: "
-          '${_sceneNames.entries.map((e) => '${e.key}=${e.value}').join(', ')}');
+      errors.add(
+        "CAPTURE_SCENES token '$tok' matches no scene. Known scenes: "
+        '${_sceneNames.entries.map((e) => '${e.key}=${e.value}').join(', ')}',
+      );
     }
   }
 
@@ -547,26 +647,34 @@ _CapturePlan _buildCapturePlan() {
     final scenes = sceneTokens.isEmpty
         ? t.scenes
         : t.scenes
-            .where((s) => sceneTokens.any((tok) => _sceneMatchesToken(s, tok)))
+            .where(
+              (s) => sceneTokens.any((tok) => _sceneMatchesToken(s, tok)),
+            )
             .toList(growable: false);
     if (scenes.isEmpty) {
-      skipped.add("$label — CAPTURE_SCENES selected none of this target's "
-          'scenes ${t.scenes} (it deliberately renders only those)');
+      skipped.add(
+        "$label — CAPTURE_SCENES selected none of this target's "
+        'scenes ${t.scenes} (it deliberately renders only those)',
+      );
       continue;
     }
     if (scenes.length < t.scenes.length) {
       final dropped =
           t.scenes.where((s) => !scenes.contains(s)).toList(growable: false);
-      skipped.add('$label scenes $dropped — not selected by CAPTURE_SCENES '
-          '(scenes $scenes WERE captured for this target)');
+      skipped.add(
+        '$label scenes $dropped — not selected by CAPTURE_SCENES '
+        '(scenes $scenes WERE captured for this target)',
+      );
     }
     selected.add(_Planned(t, scenes));
   }
 
   if (errors.isEmpty && selected.isEmpty) {
-    errors.add('the CAPTURE_TARGETS/CAPTURE_SCENES combination selects ZERO '
-        'shots (every token matched something, but no target renders any of '
-        'the requested scenes)');
+    errors.add(
+      'the CAPTURE_TARGETS/CAPTURE_SCENES combination selects ZERO '
+      'shots (every token matched something, but no target renders any of '
+      'the requested scenes)',
+    );
   }
   return _CapturePlan(selected, skipped, errors, partial);
 }
@@ -673,13 +781,21 @@ class _CaptureAppState extends State<_CaptureApp> {
     // load the hero book, which is what populates the mini player above the
     // nav bar on scenes 2-5. Without it those four shots show an empty
     // transport strip.
+    // Destinations with ambience present: 0 Now Playing, 1 Library,
+    // 2 Discover, 3 Ambience, 4 Settings.
     final deepLink = switch (scene) {
-      1 => const DemoDeepLink(screen: 0, play: kHeroBookId),
+      1 || 4 || 8 => const DemoDeepLink(screen: 0, play: kHeroBookId),
       2 => const DemoDeepLink(screen: 1, play: kHeroBookId),
       3 => const DemoDeepLink(screen: 2, play: kHeroBookId),
-      4 => const DemoDeepLink(screen: 2, play: kHeroBookId, book: kHeroBookId),
-      _ => const DemoDeepLink(screen: 3, play: kHeroBookId),
+      5 => const DemoDeepLink(screen: 3, play: kHeroBookId),
+      6 || 7 => const DemoDeepLink(screen: 4, play: kHeroBookId),
+      _ => const DemoDeepLink(screen: 2, play: kHeroBookId, book: kHeroBookId),
     };
+    final audio = ScreenshotPlaybackService();
+    final ambience = ScreenshotAmbienceService(
+      book: audio,
+      seed: scene == 5 ? kBattleMix : kStormMix,
+    );
 
     // The template leaves this mutable so a scene MAY swap the root widget
     // (stacking a modal dialog, say). Every Diegema scene is the same
@@ -700,16 +816,23 @@ class _CaptureAppState extends State<_CaptureApp> {
       libriVoxService: DemoLibriVoxService(),
       downloader: DemoDownloader(),
       artworkService: DemoArtworkService(),
-      audioService: ScreenshotPlaybackService(),
+      audioService: audio,
+      ambience: ambience,
+      sync: ScreenshotSyncController(
+        thisDevice: _deviceName(t),
+        canScan: t.layout != ScreenshotLayout.desktop,
+      ),
       // An empty override map: reads return defaults without touching the
       // `shared_preferences` platform channel, so no shot can inherit the
       // developer's own saved skip interval.
-      preferences: const UiPreferences(overrides: {}),
+      // Mutable on purpose (not const): the ambience mixer writes its state.
+      // ignore: prefer_const_constructors
+      preferences: UiPreferences(overrides: <String, Object>{}),
       libraryScanner: _noLibraryScan,
       // Forced rather than persisted. `AppSettings` honours this over anything
       // stored, so the whole gallery is one coherent theme. Re-run with
       // ThemeMode.light for a light set.
-      initialThemeMode: ThemeMode.dark,
+      initialThemeMode: scene == 8 ? ThemeMode.light : ThemeMode.dark,
       deepLink: deepLink,
     );
 
@@ -762,19 +885,23 @@ class _CaptureAppState extends State<_CaptureApp> {
         print('CAPTURE_FILTER_ERROR: $e');
       }
       // ignore: avoid_print
-      print('CAPTURE_ABORTED: nothing was captured and '
-          '$_outRoot/capture_manifest.json was NOT modified.');
+      print(
+        'CAPTURE_ABORTED: nothing was captured and '
+        '$_outRoot/capture_manifest.json was NOT modified.',
+      );
       exit(2);
     }
     // ignore: avoid_print
-    print(plan.partial
-        ? 'CAPTURE_PLAN: PARTIAL run — ${plan.shotCount} of '
-            '${_canonicalShotCount()} shot(s), '
-            '${plan.selected.length} of ${_targets.length} target(s)  '
-            '[CAPTURE_TARGETS=$_captureTargetsFilter '
-            'CAPTURE_SCENES=$_captureScenesFilter]'
-        : 'CAPTURE_PLAN: FULL run — ${plan.shotCount} shot(s), '
-            '${_targets.length} target(s), no filters');
+    print(
+      plan.partial
+          ? 'CAPTURE_PLAN: PARTIAL run — ${plan.shotCount} of '
+              '${_canonicalShotCount()} shot(s), '
+              '${plan.selected.length} of ${_targets.length} target(s)  '
+              '[CAPTURE_TARGETS=$_captureTargetsFilter '
+              'CAPTURE_SCENES=$_captureScenesFilter]'
+          : 'CAPTURE_PLAN: FULL run — ${plan.shotCount} shot(s), '
+              '${_targets.length} target(s), no filters',
+    );
     for (final p in plan.selected) {
       final t = p.t;
       Directory('$_outRoot/${t.dir}').createSync(recursive: true);
@@ -809,8 +936,12 @@ class _CaptureAppState extends State<_CaptureApp> {
             _shotId = '$shotId#blank';
           });
           await _awaitFrame();
-          landed =
-              await _mountAndVerify(sceneWidget, scene, t, '$shotId#retry');
+          landed = await _mountAndVerify(
+            sceneWidget,
+            scene,
+            t,
+            '$shotId#retry',
+          );
           // Land in EXACTLY ONE bucket: recorded only once we know whether the
           // retry recovered it or not. Recording into _sceneRetries BEFORE
           // attempting the retry (as an earlier version of this did) meant a
@@ -819,11 +950,24 @@ class _CaptureAppState extends State<_CaptureApp> {
           // screen". A recovered shot stays non-fatal; only a shot still wrong
           // after the retry fails the validator.
           if (landed) {
-            _sceneRetries.add('$shotId: ${_expectedWidget[scene]} not mounted '
-                'on first try — recovered on retry');
+            _sceneRetries.add(
+              '$shotId: ${_expectedWidget[scene]} not mounted '
+              'on first try — recovered on retry',
+            );
           } else {
-            _sceneMismatches.add('$shotId: ${_expectedWidget[scene]} still not '
-                'mounted after retry');
+            _sceneMismatches.add(
+              '$shotId: ${_expectedWidget[scene]} still not '
+              'mounted after retry',
+            );
+          }
+        }
+        if (landed) {
+          final acted = await _afterMount(scene, t);
+          if (!acted) {
+            _sceneMismatches.add(
+              '$shotId: step after mount for scene $scene '
+              'did not produce ${_afterWidget[scene] ?? 'its state'}',
+            );
           }
         }
         await _capture(t, scene);
@@ -842,36 +986,48 @@ class _CaptureAppState extends State<_CaptureApp> {
     }
     if (_settleTimeouts.isNotEmpty) {
       // ignore: avoid_print
-      print('SETTLE_TIMEOUT (may be mid-animation, inspect these): '
-          '${_settleTimeouts.join(' | ')}');
+      print(
+        'SETTLE_TIMEOUT (may be mid-animation, inspect these): '
+        '${_settleTimeouts.join(' | ')}',
+      );
     }
     if (_sceneRetries.isNotEmpty) {
       // ignore: avoid_print
-      print('SCENE_RETRY (landed on the wrong screen, recovered): '
-          '${_sceneRetries.join(' | ')}');
+      print(
+        'SCENE_RETRY (landed on the wrong screen, recovered): '
+        '${_sceneRetries.join(' | ')}',
+      );
     }
     if (_sceneMismatches.isNotEmpty) {
       // ignore: avoid_print
-      print('SCENE_MISMATCH (PNG shows the WRONG screen): '
-          '${_sceneMismatches.join(' | ')}');
+      print(
+        'SCENE_MISMATCH (PNG shows the WRONG screen): '
+        '${_sceneMismatches.join(' | ')}',
+      );
     }
     if (_layoutErrorsByShot.isNotEmpty) {
       // ignore: avoid_print
-      print('LAYOUT_ERRORS (subtree unpainted — these shots are BLANK): '
-          '${_layoutErrorsByShot.keys.join(' | ')}');
+      print(
+        'LAYOUT_ERRORS (subtree unpainted — these shots are BLANK): '
+        '${_layoutErrorsByShot.keys.join(' | ')}',
+      );
     }
     if (_guardUnset.isNotEmpty) {
       // ignore: avoid_print
-      print('SCENE_GUARD_UNSET (fill _expectedWidget for these scene numbers — '
-          'the wrong-screen guard did NOT run): ${_guardUnset.join(', ')}');
+      print(
+        'SCENE_GUARD_UNSET (fill _expectedWidget for these scene numbers — '
+        'the wrong-screen guard did NOT run): ${_guardUnset.join(', ')}',
+      );
     }
     // A partial run must NEVER be mistakable for a full one. Say so last, where
     // a human actually looks, and name everything that was not re-captured.
     if (plan.partial) {
       // ignore: avoid_print
-      print('PARTIAL_RUN: captured ${plan.shotCount} of '
-          '${_canonicalShotCount()} shot(s). The rest were NOT re-rendered — '
-          'their manifest entries were carried over from the previous run.');
+      print(
+        'PARTIAL_RUN: captured ${plan.shotCount} of '
+        '${_canonicalShotCount()} shot(s). The rest were NOT re-rendered — '
+        'their manifest entries were carried over from the previous run.',
+      );
       // ignore: avoid_print
       print('CAPTURE_SKIPPED_TARGETS (not re-captured this run):');
       for (final s in plan.skipped) {
@@ -925,8 +1081,103 @@ class _CaptureAppState extends State<_CaptureApp> {
 
     ctx.visitChildElements(walk);
     // ignore: avoid_print
-    print('MOUNT_DUMP $shotId: wanted $expected, mounted: '
-        '${(seen.toList()..sort()).join(", ")}');
+    print(
+      'MOUNT_DUMP $shotId: wanted $expected, mounted: '
+      '${(seen.toList()..sort()).join(", ")}',
+    );
+  }
+
+  /// The first element under [ctx] whose widget satisfies [test], or null.
+  Element? _findElement(BuildContext ctx, bool Function(Widget) test) {
+    Element? found;
+    void walk(Element el) {
+      if (found != null) return;
+      if (test(el.widget)) {
+        found = el;
+        return;
+      }
+      el.visitChildren(walk);
+    }
+
+    ctx.visitChildElements(walk);
+    return found;
+  }
+
+  /// Polls until a widget named [typeName] is mounted under the boundary.
+  Future<bool> _waitForType(String typeName, Duration timeout) async {
+    final deadline = DateTime.now().add(timeout);
+    while (true) {
+      final ctx = _boundaryKey.currentContext;
+      if (ctx == null || !ctx.mounted) return false;
+      if (_isMountedUnder(ctx, typeName)) return true;
+      if (!DateTime.now().isBefore(deadline)) return false;
+      WidgetsBinding.instance.scheduleFrame();
+      await _awaitFrame();
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
+  }
+
+  /// Drives the app through its own widgets (the same callbacks a tap or a
+  /// submitted search would reach) into the state a scene shows, then settles.
+  /// Returns whether the scene's [_afterWidget] is mounted. Nothing here touches
+  /// private app state or changes app behaviour.
+  Future<bool> _afterMount(int scene, _Target t) async {
+    final ctx = _boundaryKey.currentContext;
+    if (ctx == null || !ctx.mounted) return false;
+    switch (scene) {
+      case 3: // Discover: a finished search
+        final field = _findElement(ctx, (w) => w is TextField);
+        if (field == null) return false;
+        final tf = field.widget as TextField;
+        const query = 'fiction'; // a category of the demo catalogue
+        tf.controller?.text = query;
+        tf.onSubmitted?.call(query);
+      case 4: // Bookmarks sheet over Now Playing
+        final button = _findElement(ctx, (w) => w is BookmarksButton);
+        if (button == null) return false;
+        final b = button.widget as BookmarksButton;
+        unawaited(
+          showBookmarks(
+            button,
+            book: b.book,
+            audioService: b.audioService,
+            db: b.db,
+          ),
+        );
+      case 5: // Ambience: bring the Places group (Battlefield, Sword fight) up
+        // The list builds lazily, so Places does not exist on a short screen
+        // until the list has been scrolled near it.
+        final list = _findElement(ctx, (w) => w is Scrollable);
+        if (list is StatefulElement) {
+          final pos = (list.state as ScrollableState).position;
+          await pos.moveTo(pos.maxScrollExtent * 0.6, duration: Duration.zero);
+          await _awaitFrame();
+        }
+        if (!ctx.mounted) return false;
+        final places =
+            _findElement(ctx, (w) => w is Text && w.data == 'Places');
+        if (places != null) {
+          await Scrollable.ensureVisible(places,
+              alignment: 0.12, duration: Duration.zero);
+        }
+      case 7: // Settings -> Linked devices
+        final settings = _findElement(ctx, (w) => w is SettingsScreen);
+        if (settings == null) return false;
+        unawaited(
+          Navigator.of(settings).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  LinkedDevicesScreen(pollForScanner: t.device == 'mac'),
+            ),
+          ),
+        );
+      default:
+        return true;
+    }
+    final want = _afterWidget[scene];
+    final ok = want == null || await _waitForType(want, _mountTimeout);
+    await _settle();
+    return ok;
   }
 
   bool _isMountedUnder(BuildContext ctx, String typeName) {
@@ -957,7 +1208,11 @@ class _CaptureAppState extends State<_CaptureApp> {
   /// consecutive failures on the next). Build once per shot, mount as many times
   /// as needed.
   Future<bool> _mountAndVerify(
-      Widget screen, int scene, _Target t, String shotId) async {
+    Widget screen,
+    int scene,
+    _Target t,
+    String shotId,
+  ) async {
     setState(() {
       _target = t;
       _shotId = shotId;
@@ -1060,8 +1315,9 @@ class _CaptureAppState extends State<_CaptureApp> {
     };
     const path = '$_outRoot/capture_manifest.json';
     if (plan.partial) _mergeIntoManifest(manifest, plan, path);
-    File(path).writeAsStringSync(
-        const JsonEncoder.withIndent('  ').convert(manifest));
+    File(
+      path,
+    ).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(manifest));
     // ignore: avoid_print
     print('MANIFEST_WRITTEN: $path');
   }
@@ -1086,9 +1342,11 @@ class _CaptureAppState extends State<_CaptureApp> {
       // all of their PNGs as strays — the exact false failure this merge exists
       // to prevent.
       // ignore: avoid_print
-      print('MANIFEST_MERGE_ERROR: cannot parse the existing manifest at '
-          '$path ($e). Aborting rather than replacing the whole shipped set '
-          "with this partial run's subset. Fix or delete it, or do a full run.");
+      print(
+        'MANIFEST_MERGE_ERROR: cannot parse the existing manifest at '
+        '$path ($e). Aborting rather than replacing the whole shipped set '
+        "with this partial run's subset. Fix or delete it, or do a full run.",
+      );
       exit(2);
     }
   }
@@ -1124,7 +1382,10 @@ class _CaptureAppState extends State<_CaptureApp> {
   /// HOLE: recorded in `merge_missing` and failed by the validator, because the
   /// shipped set really is incomplete.
   void _mergeIntoManifest(
-      Map<String, dynamic> manifest, _CapturePlan plan, String path) {
+    Map<String, dynamic> manifest,
+    _CapturePlan plan,
+    String path,
+  ) {
     // The canonical set, in the order a full run writes it.
     final canonicalFiles = <String>[];
     final canonicalShotIds = <String>{};
@@ -1137,11 +1398,11 @@ class _CaptureAppState extends State<_CaptureApp> {
     final canonicalSet = canonicalFiles.toSet();
 
     final freshFiles = <String>{
-      for (final s in _manifestShots) s['file'] as String
+      for (final s in _manifestShots) s['file'] as String,
     };
     final freshShotIds = <String>{
       for (final f in freshFiles)
-        f.endsWith('.png') ? f.substring(0, f.length - 4) : f
+        f.endsWith('.png') ? f.substring(0, f.length - 4) : f,
     };
 
     final prev = _readPreviousManifest(path);
@@ -1164,9 +1425,11 @@ class _CaptureAppState extends State<_CaptureApp> {
       }
     } else {
       // ignore: avoid_print
-      print('MANIFEST_MERGE: no existing manifest at $path — nothing to carry '
-          'over, so this manifest describes ONLY this partial run and the '
-          'validator will (correctly) report the rest of the set as missing.');
+      print(
+        'MANIFEST_MERGE: no existing manifest at $path — nothing to carry '
+        'over, so this manifest describes ONLY this partial run and the '
+        'validator will (correctly) report the rest of the set as missing.',
+      );
     }
 
     final byFile = <String, Map<String, dynamic>>{...carried};
@@ -1222,33 +1485,43 @@ class _CaptureAppState extends State<_CaptureApp> {
 
     if (droppedStale.isNotEmpty) {
       // ignore: avoid_print
-      print('MANIFEST_MERGE_DROPPED_STALE (no current target/scene produces '
-          'these, so their old manifest entries were NOT carried over; any PNG '
-          'still on disk will be reported as [STRAY] — delete it or restore the '
-          'target): ${droppedStale.join(' | ')}');
+      print(
+        'MANIFEST_MERGE_DROPPED_STALE (no current target/scene produces '
+        'these, so their old manifest entries were NOT carried over; any PNG '
+        'still on disk will be reported as [STRAY] — delete it or restore the '
+        'target): ${droppedStale.join(' | ')}',
+      );
     }
     if (missingPng.isNotEmpty) {
       // ignore: avoid_print
-      print('MANIFEST_MERGE_MISSING_PNG (carried-over entry but no PNG on disk '
-          '— kept on purpose so the validator FAILS it): '
-          '${missingPng.join(' | ')}');
+      print(
+        'MANIFEST_MERGE_MISSING_PNG (carried-over entry but no PNG on disk '
+        '— kept on purpose so the validator FAILS it): '
+        '${missingPng.join(' | ')}',
+      );
     }
     if (holes.isNotEmpty) {
       // ignore: avoid_print
-      print('MANIFEST_MERGE_HOLES (never captured and no previous entry — the '
-          'shipped set is INCOMPLETE): ${holes.join(' | ')}');
+      print(
+        'MANIFEST_MERGE_HOLES (never captured and no previous entry — the '
+        'shipped set is INCOMPLETE): ${holes.join(' | ')}',
+      );
     }
     // ignore: avoid_print
-    print('MANIFEST_MERGED: ${_manifestShots.length} fresh + '
-        '${carried.length} carried over = ${merged.length} of '
-        '${canonicalFiles.length} canonical shot(s)');
+    print(
+      'MANIFEST_MERGED: ${_manifestShots.length} fresh + '
+      '${carried.length} carried over = ${merged.length} of '
+      '${canonicalFiles.length} canonical shot(s)',
+    );
   }
 
   /// Awaits the next frame, but never blocks longer than [_frameWaitTimeout] —
   /// see that constant for why a bare `endOfFrame` can hang an entire run.
   /// EVERY `endOfFrame` in this file must go through here.
-  Future<void> _awaitFrame() => WidgetsBinding.instance.endOfFrame
-      .timeout(_frameWaitTimeout, onTimeout: () {});
+  Future<void> _awaitFrame() => WidgetsBinding.instance.endOfFrame.timeout(
+        _frameWaitTimeout,
+        onTimeout: () {},
+      );
 
   /// Pumps frames until nothing is ANIMATING, so async-decoded content (SVGs,
   /// web/async fonts, images) and post-frame callbacks complete — and no shot is
@@ -1329,7 +1602,10 @@ class _CaptureAppState extends State<_CaptureApp> {
                       child: RepaintBoundary(
                         key: _boundaryKey,
                         child: SizedBox(
-                            width: _target.w, height: _target.h, child: shot),
+                          width: _target.w,
+                          height: _target.h,
+                          child: shot,
+                        ),
                       ),
                     ),
                   ),

@@ -34,6 +34,7 @@ class FakePlaybackService extends AudioPlaybackService {
     int? initialChapterIndex,
     Duration? initialPosition,
     bool autoPlay = true,
+    bool resume = false,
   }) async {
     loadCalls++;
     currentBookNotifier.value = book;

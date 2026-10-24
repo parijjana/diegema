@@ -178,11 +178,16 @@ class AudioPlaybackService {
   /// position, and leaves playback paused — used by [NowPlayingScreen] to
   /// restore the last-played book on the idle screen without starting
   /// audio the user did not ask for.
+  ///
+  /// [resume] marks an explicit [initialChapterIndex] / [initialPosition] as
+  /// resuming the user's own saved spot (the auto-resume banner), so the skip
+  /// back on resume applies. Without it an explicit position is a jump.
   Future<void> loadBook(
     UnifiedAudiobook book, {
     int? initialChapterIndex,
     Duration? initialPosition,
     bool autoPlay = true,
+    bool resume = false,
   }) async {
     await init();
     _progressFrozenBookId = null;
@@ -214,7 +219,7 @@ class AudioPlaybackService {
     // True only when the position came from saved progress: a resume. An
     // explicit chapter/position (bookmark, chapter pick) is a jump and never
     // rewinds, and neither does a start from 0.
-    var resumed = false;
+    var resumed = resume && targetPosition > Duration.zero;
     if (initialChapterIndex == null && _db != null) {
       try {
         final savedProgress = await _db!.getProgress(book.id);

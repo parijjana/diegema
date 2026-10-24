@@ -50,7 +50,8 @@ void main() {
     test('filters', () {
       expect(ids(LibrarySort.recent, LibraryFilter.inProgress), ['a']);
       expect(ids(LibrarySort.recent, LibraryFilter.finished), ['b']);
-      expect(ids(LibrarySort.recent, LibraryFilter.downloaded), ['b', 'a']);
+      // LibriVox downloads only: local 'b' is on the device but is Local.
+      expect(ids(LibrarySort.recent, LibraryFilter.downloaded), ['a']);
       expect(ids(LibrarySort.recent, LibraryFilter.local), ['b']);
     });
   });

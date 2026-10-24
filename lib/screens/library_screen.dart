@@ -1240,7 +1240,10 @@ List<UnifiedAudiobook> applyLibraryView(
       case LibraryFilter.finished:
         return stats[b.id]?.finished ?? false;
       case LibraryFilter.downloaded:
-        return b.isDownloaded;
+        // Downloaded from LibriVox. Local books are on the device too (their
+        // isDownloaded is true), but they have the Local filter; counting
+        // them here made Downloaded match almost the whole library.
+        return b.origin == BookIdentity.originLibrivox && b.isDownloaded;
       case LibraryFilter.local:
         return b.origin == BookIdentity.originLocal;
     }

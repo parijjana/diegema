@@ -28,7 +28,8 @@ void main() {
   setUp(() => audio = FakePlaybackService());
   tearDown(() async => audio.dispose().catchError((_) {}));
 
-  Future<void> pumpApp(WidgetTester tester, Size size, double scale) async {
+  Future<AppDatabase> pumpApp(WidgetTester tester, Size size, double scale,
+      {Map<String, Object> prefs = const <String, Object>{}}) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     tester.platformDispatcher.textScaleFactorTestValue = scale;
@@ -45,10 +46,11 @@ void main() {
       initialThemeMode: ThemeMode.light,
       database: db,
       audioService: audio,
-      preferences: const UiPreferences(overrides: <String, Object>{}),
+      preferences: UiPreferences(overrides: prefs),
       ambience: ambience,
     ));
     await pumpFrames(tester);
+    return db;
   }
 
   group('bottom nav labels', () {
@@ -98,6 +100,64 @@ void main() {
           }
           await unmount(tester);
         });
+      }
+    }
+  });
+
+  group('Now Playing action row', () {
+    for (final style in ['tiles', 'round', 'bar']) {
+      for (final e in phoneSizes.entries) {
+        for (final scale in [1.0, 1.3, 2.0]) {
+          testWidgets('all four read in full: $style ${e.key} x$scale',
+              (tester) async {
+            final db = await pumpApp(tester, e.value, scale,
+                prefs: {'now_playing.controls_style': style});
+            final book = await seedBook(db, id: 'z', title: 'Persuasion');
+            await audio.loadBook(book);
+            await pumpFrames(tester);
+            expect(tester.takeException(), isNull);
+
+            // The row's labels: stable words in every style.
+            final labels = [
+              'Up next',
+              style == 'tiles' ? 'Speed' : '1.0x',
+              'Sleep',
+              'Marks',
+            ];
+            final slots = <Rect>[];
+            for (final label in labels) {
+              final f = find.text(label);
+              expect(f, findsOneWidget, reason: label);
+              final ro = tester.renderObject<RenderParagraph>(f);
+              expect(ro.didExceedMaxLines, isFalse,
+                  reason: '"$label" is cut off');
+              // No word broken across lines: the box is at least as wide
+              // as the longest word.
+              expect(ro.size.width + 0.5,
+                  greaterThanOrEqualTo(ro.getMinIntrinsicWidth(double.infinity)),
+                  reason: '"$label" is narrower than its longest word');
+              final slot = find.ancestor(of: f, matching: find.byType(InkWell));
+              final r = tester.getRect(slot.first);
+              expect(r.width, greaterThanOrEqualTo(48));
+              expect(r.height, greaterThanOrEqualTo(48));
+              final t = tester.getRect(f);
+              expect(t.left, greaterThanOrEqualTo(r.left - 0.5),
+                  reason: '"$label" spills left of its button');
+              expect(t.right, lessThanOrEqualTo(r.right + 0.5),
+                  reason: '"$label" spills right of its button');
+              expect(t.bottom, lessThanOrEqualTo(r.bottom + 0.5),
+                  reason: '"$label" spills below its button');
+              slots.add(r);
+            }
+            for (var i = 0; i < slots.length; i++) {
+              for (var j = i + 1; j < slots.length; j++) {
+                expect(slots[i].overlaps(slots[j]), isFalse,
+                    reason: 'buttons $i and $j overlap');
+              }
+            }
+            await unmount(tester);
+          });
+        }
       }
     }
   });

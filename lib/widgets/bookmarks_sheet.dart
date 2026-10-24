@@ -394,8 +394,8 @@ class BookmarksButton extends StatelessWidget {
                   context,
                   const ActionFace(
                     icon: Icons.bookmark_rounded,
-                    caption: 'Bookmarks',
-                    value: 'Save place',
+                    caption: 'Marks',
+                    value: 'Save',
                     short: 'Marks',
                   ),
                 )

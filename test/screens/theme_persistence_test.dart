@@ -78,7 +78,7 @@ void main() {
   Future<void> openSettings(WidgetTester tester) async {
     await tester.tap(find.descendant(
       of: find.byType(NavigationBar),
-      matching: find.text('Settings'),
+      matching: find.byTooltip('Settings'),
     ));
     await pumpFrames(tester);
   }

@@ -310,7 +310,11 @@ class _LinkedDevicesScreenState extends State<LinkedDevicesScreen> {
             ? Sp.gutterDesktop
             : Sp.gutterPhone;
         return ListView(
-          padding: EdgeInsets.fromLTRB(gutter, Sp.x4, gutter, Sp.x8),
+          // The system bar's inset is added: an explicit padding replaces
+          // the list's own safe-area handling, which left the last row
+          // under the navigation bar / home indicator.
+          padding: EdgeInsets.fromLTRB(gutter, Sp.x4, gutter,
+              Sp.x8 + MediaQuery.paddingOf(context).bottom),
           children: [
             Semantics(
               header: true,

@@ -54,6 +54,8 @@ RECORDINGS = {
     'fireplace': ('fireplace.mp3', True),
     # Freesound (banan_, CC0); an OGG Vorbis file, which afconvert decodes directly.
     'battle': ('385895__banan__battlefield-ambience-loop.ogg', True),
+    # Freesound (freefire66, CC0); a 96 kHz 24-bit WAV, decoded to 16-bit like the rest.
+    'sword_fight': ('175951__freefire66__swordbattle2.wav', True),
 }
 
 

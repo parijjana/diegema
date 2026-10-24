@@ -78,4 +78,21 @@ void main() {
   test('identical unsuffixed copies get no label', () {
     expect(libraryVariantLabels([_b('1', 'Emma'), _b('2', 'Emma')]), isEmpty);
   });
+
+  test('a stored reader is appended to the label; none leaves it bare', () {
+    UnifiedAudiobook r(String id, String t, List<String> n) => UnifiedAudiobook(
+        id: id, title: t, author: 'A', description: '', narrators: n);
+    final m = libraryVariantLabels([
+      r('1', 'Emma', ['Ann']),
+      r('2', 'Emma, Version 2', ['Bob', 'Cy']),
+      r('3', 'Emma, Version 3', ['A', 'B', 'C']),
+      r('4', 'Emma, Version 4', const []),
+    ]);
+    expect(m, {
+      '1': 'Original · read by Ann',
+      '2': 'Version 2 · read by Bob and Cy',
+      '3': 'Version 3 · read by A and others',
+      '4': 'Version 4',
+    });
+  });
 }

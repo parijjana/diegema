@@ -41,16 +41,30 @@ TitleSplit splitTitleVariant(String title) {
   return (base: t, label: null);
 }
 
+/// "read by X", "read by X and Y", or "read by X and others" for three or
+/// more; null when there is no reader.
+String? readerSuffix(List<String> narrators) {
+  final names = [
+    for (final n in narrators)
+      if (n.trim().isNotEmpty) n.trim()
+  ];
+  if (names.isEmpty) return null;
+  if (names.length == 1) return 'read by ${names[0]}';
+  if (names.length == 2) return 'read by ${names[0]} and ${names[1]}';
+  return 'read by ${names[0]} and others';
+}
+
 /// For every book whose base title is shared by two or more books in
 /// [books], the label that tells it apart: "Version 2", "Vol. 032", or
 /// "Original" for the unsuffixed one. Books with a unique base title (and
 /// copies with nothing to tell them apart) are absent from the result, so
 /// they render exactly as before.
 ///
-/// The reader is deliberately not used: the Library database does not store
-/// narrators, so a library book never carries them.
+/// When the book has a stored reader the label ends "· read by X" (see
+/// [readerSuffix]); books without one keep the bare label.
 Map<String, String> libraryVariantLabels(List<UnifiedAudiobook> books) {
   final groups = <String, List<(String, TitleSplit)>>{};
+  final byId = {for (final b in books) b.id: b};
   for (final b in books) {
     final s = splitTitleVariant(b.title);
     groups.putIfAbsent(s.base.toLowerCase(), () => []).add((b.id, s));
@@ -59,7 +73,9 @@ Map<String, String> libraryVariantLabels(List<UnifiedAudiobook> books) {
   for (final g in groups.values) {
     if (g.length < 2 || !g.any((e) => e.$2.label != null)) continue;
     for (final (id, s) in g) {
-      out[id] = s.label ?? 'Original';
+      final label = s.label ?? 'Original';
+      final reader = readerSuffix(byId[id]?.narrators ?? const []);
+      out[id] = reader == null ? label : '$label · $reader';
     }
   }
   return out;

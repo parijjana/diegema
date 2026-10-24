@@ -38,25 +38,31 @@ class NarratorBackfillService {
 
       final books = await db.getAllAudiobooks();
       var failed = false;
+      var unsure = false;
       for (final book in books) {
         if (book.origin != BookIdentity.originLibrivox ||
             book.narrators.isNotEmpty) {
           continue;
         }
         try {
-          final names =
-              await service.narratorsForArchiveId(book.id, book.title);
+          final r = await service.narratorsForArchiveId(book.id, book.title);
+          final names = r.names;
           if (names != null && names.isNotEmpty) {
             await db.setNarrators(book.id, names);
+          } else if (!r.sawBooks) {
+            // The searches found nothing at all: maybe a bad query, not a
+            // missing book. Not resolved; the attempt cap bounds retries.
+            unsure = true;
           }
-          // null / empty: LibriVox has no readers for it; unresolvable.
+          // Otherwise books came back and none matched the id: genuinely
+          // unresolvable.
         } catch (_) {
           failed = true;
           // A dead network will fail every book; stop rather than hammer.
           break;
         }
       }
-      if (!failed) await _setInt(doneKey, 1);
+      if (!failed && !unsure) await _setInt(doneKey, 1);
     } catch (_) {
       // Best-effort maintenance; never surfaces to the user.
     }

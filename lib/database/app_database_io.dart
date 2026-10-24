@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:drift/drift.dart';
@@ -56,6 +57,11 @@ class Audiobooks extends Table {
   /// `services/portable_key_io.dart`). Null until worked out — a local
   /// book's needs its files read.
   TextColumn get portableKey => text().nullable()();
+
+  /// Readers, as a JSON array of names (schema v5). Null for rows that
+  /// predate the column and for local books; see
+  /// [AppDatabase.saveAudiobook] for why an empty list never overwrites it.
+  TextColumn get narrators => text().nullable()();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
@@ -193,7 +199,7 @@ class AppDatabase extends _$AppDatabase {
   /// content whose chapter durations were never probed.
   static const double continueListeningMaxProgressFraction = 0.95;
 
-  static const int _schemaVersion = 4;
+  static const int _schemaVersion = 5;
 
   /// The schema this build reads and writes; the CLI refuses any other.
   static const int currentSchemaVersion = _schemaVersion;
@@ -246,6 +252,10 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(audiobooks, audiobooks.portableKey);
             await m.createTable(syncRecords);
             await m.createIndex(syncRecordsDeviceHlc);
+          }
+          if (from < 5 && to >= 5) {
+            // Narrators (schema v5). Existing rows stay null: no reader.
+            await m.addColumn(audiobooks, audiobooks.narrators);
           }
         },
         beforeOpen: (details) async {
@@ -394,6 +404,11 @@ class AppDatabase extends _$AppDatabase {
         origin: Value(book.origin),
         coverUrl: Value(book.coverArtUrlOrPath),
         isDownloaded: Value(book.isDownloaded),
+        // A save from a copy that doesn't know the readers (a local scan,
+        // a metadata-only save) must not erase ones already stored.
+        narrators: book.narrators.isEmpty
+            ? const Value.absent()
+            : Value(jsonEncode(book.narrators)),
       ),
     );
 
@@ -463,7 +478,17 @@ class AppDatabase extends _$AppDatabase {
       coverArtUrlOrPath: bookRow.userCoverPath ?? bookRow.coverUrl,
       chapters: domainChapters,
       isDownloaded: bookRow.isDownloaded,
+      narrators: _decodeNarrators(bookRow.narrators),
     );
+  }
+
+  static List<String> _decodeNarrators(String? raw) {
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final v = jsonDecode(raw);
+      if (v is List) return [for (final n in v) '$n'];
+    } catch (_) {}
+    return const [];
   }
 
   Future<List<domain.UnifiedAudiobook>> getAllAudiobooks() async {

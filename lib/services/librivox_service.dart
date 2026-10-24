@@ -1,3 +1,4 @@
+import '../core/utils/book_identity.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -217,6 +218,45 @@ class LibriVoxService {
       debugPrint('Internet Archive search error: $e');
     }
     return [];
+  }
+
+  /// The readers of the book archived as [archiveId] (the id the Library
+  /// stores), for the one-off narrator backfill. The LibriVox feed has no
+  /// lookup by archive identifier, so this searches by [title] (one rate
+  /// limited call) and picks the result whose `url_iarchive` is [archiveId].
+  /// Returns null when LibriVox answered but has no such book, and throws
+  /// when the request itself failed, so the caller can tell the two apart.
+  Future<List<String>?> narratorsForArchiveId(String archiveId, String title) {
+    final url = '$_baseUrl/?format=json&extended=1&limit=50'
+        '&title=${Uri.encodeQueryComponent('^${title.trim()}')}';
+    return _rateLimiter.dispatch<List<String>?>(
+      apiId: 'librivox',
+      call: () async {
+        final response = await _client
+            .get(Uri.parse(url), headers: _headers)
+            .timeout(const Duration(seconds: 30));
+        if (response.statusCode == 404) return null; // "no books found"
+        if (response.statusCode != 200) {
+          throw http.ClientException(
+              'LibriVox answered ${response.statusCode}');
+        }
+        final data = await compute(json.decode, response.body) as JsonMap;
+        final raw = data['books'];
+        final items = raw is JsonMap
+            ? raw.values
+            : raw is List
+                ? raw
+                : const [];
+        for (final item in items) {
+          if (item is! JsonMap) continue;
+          final book = LibriVoxBook.fromJson(item);
+          final id = BookIdentity.archiveIdentifierFor(
+              librivoxApiId: book.id, urlIarchive: book.urlIarchive);
+          if (id == archiveId) return book.narrators;
+        }
+        return null;
+      },
+    );
   }
 
   Future<LibriVoxBook?> getBookById(String id) async {

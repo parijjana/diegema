@@ -755,6 +755,12 @@ class AppDatabase extends _$AppDatabase {
         .write(AudiobooksCompanion(coverUrl: Value(coverUrl)));
   }
 
+  /// Stores just the readers, leaving everything else (chapters included)
+  /// alone. Used by the one-off narrator backfill.
+  Future<void> setNarrators(String audiobookId, List<String> names) =>
+      (update(audiobooks)..where((t) => t.id.equals(audiobookId))).write(
+          AudiobooksCompanion(narrators: Value(jsonEncode(names))));
+
   // --- Bookmarks / audio clips ---
 
   /// Creates a bookmark or clip. A `null` [endPositionSeconds] (the

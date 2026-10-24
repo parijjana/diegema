@@ -10,6 +10,7 @@ import '../services/sync/sync_controller.dart';
 import '../sync/sync_view.dart';
 import '../core/utils/book_identity.dart';
 import '../core/utils/sync_format.dart';
+import '../core/utils/title_variants.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
@@ -462,6 +463,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final sort = settings?.librarySort ?? LibrarySort.recent;
     final filter = settings?.libraryFilter ?? LibraryFilter.all;
     final inProgressIds = {for (final b in _inProgress) b.id};
+    final variants = libraryVariantLabels(_books);
     final shown = applyLibraryView(
       _books,
       sort: sort,
@@ -553,6 +555,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     final p = _progressById[book.id];
                     return _BookTile(
                       book: book,
+                      variant: variants[book.id],
                       coverSize: size,
                       progress: p,
                       caption: p == null
@@ -573,6 +576,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     padding: const EdgeInsets.only(bottom: Sp.listGap),
                     child: _InProgressRow(
                       book: book,
+                      variant: variants[book.id],
                       progress: _progressById[book.id],
                       compact: !wide,
                       onTap: () => _openDetail(context, book, wide: wide),
@@ -594,6 +598,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   final chapters = book.chapters.length;
                   return _BookTile(
                     book: book,
+                    variant: variants[book.id],
                     coverSize: size,
                     progress: p,
                     caption: isInProgress
@@ -620,6 +625,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   padding: const EdgeInsets.only(bottom: Sp.listGap),
                   child: _BookRow(
                     book: book,
+                    variant: variants[book.id],
                     inProgress: inProgressIds.contains(book.id),
                     progress: _progressById[book.id],
                     onTap: () => _openDetail(context, book, wide: wide),
@@ -931,9 +937,11 @@ class _InProgressRow extends StatelessWidget {
   /// Phone gets a tighter card (per the approved mockup: a 64x64 cover
   /// rather than the 56x56 one wide keeps).
   final bool compact;
+  final String? variant;
 
   const _InProgressRow({
     required this.book,
+    this.variant,
     required this.progress,
     required this.onTap,
     this.onLongPress,
@@ -999,6 +1007,7 @@ class _InProgressRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppType.body.copyWith(color: c.textSecondary),
                       ),
+                      if (variant != null) VariantLabel(label: variant!),
                       const SizedBox(height: Sp.x2),
                       if (percentLabel != null) ...[
                         _AccentProgressBar(value: progress!),
@@ -1043,9 +1052,11 @@ class _BookTile extends StatelessWidget {
   final String semanticsLabel;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final String? variant;
 
   const _BookTile({
     required this.book,
+    this.variant,
     required this.coverSize,
     required this.progress,
     required this.caption,
@@ -1067,6 +1078,7 @@ class _BookTile extends StatelessWidget {
       ),
       title: book.title,
       author: book.author,
+      variant: variant,
       progress: progress,
       caption: caption,
       captionAccent: captionAccent,
@@ -1093,9 +1105,11 @@ class _BookRow extends StatelessWidget {
   final bool inProgress;
   final double? progress;
   final VoidCallback? onLongPress;
+  final String? variant;
 
   const _BookRow({
     required this.book,
+    this.variant,
     required this.onTap,
     this.onLongPress,
     this.inProgress = false,
@@ -1160,6 +1174,7 @@ class _BookRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppType.body.copyWith(color: c.textSecondary),
                       ),
+                      if (variant != null) VariantLabel(label: variant!),
                       const SizedBox(height: Sp.x1),
                       if (inProgress && progress != null) ...[
                         _AccentProgressBar(value: progress!),

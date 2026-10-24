@@ -7,6 +7,17 @@ import 'package:diegema/core/ui_preferences.dart';
 import 'package:diegema/database/app_database.dart';
 import 'package:diegema/services/ambience_service.dart';
 
+import 'package:diegema/core/network/rate_limit_dispatcher.dart';
+import 'package:diegema/domain/models/librivox_book.dart';
+import 'package:diegema/screens/discover_screen.dart';
+import 'package:diegema/services/artwork_enrichment_service.dart';
+import 'package:diegema/services/librivox_downloader.dart';
+import 'package:diegema/services/librivox_service.dart';
+import 'package:diegema/theme/app_theme.dart';
+import 'package:diegema/widgets/librivox_book_item.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+
 import '../services/ambience_service_test.dart' show FakeChannel;
 import '../support/fake_playback_service.dart';
 import '../support/golden_fonts.dart';
@@ -198,9 +209,8 @@ void main() {
             void expectClear(String when) {
               for (final t in find.textContaining('Book number').evaluate()) {
                 // Only the part inside the list is painted.
-                final r = tester
-                    .getRect(find.byWidget(t.widget))
-                    .intersect(list);
+                final r =
+                    tester.getRect(find.byWidget(t.widget)).intersect(list);
                 // Only what is on screen counts.
                 if (r.isEmpty) continue;
                 expect(r.overlaps(fab), isFalse,
@@ -252,4 +262,101 @@ void main() {
       }
     }
   });
+
+  group('Discover', () {
+    LibriVoxBook book(int i) => LibriVoxBook(
+          id: 'book_$i',
+          title: 'Tale number $i',
+          description: 'A novel.',
+          totalTimeSecs: 3000,
+          authors: [
+            LibriVoxAuthor(id: '1', firstName: 'A', lastName: 'Author')
+          ],
+          urlRss: 'https://example.invalid/rss/$i',
+          urlZipFile: 'https://example.invalid/zip/$i',
+          language: 'English',
+          narrators: const [],
+        );
+
+    for (final e in phoneSizes.entries) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+            'search results end clear of the search bar: '
+            '${e.key} x$scale', (tester) async {
+          final db = AppDatabase(NativeDatabase.memory());
+          addTearDown(db.close);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final client = MockClient((r) async => http.Response('', 404));
+          final service = _Paged(40, book);
+          await setSurface(tester, e.value);
+          await tester.pumpWidget(MaterialApp(
+            theme: AppTheme.light(),
+            home: Scaffold(
+              body: DiscoverScreen(
+                db: db,
+                audioService: audio,
+                libriVoxService: service,
+                artworkService: ArtworkEnrichmentService(client: client),
+                downloader: LibriVoxStreamAndDownloader(client: client),
+              ),
+            ),
+          ));
+          await pumpFrames(tester);
+          await tester.enterText(find.byType(TextField), 'tales');
+          await tester.testTextInput.receiveAction(TextInputAction.search);
+          await pumpFrames(tester);
+          expect(tester.takeException(), isNull);
+
+          final field = tester.getRect(find.byType(TextField));
+          final list = tester.getRect(find.byType(CustomScrollView));
+          // The field has its own strip: it never overlaps the list at all,
+          // so nothing is under it at the top either.
+          expect(list.overlaps(field), isFalse,
+              reason: 'the search field floats over the results');
+
+          await tester.drag(
+              find.byType(CustomScrollView), const Offset(0, -9000));
+          await pumpFrames(tester, frames: 3);
+
+          // Everything still painted in the list stays above the field.
+          for (final el in find.byType(LibriVoxBookItem).evaluate()) {
+            final r = tester.getRect(find.byWidget(el.widget)).intersect(list);
+            if (r.isEmpty) continue;
+            expect(r.overlaps(field), isFalse,
+                reason: 'a cover sits under the search field at the end');
+          }
+          // "Load more" is on screen, clear of the field, and tappable.
+          final more = find.text('Load more');
+          expect(more, findsOneWidget);
+          final m = tester.getRect(more);
+          expect(m.bottom, lessThanOrEqualTo(field.top));
+          expect(m.top, greaterThanOrEqualTo(list.top));
+          await tester.tap(more);
+          await pumpFrames(tester);
+          expect(service.calls, 2);
+          await unmount(tester);
+        });
+      }
+    }
+  });
+}
+
+class _Paged extends LibriVoxService {
+  final int total;
+  final LibriVoxBook Function(int) make;
+  int calls = 0;
+  _Paged(this.total, this.make)
+      : super(
+            rateLimiter: RateLimitDispatcher(cooldownOverride: Duration.zero));
+
+  @override
+  Future<List<LibriVoxBook>> searchBooks(String term,
+      {int limit = 10, int offset = 0}) async {
+    if (term != 'tales') return const [];
+    calls++;
+    return [
+      for (var i = offset; i < offset + limit && i < total; i++) make(i),
+    ];
+  }
 }

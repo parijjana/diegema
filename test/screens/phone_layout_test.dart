@@ -18,6 +18,8 @@ import 'package:diegema/widgets/librivox_book_item.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:diegema/sync/sync_record.dart';
+import '../helpers/fake_sync_controller.dart';
 import '../services/ambience_service_test.dart' show FakeChannel;
 import '../support/fake_playback_service.dart';
 import '../support/golden_fonts.dart';
@@ -257,6 +259,88 @@ void main() {
           await tester.tap(last);
           await pumpFrames(tester);
           expect(tester.takeException(), isNull);
+          await unmount(tester);
+        });
+      }
+    }
+  });
+
+  group('Linked devices', () {
+    final others = [
+      rec(SyncKind.device, 'mac', 'mac', 1,
+          {'name': 'MacBook', 'platform': 'macos'}),
+      rec(SyncKind.device, 'pc', 'pc', 2, {'name': 'Desk PC'}),
+      rec(SyncKind.device, 'tab', 'tab', 3, {'name': 'Tablet'}),
+      rec(SyncKind.device, 'tv', 'tv', 4, {'name': 'Living room'}),
+    ];
+    // Phones with a system navigation bar (48dp inset), and a desktop.
+    const cases = <String, (Size, double)>{
+      '360x800 + nav': (Size(360, 800), 48),
+      '411x914 + nav': (Size(411, 914), 48),
+      '430x932 + home bar': (Size(430, 932), 34),
+      '1280x720 desktop': (Size(1280, 720), 0),
+    };
+    for (final e in cases.entries) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+            'scrolls to the last row, clear of the system bar: '
+            '${e.key} x$scale', (tester) async {
+          final (size, inset) = e.value;
+          final db = AppDatabase(NativeDatabase.memory());
+          addTearDown(db.close);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await setSurface(tester, size);
+          tester.view.padding = FakeViewPadding(bottom: inset);
+          tester.view.viewPadding = FakeViewPadding(bottom: inset);
+          addTearDown(tester.view.resetPadding);
+          addTearDown(tester.view.resetViewPadding);
+          await tester.pumpWidget(AudiobookApp(
+            database: db,
+            audioService: audio,
+            sync: FakeSyncController(records: others)..linked = true,
+            preferences: const UiPreferences(overrides: <String, Object>{}),
+          ));
+          await pumpFrames(tester);
+          await tester.tap(find.descendant(
+              of: find.byType(NavigationBar),
+              matching: find.byTooltip('Settings')));
+          await pumpFrames(tester);
+          final row = find.text('Linked devices');
+          await tester.scrollUntilVisible(row, 120,
+              maxScrolls: 200,
+              scrollable: find
+                  .descendant(
+                      of: find.byType(ListView),
+                      matching: find.byType(Scrollable))
+                  .first);
+          await tester.ensureVisible(row);
+          await pumpFrames(tester);
+          await tester.tap(row);
+          await pumpFrames(tester);
+          expect(find.text('This device'), findsOneWidget);
+
+          final list = find.descendant(
+              of: find.byType(ListView), matching: find.byType(Scrollable));
+          for (var i = 0; i < 6; i++) {
+            await tester.drag(list.first, const Offset(0, -9000));
+            await pumpFrames(tester, frames: 2);
+          }
+          expect(tester.takeException(), isNull);
+
+          // The last row in the list, fully on screen above the system bar.
+          final last = tester.getRect(find.text('Unlink this device'));
+          expect(last.bottom, lessThanOrEqualTo(size.height - inset),
+              reason: 'the last row is under the system bar');
+          expect(last.top, greaterThanOrEqualTo(0));
+          // And scrolling back up, every device row is reachable.
+          await tester.drag(list.first, const Offset(0, 9000));
+          await pumpFrames(tester, frames: 3);
+          for (final n in ['MacBook', 'Desk PC']) {
+            await tester.scrollUntilVisible(find.text(n), 100,
+                scrollable: list.first, maxScrolls: 60);
+            expect(find.text(n), findsOneWidget, reason: n);
+          }
           await unmount(tester);
         });
       }

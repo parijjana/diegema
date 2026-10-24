@@ -92,7 +92,7 @@ void main() {
     ));
     await pumpFrames(tester);
     await tester.tap(find.descendant(
-        of: find.byType(NavigationBar), matching: find.text('Settings')));
+        of: find.byType(NavigationBar), matching: find.byTooltip('Settings')));
     await pumpFrames(tester);
     final toggle = find.text('Download on Wi-Fi only');
     await tester.scrollUntilVisible(toggle, 120,

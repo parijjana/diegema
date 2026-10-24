@@ -15,7 +15,7 @@ enum AmbienceGroup {
 }
 
 /// One bundled, seamlessly looping background sound. Built by
-/// `tool/ambience/prepare_ambience.py`; recordings are CC0 (BigSoundBank),
+/// `tool/ambience/prepare_ambience.py`; recordings are CC0 (BigSoundBank, plus `battle` from Freesound),
 /// the three noises are synthesised (see `assets/ambience/CREDITS.md`).
 class AmbienceSound {
   final String id;
@@ -59,6 +59,8 @@ class AmbienceSound {
     AmbienceSound('ship_timbers', 'Ship timbers', AmbienceGroup.places,
         Icons.sailing_rounded),
     AmbienceSound('horses', 'Horses', AmbienceGroup.places, Icons.pets_rounded),
+    AmbienceSound('battle', 'Battlefield', AmbienceGroup.places,
+        Icons.shield_rounded),
     AmbienceSound('white_noise', 'White noise', AmbienceGroup.noise,
         Icons.graphic_eq_rounded),
     AmbienceSound('pink_noise', 'Pink noise', AmbienceGroup.noise,

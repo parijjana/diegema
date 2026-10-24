@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Builds the bundled ambience loops in assets/ambience/.
 
-Reproducible and dependency-free (macOS `afconvert` + the Python stdlib):
+Reproducible and dependency-free (macOS `afconvert` + the Python stdlib). `--only a,b` rebuilds just those
+recordings (AAC output can differ byte-wise between macOS versions):
 
     python3 tool/ambience/prepare_ambience.py ~/code/projects/Aulos/assets/audio/noise
 
@@ -10,7 +11,7 @@ Reproducible and dependency-free (macOS `afconvert` + the Python stdlib):
 with a note, so each folder can be built on its own.)
 
 For each recording it:
-  1. decodes the source MP3 to 16-bit PCM (`afconvert`);
+  1. decodes the source MP3 to 16-bit PCM (`afconvert`; it reads OGG Vorbis too, so no ffmpeg is needed);
   2. keeps at most MAX_SECONDS and folds the tail back over the head with an
      equal-power crossfade, so the file loops with no seam or click;
   3. sets its level to TARGET_DBFS RMS, well under spoken word (LibriVox
@@ -42,7 +43,6 @@ RECORDINGS = {
     'city_street': ('city_street.mp3', True),
     # Added for Mimesis cue sheets. Source files are named after the sound id
     # (see assets/ambience/CREDITS.md for each clip's BigSoundBank page).
-    # `battle` has no CC0 source yet, so it is not built.
     'tavern_crowd': ('tavern_crowd.mp3', True),
     'wind': ('wind.mp3', True),
     'gulls': ('gulls.mp3', True),
@@ -52,10 +52,26 @@ RECORDINGS = {
     'river': ('river.mp3', True),
     'horses': ('horses.mp3', True),
     'fireplace': ('fireplace.mp3', True),
+    # Freesound (banan_, CC0); an OGG Vorbis file, which afconvert decodes directly.
+    'battle': ('385895__banan__battlefield-ambience-loop.ogg', True),
+    # Freesound (freefire66, CC0); a 96 kHz 24-bit WAV, decoded to 16-bit like the rest.
+    'sword_fight': ('175951__freefire66__swordbattle2.wav', True),
 }
 
 
+def fix_extensible_header(path):
+    """afconvert writes WAVE_FORMAT_EXTENSIBLE (tag 0xFFFE) for some decodes,
+    e.g. OGG Vorbis; Python's `wave` only reads plain PCM. When the sub-format
+    is PCM, relabel the tag in place (the sample data is unchanged)."""
+    with open(path, 'r+b') as f:
+        head = f.read(48)
+        if head[20:22] == b'\xfe\xff' and head[44:46] == b'\x01\x00':
+            f.seek(20)
+            f.write(b'\x01\x00')
+
+
 def read_wav(path):
+    fix_extensible_header(path)
     with wave.open(path) as w:
         ch, rate = w.getnchannels(), w.getframerate()
         data = array.array('h', w.readframes(w.getnframes()))
@@ -144,10 +160,12 @@ def encode(wav, name, ch):
     print(f'{name}.m4a  {os.path.getsize(dst) // 1024} KB')
 
 
-def main(src_dir, noises=True):
+def main(src_dir, noises=True, only=None):
     os.makedirs(OUT, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         for name, (src, stereo) in RECORDINGS.items():
+            if only and name not in only:
+                continue
             if not os.path.exists(os.path.join(src_dir, src)):
                 print(f'skip {name}: {src} not in {src_dir}')
                 continue
@@ -168,4 +186,6 @@ def main(src_dir, noises=True):
 
 
 if __name__ == '__main__':
-    main(os.path.expanduser(sys.argv[1]), noises='--no-noise' not in sys.argv)
+    only = sys.argv[sys.argv.index('--only') + 1].split(',') if '--only' in sys.argv else None
+    main(os.path.expanduser(sys.argv[1]),
+         noises='--no-noise' not in sys.argv and not only, only=only)

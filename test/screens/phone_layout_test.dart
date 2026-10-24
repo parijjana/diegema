@@ -67,8 +67,9 @@ void main() {
             final fade = find.ancestor(
                 of: find.byWidget(t.widget),
                 matching: find.byType(FadeTransition));
-            if (fade.evaluate().any(
-                (e) => (e.widget as FadeTransition).opacity.value == 0)) {
+            if (fade
+                .evaluate()
+                .any((e) => (e.widget as FadeTransition).opacity.value == 0)) {
               continue;
             }
             final ro = t.renderObject! as RenderParagraph;
@@ -80,10 +81,11 @@ void main() {
           }
           if (scale == 1.0) {
             // Not simply hidden: at normal text size the labels show.
-            final lib = find.descendant(of: bar, matching: find.text('Library'));
+            final lib =
+                find.descendant(of: bar, matching: find.text('Library'));
             expect(lib, findsOneWidget);
-            final fade = find.ancestor(
-                of: lib, matching: find.byType(FadeTransition));
+            final fade =
+                find.ancestor(of: lib, matching: find.byType(FadeTransition));
             expect(
                 fade.evaluate().every(
                     (e) => (e.widget as FadeTransition).opacity.value > 0),
@@ -133,8 +135,10 @@ void main() {
                   reason: '"$label" is cut off');
               // No word broken across lines: the box is at least as wide
               // as the longest word.
-              expect(ro.size.width + 0.5,
-                  greaterThanOrEqualTo(ro.getMinIntrinsicWidth(double.infinity)),
+              expect(
+                  ro.size.width + 0.5,
+                  greaterThanOrEqualTo(
+                      ro.getMinIntrinsicWidth(double.infinity)),
                   reason: '"$label" is narrower than its longest word');
               final slot = find.ancestor(of: f, matching: find.byType(InkWell));
               final r = tester.getRect(slot.first);
@@ -158,6 +162,93 @@ void main() {
             await unmount(tester);
           });
         }
+      }
+    }
+  });
+
+  Future<void> openLibrary(WidgetTester tester, Size size, double scale,
+      {required String layout, int books = 6}) async {
+    final db =
+        await pumpApp(tester, size, scale, prefs: {'library.layout': layout});
+    for (var i = 0; i < books; i++) {
+      await seedBook(db, id: 'b$i', title: 'Book number $i');
+    }
+    await tester.tap(find.descendant(
+        of: find.byType(NavigationBar), matching: find.byTooltip('Library')));
+    await pumpFrames(tester);
+  }
+
+  group('Library', () {
+    for (final layout in ['list', 'tiles']) {
+      for (final e in phoneSizes.entries) {
+        for (final scale in [1.0, 2.0]) {
+          testWidgets('Import button covers no book: $layout ${e.key} x$scale',
+              (tester) async {
+            await openLibrary(tester, e.value, scale, layout: layout);
+            expect(tester.takeException(), isNull);
+            final fab = tester.getRect(find
+                .ancestor(
+                    of: find.text('Import a book'),
+                    matching: find.byType(InkWell))
+                .first);
+            expect(fab.height, greaterThanOrEqualTo(48));
+            final list = tester.getRect(find.byType(CustomScrollView).first);
+            expect(list.overlaps(fab), isFalse,
+                reason: 'the button sits over the scrolling list');
+            void expectClear(String when) {
+              for (final t in find.textContaining('Book number').evaluate()) {
+                // Only the part inside the list is painted.
+                final r = tester
+                    .getRect(find.byWidget(t.widget))
+                    .intersect(list);
+                // Only what is on screen counts.
+                if (r.isEmpty) continue;
+                expect(r.overlaps(fab), isFalse,
+                    reason: '${(t.widget as Text).data} is under the button '
+                        '$when');
+              }
+            }
+
+            expectClear('at the top');
+            await tester.drag(
+                find.byType(CustomScrollView).first, const Offset(0, -3000));
+            await pumpFrames(tester, frames: 3);
+            expectClear('at the end');
+            await unmount(tester);
+          });
+        }
+      }
+    }
+
+    for (final e in phoneSizes.entries) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('filter chips scroll to the last one: ${e.key} x$scale',
+            (tester) async {
+          await openLibrary(tester, e.value, scale, layout: 'list');
+          expect(tester.takeException(), isNull);
+          final last = find.widgetWithText(ChoiceChip, 'Local');
+          final bar = find.ancestor(
+              of: last, matching: find.byType(SingleChildScrollView));
+          expect(bar, findsOneWidget);
+          final scrollable = tester.state<ScrollableState>(
+              find.descendant(of: bar, matching: find.byType(Scrollable)));
+          expect(scrollable.position.axis, Axis.horizontal);
+          // The row is wider than the screen, so it must scroll, and it
+          // says so with a fade over the clipped edge.
+          expect(scrollable.position.maxScrollExtent, greaterThan(0));
+          expect(find.ancestor(of: bar, matching: find.byType(ShaderMask)),
+              findsOneWidget);
+          await tester.drag(bar, const Offset(-2000, 0));
+          await pumpFrames(tester, frames: 3);
+          final r = tester.getRect(last);
+          expect(r.right, lessThanOrEqualTo(e.value.width));
+          expect(r.left, greaterThanOrEqualTo(0));
+          expect(r.height, greaterThanOrEqualTo(48 - 8)); // chip + padded tap
+          await tester.tap(last);
+          await pumpFrames(tester);
+          expect(tester.takeException(), isNull);
+          await unmount(tester);
+        });
       }
     }
   });

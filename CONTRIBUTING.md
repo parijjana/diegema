@@ -1,31 +1,86 @@
 # Contributing to Diegema
 
-Thank you for your interest in contributing to **Diegema**! We welcome bug fixes, documentation improvements, UI enhancements, and new feature contributions.
+Thank you for your interest in contributing to **Diegema**, a free audiobook
+player for Android, iOS, macOS and Windows (the web build is a demo only). Bug
+fixes, documentation, UI polish and features are all welcome.
 
 ---
 
-## 🛠️ Development Workflow
+## Development workflow
 
-1. **Fork & Clone**: Fork the repository and clone it to your local machine.
-2. **Setup Local Pre-Commit Hook**:
+1. **Fork and clone** the repository.
+2. **Install Flutter** 3.44 (stable) and the toolchain for the platform you are
+   working on (see "Building" in the [README](README.md)).
+3. **Install the local pre-commit hook**:
    ```bash
    ./scripts/install_hooks.sh
    ```
-   This ensures that `flutter analyze` and `flutter test` run automatically before every commit.
-3. **Run Code Verification**:
+   It runs `flutter analyze` and `flutter test` before every commit.
+4. **Verify before you push**:
    ```bash
    flutter analyze
    flutter test
    ```
-4. **Code Quality Rules**:
-   - Write unit/widget tests for new features.
-   - Maintain 0 static analysis errors and 0 warnings.
-   - Follow Flutter style lints and preserve existing docstrings/contracts.
+5. **Code quality rules**:
+   - Write unit or widget tests for new behaviour.
+   - Keep `flutter analyze` at zero errors and zero warnings.
+   - Follow the Flutter lints and preserve existing docstrings and contracts.
+   - Golden tests are not regenerated casually: if one fails because of your
+     change, explain why in the pull request.
+6. **Fonts**: only self-hosted fonts under SIL OFL (without a Reserved Font
+   Name), Apache 2.0, MIT or CC0. No Google Fonts or other font CDNs.
 
 ---
 
-## 🎙️ Project values
+## Demo assets, the web demo and screenshots
 
-This project is a 100% free, non-commercial, ad-free player for public domain recordings. Contributions must respect user privacy and maintain zero telemetry in open-source builds.
+`assets/demo/**` (a canned catalogue and cover art) is used only by the web demo
+(`DEMO_MODE`) and by the store-screenshot harness (`lib/screenshot_main.dart`). It
+is deliberately **not** listed in `pubspec.yaml`, so Android, iOS, macOS and
+Windows release builds do not ship it.
 
-Diegema is an independent project, not affiliated with or endorsed by LibriVox or the Internet Archive. We strongly support LibriVox and its mission; keep project text factual about where recordings come from, and never imply a partnership or endorsement.
+To build or run something that needs it, wrap the command in
+`tool/with_demo_assets.sh`. It adds the demo assets to `pubspec.yaml` for the
+duration of the command and always restores the file afterwards:
+
+```bash
+# Web demo
+tool/with_demo_assets.sh flutter build web --release \
+  --dart-define=DEMO_MODE=true --pwa-strategy=none
+
+# Store-screenshot harness (debug, so overflow detection is on)
+tool/with_demo_assets.sh flutter run -d macos \
+  -t lib/screenshot_main.dart --dart-define=DEMO_MODE=true
+```
+
+If you add a new asset that only the demo needs, put it under `assets/demo/` and
+extend the two lines in the script; do not list it in `pubspec.yaml`.
+
+---
+
+## Regenerating app icons
+
+The icon source is in `design/icon/` (see its README). To rebuild the Android,
+iOS, macOS and web icon files from it:
+
+```bash
+python3 tool/icons/make_icons.py
+```
+
+(requires Pillow). The Android notification and monochrome icons are vector
+drawables in `android/app/src/main/res/drawable/`.
+
+---
+
+## Project values
+
+This project is a 100% free, non-commercial, ad-free player for public domain
+recordings. Contributions must respect user privacy and maintain zero telemetry
+in open-source builds.
+
+Diegema is an independent project, not affiliated with or endorsed by LibriVox or
+the Internet Archive. We strongly support LibriVox and its mission; keep project
+text factual about where recordings come from, and never imply a partnership or
+endorsement.
+
+Questions: overengineeredhobbies@gmail.com

@@ -61,8 +61,9 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/demo/catalog.json
-    - assets/demo/covers/
+    # assets/demo/** (catalog + covers) is deliberately NOT listed here, so
+    # store builds do not ship it. Demo and screenshot runs go through
+    # tool/with_demo_assets.sh, which adds it for the duration of one command.
     # Background ambience loops, built by tool/ambience/prepare_ambience.py
     # (CC0 recordings + generated noise; see assets/ambience/CREDITS.md).
     - assets/ambience/

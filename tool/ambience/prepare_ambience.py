@@ -7,7 +7,7 @@ recordings (AAC output can differ byte-wise between macOS versions):
     python3 tool/ambience/prepare_ambience.py ~/code/projects/Aulos/assets/audio/noise
 
 (Sources outside the repo; the newer clips live in a folder of their own, e.g.
-`~/diegema-ambience-src`. Any recording whose source file is missing is skipped
+`~/code/projects/diegema/ambience-src`. Any recording whose source file is missing is skipped
 with a note, so each folder can be built on its own.)
 
 For each recording it:

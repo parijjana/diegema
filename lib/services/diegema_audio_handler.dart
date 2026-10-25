@@ -262,6 +262,7 @@ Future<DiegemaAudioHandler> initDiegemaAudioService(
           'com.overengineeredhobbies.diegema.playback',
       androidNotificationChannelName: 'Playback',
       androidNotificationOngoing: false,
+      androidNotificationIcon: 'drawable/ic_stat_campfire',
     ),
   );
 }

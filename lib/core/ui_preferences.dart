@@ -17,7 +17,13 @@ import 'player_controls_style.dart';
 class UiPreferences {
   static const String _pinnedRowVisibleKey = 'now_playing.pinned_row_visible';
   static const String _themeModeKey = 'appearance.theme_mode';
+
+  /// The single pre-split skip interval. Still read (never written) so an
+  /// existing install's choice seeds both [_skipBackSecondsKey] and
+  /// [_skipForwardSecondsKey] the first time either is read.
   static const String _skipSecondsKey = 'playback.skip_seconds';
+  static const String _skipBackSecondsKey = 'playback.skip_back_seconds';
+  static const String _skipForwardSecondsKey = 'playback.skip_forward_seconds';
   static const String _defaultSpeedKey = 'playback.default_speed';
   static const String _bookSpeedPrefix = 'playback.book_speed.';
   static const String _controlsStyleKey = 'now_playing.controls_style';
@@ -112,39 +118,56 @@ class UiPreferences {
     }
   }
 
-  /// How far the skip controls jump, in seconds. Validated against
+  /// How far the rewind control jumps, in seconds. Validated against
   /// [kSkipSecondsOptions] on the way out rather than trusted: a value the
   /// panel can no longer offer would otherwise be stuck on the device
   /// forever, with no UI able to change it.
-  Future<int> getSkipSeconds({int defaultValue = kSkipSeconds}) async {
+  ///
+  /// MIGRATION: until a value is stored under the new key, the legacy
+  /// single `playback.skip_seconds` seeds it, so nobody's setting changes
+  /// when the interval was split in two.
+  Future<int> getSkipBackSeconds({int defaultValue = kSkipSeconds}) =>
+      _readSkip(_skipBackSecondsKey, defaultValue);
+
+  /// How far the fast-forward control jumps; see [getSkipBackSeconds].
+  Future<int> getSkipForwardSeconds({int defaultValue = kSkipSeconds}) =>
+      _readSkip(_skipForwardSecondsKey, defaultValue);
+
+  Future<void> setSkipBackSeconds(int value) =>
+      _writeInt(_skipBackSecondsKey, value);
+
+  Future<void> setSkipForwardSeconds(int value) =>
+      _writeInt(_skipForwardSecondsKey, value);
+
+  Future<int> _readSkip(String key, int defaultValue) async {
+    int? valid(Object? v) =>
+        v is int && kSkipSecondsOptions.contains(v) ? v : null;
     final overrides = _overrides;
     if (overrides != null) {
-      final value = overrides[_skipSecondsKey];
-      return value is int && kSkipSecondsOptions.contains(value)
-          ? value
-          : defaultValue;
+      return valid(overrides[key]) ??
+          valid(overrides[_skipSecondsKey]) ??
+          defaultValue;
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      final stored = prefs.getInt(_skipSecondsKey);
-      return stored != null && kSkipSecondsOptions.contains(stored)
-          ? stored
-          : defaultValue;
+      return valid(prefs.getInt(key)) ??
+          valid(prefs.getInt(_skipSecondsKey)) ??
+          defaultValue;
     } catch (e) {
       debugPrint('UiPreferences: read failed, using default: $e');
       return defaultValue;
     }
   }
 
-  Future<void> setSkipSeconds(int value) async {
+  Future<void> _writeInt(String key, int value) async {
     final overrides = _overrides;
     if (overrides != null) {
-      overrides[_skipSecondsKey] = value;
+      overrides[key] = value;
       return;
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_skipSecondsKey, value);
+      await prefs.setInt(key, value);
     } catch (e) {
       debugPrint('UiPreferences: write failed: $e');
     }

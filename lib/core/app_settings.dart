@@ -117,7 +117,8 @@ class AppSettings extends ChangeNotifier {
   final ThemeMode? _forcedThemeMode;
 
   ThemeMode _themeMode;
-  int _skipSeconds;
+  int _skipBackSeconds = kSkipSeconds;
+  int _skipForwardSeconds = kSkipSeconds;
   double _defaultSpeed = 1.0;
   PlayerControlsStyle _controlsStyle = PlayerControlsStyle.tiles;
   PlayerControlsStyle _transportStyle = PlayerControlsStyle.round;
@@ -137,14 +138,17 @@ class AppSettings extends ChangeNotifier {
     ThemeMode? initialThemeMode,
   })  : _preferences = preferences,
         _forcedThemeMode = initialThemeMode,
-        _themeMode = initialThemeMode ?? ThemeMode.system,
-        _skipSeconds = kSkipSeconds;
+        _themeMode = initialThemeMode ?? ThemeMode.system;
 
   ThemeMode get themeMode => _themeMode;
 
-  /// How far the rewind/fast-forward controls jump. Always one of
+  /// How far the rewind control jumps. Always one of
+  /// [kSkipSecondsOptions]. Independent of [skipForwardSeconds].
+  int get skipBackSeconds => _skipBackSeconds;
+
+  /// How far the fast-forward control jumps. Always one of
   /// [kSkipSecondsOptions].
-  int get skipSeconds => _skipSeconds;
+  int get skipForwardSeconds => _skipForwardSeconds;
 
   /// The speed books open at unless they have their own. Always one of
   /// [kPlaybackSpeedOptions].
@@ -188,7 +192,8 @@ class AppSettings extends ChangeNotifier {
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
-    final storedSkip = await _preferences.getSkipSeconds();
+    final storedSkipBackSeconds = await _preferences.getSkipBackSeconds();
+    final storedSkipForwardSeconds = await _preferences.getSkipForwardSeconds();
     final storedSpeed = await _preferences.getDefaultSpeed();
     final storedStyle = await _preferences.getPlayerControlsStyle();
     final storedTransport = await _preferences.getTransportStyle();
@@ -212,7 +217,8 @@ class AppSettings extends ChangeNotifier {
         TextSizeChoice.fromName(await _preferences.getTextSizeName());
 
     if (storedTheme == _themeMode &&
-        storedSkip == _skipSeconds &&
+        storedSkipBackSeconds == _skipBackSeconds &&
+        storedSkipForwardSeconds == _skipForwardSeconds &&
         storedSpeed == _defaultSpeed &&
         storedStyle == _controlsStyle &&
         storedTransport == _transportStyle &&
@@ -229,7 +235,8 @@ class AppSettings extends ChangeNotifier {
       return;
     }
     _themeMode = storedTheme;
-    _skipSeconds = storedSkip;
+    _skipBackSeconds = storedSkipBackSeconds;
+    _skipForwardSeconds = storedSkipForwardSeconds;
     _defaultSpeed = storedSpeed;
     _controlsStyle = storedStyle;
     _transportStyle = storedTransport;
@@ -253,13 +260,23 @@ class AppSettings extends ChangeNotifier {
     await _preferences.setThemeMode(mode);
   }
 
-  Future<void> setSkipSeconds(int seconds) async {
-    if (seconds == _skipSeconds || !kSkipSecondsOptions.contains(seconds)) {
+  Future<void> setSkipBackSeconds(int seconds) async {
+    if (seconds == _skipBackSeconds || !kSkipSecondsOptions.contains(seconds)) {
       return;
     }
-    _skipSeconds = seconds;
+    _skipBackSeconds = seconds;
     notifyListeners();
-    await _preferences.setSkipSeconds(seconds);
+    await _preferences.setSkipBackSeconds(seconds);
+  }
+
+  Future<void> setSkipForwardSeconds(int seconds) async {
+    if (seconds == _skipForwardSeconds ||
+        !kSkipSecondsOptions.contains(seconds)) {
+      return;
+    }
+    _skipForwardSeconds = seconds;
+    notifyListeners();
+    await _preferences.setSkipForwardSeconds(seconds);
   }
 
   Future<void> setDefaultSpeed(double speed) async {

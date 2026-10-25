@@ -14,19 +14,16 @@ const List<double> kPlaybackSpeedOptions = [
   2.0,
 ];
 
-/// Skip amount (in seconds) for the rewind/fast-forward controls.
-///
-/// Material Icons only ships `_10_` and `_30_` suffixed skip glyphs (no
-/// `_15_` variant exists), so the icon can never literally match this
-/// value — see [SkipIntervalIcon] in `lib/widgets/skip_interval_icon.dart`,
-/// which renders a generic glyph with this number stamped on it instead of
-/// relying on a matching icon asset. Must stay in sync with
-/// `AudioPlaybackService`'s own `skipForward`/`skipBackward` defaults.
+/// The default skip amount (in seconds), used for both the rewind and the
+/// fast-forward controls until the user picks their own (they are separate
+/// settings: `AppSettings.skipBackSeconds` / `skipForwardSeconds`). The
+/// number is drawn beside the arrow by [SkipIntervalIcon]
+/// (`lib/widgets/skip_interval_icon.dart`), so any interval can be shown.
+/// Must stay in sync with `AudioPlaybackService`'s own
+/// `skipForward`/`skipBackward` defaults.
 const int kSkipSeconds = 15;
 
 /// Skip intervals offered in the settings panel. 15 is the default and the
 /// category convention; 10 suits dense non-fiction, 30 and 60 suit
-/// re-finding your place after drifting off. The stamped-number approach
-/// described above is what makes this configurable at all — an icon set
-/// with no `_15_` glyph could never have carried four.
-const List<int> kSkipSecondsOptions = [10, 15, 30, 60];
+/// re-finding your place after drifting off; 5 suits a quick re-listen.
+const List<int> kSkipSecondsOptions = [5, 10, 15, 30, 60];

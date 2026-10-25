@@ -1,4 +1,5 @@
 // ignore_for_file: prefer_const_constructors
+import '../helpers/sync_enabled.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +21,7 @@ import '../support/test_harness.dart';
 
 /// The Library's tile (grid) layout and the setting that switches to it.
 void main() {
+  enableSyncForTests();
   late AppDatabase db;
   late AudioPlaybackService audio;
   late HiddenBooksStore store;

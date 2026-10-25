@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import '../helpers/sync_enabled.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,6 +38,7 @@ const phoneSizes = <String, Size>{
 };
 
 void main() {
+  enableSyncForTests();
   late FakePlaybackService audio;
   // Real Inter, not the test font whose glyphs are all one em wide.
   setUpAll(loadGoldenFonts);

@@ -1,4 +1,5 @@
 // ignore_for_file: prefer_const_constructors
+import '../helpers/sync_enabled.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +21,7 @@ import '../support/fake_playback_service.dart';
 import '../support/test_harness.dart';
 
 void main() {
+  enableSyncForTests();
   late FakePlaybackService audio;
 
   setUp(() {
@@ -59,7 +61,7 @@ void main() {
     ));
     await pumpFrames(tester);
     await tester.tap(find.descendant(
-        of: find.byType(NavigationBar), matching: find.text('Settings')));
+        of: find.byType(NavigationBar), matching: find.byTooltip('Settings')));
     await pumpFrames(tester);
   }
 

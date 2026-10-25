@@ -93,6 +93,25 @@ enum TextSizeChoice {
       .firstWhere((t) => t.name == name, orElse: () => TextSizeChoice.system);
 }
 
+/// How big the cover is on Now Playing (phone layout). Stored by name;
+/// unknown falls back to [large], the original layout.
+enum CoverSize {
+  large('Large', 'Cover fills the screen width'),
+  medium('Medium', 'Smaller cover, bigger chapter details'),
+  stamp('Stamp', 'Postage-stamp cover beside the title');
+
+  final String label;
+  final String description;
+  const CoverSize(this.label, this.description);
+
+  /// The next size in the Large -> Medium -> Stamp -> Large cycle used by
+  /// the quick toggle on Now Playing.
+  CoverSize get next => CoverSize.values[(index + 1) % CoverSize.values.length];
+
+  static CoverSize fromName(String? name) => CoverSize.values
+      .firstWhere((c) => c.name == name, orElse: () => CoverSize.large);
+}
+
 /// Every user-adjustable preference, in one place, read from and written
 /// back to [UiPreferences].
 ///
@@ -117,7 +136,8 @@ class AppSettings extends ChangeNotifier {
   final ThemeMode? _forcedThemeMode;
 
   ThemeMode _themeMode;
-  int _skipSeconds;
+  int _skipBackSeconds = kSkipSeconds;
+  int _skipForwardSeconds = kSkipSeconds;
   double _defaultSpeed = 1.0;
   PlayerControlsStyle _controlsStyle = PlayerControlsStyle.tiles;
   PlayerControlsStyle _transportStyle = PlayerControlsStyle.round;
@@ -131,20 +151,24 @@ class AppSettings extends ChangeNotifier {
   SkipBackOnResume _skipBackOnResume = SkipBackOnResume.s5;
   AutoAdvance _autoAdvance = AutoAdvance.stop;
   TextSizeChoice _textSize = TextSizeChoice.system;
+  CoverSize _coverSize = CoverSize.large;
 
   AppSettings({
     required UiPreferences preferences,
     ThemeMode? initialThemeMode,
   })  : _preferences = preferences,
         _forcedThemeMode = initialThemeMode,
-        _themeMode = initialThemeMode ?? ThemeMode.system,
-        _skipSeconds = kSkipSeconds;
+        _themeMode = initialThemeMode ?? ThemeMode.system;
 
   ThemeMode get themeMode => _themeMode;
 
-  /// How far the rewind/fast-forward controls jump. Always one of
+  /// How far the rewind control jumps. Always one of
+  /// [kSkipSecondsOptions]. Independent of [skipForwardSeconds].
+  int get skipBackSeconds => _skipBackSeconds;
+
+  /// How far the fast-forward control jumps. Always one of
   /// [kSkipSecondsOptions].
-  int get skipSeconds => _skipSeconds;
+  int get skipForwardSeconds => _skipForwardSeconds;
 
   /// The speed books open at unless they have their own. Always one of
   /// [kPlaybackSpeedOptions].
@@ -185,10 +209,16 @@ class AppSettings extends ChangeNotifier {
   /// In-app text size (Settings > Appearance).
   TextSizeChoice get textSize => _textSize;
 
+  /// Cover size on Now Playing (Settings > Appearance, and a long-press on
+  /// the cover itself).
+  CoverSize get coverSize => _coverSize;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
+    await _loadCoverSize();
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
-    final storedSkip = await _preferences.getSkipSeconds();
+    final storedSkipBackSeconds = await _preferences.getSkipBackSeconds();
+    final storedSkipForwardSeconds = await _preferences.getSkipForwardSeconds();
     final storedSpeed = await _preferences.getDefaultSpeed();
     final storedStyle = await _preferences.getPlayerControlsStyle();
     final storedTransport = await _preferences.getTransportStyle();
@@ -212,7 +242,8 @@ class AppSettings extends ChangeNotifier {
         TextSizeChoice.fromName(await _preferences.getTextSizeName());
 
     if (storedTheme == _themeMode &&
-        storedSkip == _skipSeconds &&
+        storedSkipBackSeconds == _skipBackSeconds &&
+        storedSkipForwardSeconds == _skipForwardSeconds &&
         storedSpeed == _defaultSpeed &&
         storedStyle == _controlsStyle &&
         storedTransport == _transportStyle &&
@@ -229,7 +260,8 @@ class AppSettings extends ChangeNotifier {
       return;
     }
     _themeMode = storedTheme;
-    _skipSeconds = storedSkip;
+    _skipBackSeconds = storedSkipBackSeconds;
+    _skipForwardSeconds = storedSkipForwardSeconds;
     _defaultSpeed = storedSpeed;
     _controlsStyle = storedStyle;
     _transportStyle = storedTransport;
@@ -246,6 +278,20 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _loadCoverSize() async {
+    final stored = CoverSize.fromName(await _preferences.getCoverSizeName());
+    if (stored == _coverSize) return;
+    _coverSize = stored;
+    notifyListeners();
+  }
+
+  Future<void> setCoverSize(CoverSize value) async {
+    if (value == _coverSize) return;
+    _coverSize = value;
+    notifyListeners();
+    await _preferences.setCoverSizeName(value.name);
+  }
+
   Future<void> setThemeMode(ThemeMode mode) async {
     if (mode == _themeMode) return;
     _themeMode = mode;
@@ -253,13 +299,23 @@ class AppSettings extends ChangeNotifier {
     await _preferences.setThemeMode(mode);
   }
 
-  Future<void> setSkipSeconds(int seconds) async {
-    if (seconds == _skipSeconds || !kSkipSecondsOptions.contains(seconds)) {
+  Future<void> setSkipBackSeconds(int seconds) async {
+    if (seconds == _skipBackSeconds || !kSkipSecondsOptions.contains(seconds)) {
       return;
     }
-    _skipSeconds = seconds;
+    _skipBackSeconds = seconds;
     notifyListeners();
-    await _preferences.setSkipSeconds(seconds);
+    await _preferences.setSkipBackSeconds(seconds);
+  }
+
+  Future<void> setSkipForwardSeconds(int seconds) async {
+    if (seconds == _skipForwardSeconds ||
+        !kSkipSecondsOptions.contains(seconds)) {
+      return;
+    }
+    _skipForwardSeconds = seconds;
+    notifyListeners();
+    await _preferences.setSkipForwardSeconds(seconds);
   }
 
   Future<void> setDefaultSpeed(double speed) async {

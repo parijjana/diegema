@@ -207,6 +207,23 @@ class AppDatabase {
     );
   }
 
+  Future<void> setNarrators(String audiobookId, List<String> names) async {
+    final book = _audiobooks[audiobookId];
+    if (book == null) return;
+    _audiobooks[audiobookId] = domain.UnifiedAudiobook(
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      description: book.description,
+      coverArtUrlOrPath: book.coverArtUrlOrPath,
+      source: book.source,
+      origin: book.origin,
+      narrators: names,
+      chapters: book.chapters,
+      isDownloaded: book.isDownloaded,
+    );
+  }
+
   Future<void> addBookmark({
     required String id,
     required String audiobookId,

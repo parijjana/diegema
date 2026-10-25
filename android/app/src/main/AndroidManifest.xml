@@ -19,6 +19,13 @@
          its Cancel button. Asked for before the first download, Android
          13+. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Sync is off in v1 (DIEGEMA_SYNC), so the permissions that only the
+         sync plugins ask for are stripped from the merged manifest:
+         mobile_scanner (CAMERA + camera feature) and bonsoir
+         (CHANGE_WIFI_MULTICAST_STATE). Re-enable for v1.1 by removing these. -->
+    <uses-permission android:name="android.permission.CAMERA" tools:node="remove"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" tools:node="remove"/>
+    <uses-feature android:name="android.hardware.camera" tools:node="remove"/>
     <application
         android:label="Diegema"
         android:name="${applicationName}"
@@ -66,6 +73,15 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <!-- background_downloader declares its optional user-initiated-transfer
+             job service as a dataSync foreground-service type. Diegema never
+             uses that mode (no RUN_USER_INITIATED_JOBS), and a dataSync type
+             would need its own Play declaration, so the type is dropped. -->
+        <service
+            android:name="com.bbflight.background_downloader.UIDTJobService"
+            tools:remove="android:foregroundServiceType"
+            tools:node="merge"/>
 
         <receiver
             android:name="com.ryanheise.audioservice.MediaButtonReceiver"

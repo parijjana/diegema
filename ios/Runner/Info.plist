@@ -72,13 +72,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_diegema._tcp</string>
-	</array>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Diegema finds your other linked devices on this Wi-Fi to keep your place in each book in step.</string>
+	<!-- Sync is off in v1 (DIEGEMA_SYNC). mobile_scanner is still linked and
+	     references camera APIs, so Apple (ITMS-90683) wants a purpose string even
+	     though the camera is never opened. NSLocalNetworkUsageDescription and
+	     NSBonjourServices are gone: nothing advertises or browses on the network
+	     in v1. Restore them (_diegema._tcp) when sync returns in v1.1. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Diegema uses the camera only to scan a code shown by your other device.</string>
+	<string>Diegema does not use the camera in this version.</string>
 </dict>
 </plist>

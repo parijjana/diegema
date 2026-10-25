@@ -22,12 +22,14 @@ import 'services/ambience_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/diegema_audio_handler.dart';
 import 'services/download_manager.dart';
+import 'core/sync_flag.dart';
 import 'services/sync/sync_controller.dart';
 import 'services/sync/sync_scheduler.dart';
 import 'services/folder_access.dart';
 import 'services/demo_seed.dart';
 import 'services/librivox_downloader.dart';
 import 'services/librivox_service.dart';
+import 'services/windows_audio.dart';
 
 /// Kept alive for the app's lifetime; see the sync setup in [main].
 // ignore: unused_element
@@ -38,6 +40,7 @@ SyncScheduler? _syncScheduler;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installErrorHandlers();
+  initWindowsAudio(); // before any AudioPlayer exists
   if (!kIsWeb && await AppDatabase.isLibraryFromNewerVersion()) {
     runApp(const NewerLibraryApp());
     return;
@@ -110,7 +113,7 @@ Future<void> main() async {
     // linked devices on this network at launch and whenever the app goes to
     // the background or comes back. Not awaited:
     // working out a local book's key reads its files.
-    if (!kDemoMode) {
+    if (kSyncEnabled && !kDemoMode) {
       final s = sync = createSyncController(nativeDb);
       if (s != null) {
         unawaited(s.foreground());
@@ -124,7 +127,15 @@ Future<void> main() async {
         AudioPlaybackService(db: nativeDb, preferences: const UiPreferences());
     ambience = AmbienceService(book: audioService);
     try {
-      await initDiegemaAudioService(audioService, ambience: ambience);
+      const prefs = UiPreferences();
+      await initDiegemaAudioService(
+        audioService,
+        // Read from storage on every press, so a change in Settings reaches
+        // the headset and lock-screen skips with no restart.
+        skipBackSeconds: prefs.getSkipBackSeconds,
+        skipForwardSeconds: prefs.getSkipForwardSeconds,
+        ambience: ambience,
+      );
     } catch (e) {
       // A platform `audio_service` cannot set up on (or a misconfigured
       // manifest) must not block the app from starting — playback itself
@@ -145,6 +156,7 @@ Future<void> main() async {
   runApp(AudiobookApp(
     database: demoDb ?? nativeDb,
     runCoverBackfill: nativeDb != null,
+    runNarratorBackfill: nativeDb != null,
     runImportMigration: nativeDb != null,
     audioService: audioService,
     ambience: ambience,

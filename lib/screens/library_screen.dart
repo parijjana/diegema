@@ -136,7 +136,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _load() async {
-    final sync = context.getInheritedWidgetOfExactType<SyncScope>()?.controller;
+    final sync = SyncScope.peek(context);
     setState(() {
       _loading = true;
       _error = null;
@@ -657,16 +657,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
             // screen instead of trailing off into blank space — it costs
             // nothing when the list is already tall enough to fill the
             // viewport, since remaining space is then zero. The extra
-            // bottom padding keeps the floating Import button clear of
-            // the last row.
+            // bottom padding is just breathing room: the Import button
+            // has its own strip below the list.
             body = RefreshIndicator(
               onRefresh: _load,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                        gutter, 0, gutter, _LibraryFab.reservedHeight),
+                    padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Sp.x4),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
                         ...rows,
@@ -685,9 +684,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
           }
         }
 
-        return Stack(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Column(
+            Expanded(
+                child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
@@ -764,12 +765,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   ),
                 Expanded(child: body),
               ],
-            ),
+            )),
+            // Phone: the button gets its own strip under the list rather
+            // than floating over it, so no row is ever under the button,
+            // at the top of the list or the end. One-handed: it stays at
+            // the bottom right, in the thumb zone, above the mini player.
             if (!wide)
-              Positioned(
-                right: gutter,
-                bottom: Sp.x4,
-                child: _LibraryFab(onPressed: _import),
+              Padding(
+                padding: EdgeInsets.fromLTRB(gutter, Sp.x2, gutter, Sp.x2),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: _LibraryFab(onPressed: _import),
+                ),
               ),
           ],
         );
@@ -787,7 +794,8 @@ const ButtonStyle _pairedButton = ButtonStyle(
   ),
 );
 
-/// Phone-only floating "Import a book" button, replacing the header icon.
+/// Phone-only "Import a book" button in its own strip under the list,
+/// replacing the header icon.
 /// Sits above the mini player without any explicit coordination with it:
 /// `AppShell` renders the mini player as a sibling *below* this screen's
 /// own `Expanded` slot, so a `Positioned` bottom-anchored inside this
@@ -796,10 +804,6 @@ class _LibraryFab extends StatelessWidget {
   final VoidCallback onPressed;
   const _LibraryFab({required this.onPressed});
 
-  /// Vertical space the list must reserve at its end so the last row is
-  /// never covered: the button's own height plus the margin on each side
-  /// of it.
-  static const double reservedHeight = _height + Sp.x4 + Sp.x4;
   static const double _height = 56;
 
   @override
@@ -818,21 +822,27 @@ class _LibraryFab extends StatelessWidget {
           onTap: onPressed,
           borderRadius: R.md,
           child: Ink(
-            height: _height,
-            padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x5, 0),
+            // At least 56 tall, taller as the label grows with the text.
+            padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x5, Sp.x2),
             decoration: BoxDecoration(
               color: c.accentFill,
               borderRadius: R.md,
               boxShadow: c.shadow2,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.add_rounded, color: c.textOnAccent),
-                const SizedBox(width: Sp.x2),
-                Text('Import a book',
-                    style: AppType.label.copyWith(color: c.textOnAccent)),
-              ],
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _height - 2 * Sp.x2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_rounded, color: c.textOnAccent),
+                  const SizedBox(width: Sp.x2),
+                  // Flexible: wraps to a second line before it ever overflows.
+                  Flexible(
+                    child: Text('Import a book',
+                        style: AppType.label.copyWith(color: c.textOnAccent)),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1299,7 +1309,7 @@ List<UnifiedAudiobook> applyLibraryView(
 
 /// Sort menu and filter chips, one horizontally scrolling row so it never
 /// overflows at large text scales. Every control is at least 48dp tall.
-class _SortFilterBar extends StatelessWidget {
+class _SortFilterBar extends StatefulWidget {
   final double gutter;
   final LibrarySort sort;
   final LibraryFilter filter;
@@ -1315,60 +1325,122 @@ class _SortFilterBar extends StatelessWidget {
   });
 
   @override
+  State<_SortFilterBar> createState() => _SortFilterBarState();
+}
+
+class _SortFilterBarState extends State<_SortFilterBar> {
+  final _scroll = ScrollController();
+
+  /// Which edges have more row beyond them; drives the fades that tell the
+  /// reader the chips scroll.
+  bool _moreStart = false;
+  bool _moreEnd = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_update);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _update() {
+    if (!_scroll.hasClients) return;
+    final p = _scroll.position;
+    final start = p.pixels > 1;
+    final end = p.pixels < p.maxScrollExtent - 1;
+    if (start != _moreStart || end != _moreEnd) {
+      setState(() {
+        _moreStart = start;
+        _moreEnd = end;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final gutter = widget.gutter;
+    final sort = widget.sort;
+    final filter = widget.filter;
+    final onSort = widget.onSort;
+    final onFilter = widget.onFilter;
+    // The extents are only known after layout; check once it has happened.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _update();
+    });
     return Padding(
       padding: const EdgeInsets.only(bottom: Sp.x2),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: gutter),
-        child: Row(
-          children: [
-            PopupMenuButton<LibrarySort>(
-              tooltip: 'Sort books',
-              initialValue: sort,
-              onSelected: onSort,
-              itemBuilder: (context) => [
-                for (final s in LibrarySort.values)
-                  PopupMenuItem(
-                    value: s,
-                    child: Text(s.label, style: AppType.body),
-                  ),
-              ],
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                    minHeight: Dim.tapMin, minWidth: Dim.tapMin),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.sort_rounded, color: c.textSecondary),
-                      const SizedBox(width: Sp.x2),
-                      Text('Sort: ${sort.label}',
-                          style: AppType.label.copyWith(color: c.text)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: Sp.x2),
-            for (final f in LibraryFilter.values)
-              Padding(
-                padding: const EdgeInsets.only(right: Sp.x2),
+      child: ShaderMask(
+        // Fade the clipped edge out so a half-visible chip reads as "more
+        // this way" rather than as a mistake. Not a Material scrollbar:
+        // those do not show on touch.
+        shaderCallback: (rect) => LinearGradient(
+          colors: [
+            _moreStart ? Colors.transparent : Colors.white,
+            Colors.white,
+            Colors.white,
+            _moreEnd ? Colors.transparent : Colors.white,
+          ],
+          stops: const [0, 0.08, 0.92, 1],
+        ).createShader(rect),
+        blendMode: BlendMode.dstIn,
+        child: SingleChildScrollView(
+          controller: _scroll,
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: gutter),
+          child: Row(
+            children: [
+              PopupMenuButton<LibrarySort>(
+                tooltip: 'Sort books',
+                initialValue: sort,
+                onSelected: onSort,
+                itemBuilder: (context) => [
+                  for (final s in LibrarySort.values)
+                    PopupMenuItem(
+                      value: s,
+                      child: Text(s.label, style: AppType.body),
+                    ),
+                ],
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: Dim.tapMin),
-                  child: Center(
-                    child: ChoiceChip(
-                      label: Text(f.label),
-                      selected: f == filter,
-                      materialTapTargetSize: MaterialTapTargetSize.padded,
-                      onSelected: (_) => onFilter(f),
+                  constraints: const BoxConstraints(
+                      minHeight: Dim.tapMin, minWidth: Dim.tapMin),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.sort_rounded, color: c.textSecondary),
+                        const SizedBox(width: Sp.x2),
+                        Text('Sort: ${sort.label}',
+                            style: AppType.label.copyWith(color: c.text)),
+                      ],
                     ),
                   ),
                 ),
               ),
-          ],
+              const SizedBox(width: Sp.x2),
+              for (final f in LibraryFilter.values)
+                Padding(
+                  padding: const EdgeInsets.only(right: Sp.x2),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: Dim.tapMin),
+                    child: Center(
+                      child: ChoiceChip(
+                        label: Text(f.label),
+                        selected: f == filter,
+                        materialTapTargetSize: MaterialTapTargetSize.padded,
+                        onSelected: (_) => onFilter(f),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

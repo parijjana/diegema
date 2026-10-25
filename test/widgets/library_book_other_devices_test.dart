@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import '../helpers/sync_enabled.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:diegema/database/app_database.dart';
@@ -13,6 +14,7 @@ import '../support/fake_playback_service.dart';
 import '../support/test_harness.dart';
 
 void main() {
+  enableSyncForTests();
   late AppDatabase db;
   late FakePlaybackService audio;
 

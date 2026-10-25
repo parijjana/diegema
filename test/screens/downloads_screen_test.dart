@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -92,7 +93,7 @@ void main() {
     ));
     await pumpFrames(tester);
     await tester.tap(find.descendant(
-        of: find.byType(NavigationBar), matching: find.text('Settings')));
+        of: find.byType(NavigationBar), matching: find.byTooltip('Settings')));
     await pumpFrames(tester);
     final toggle = find.text('Download on Wi-Fi only');
     await tester.scrollUntilVisible(toggle, 120,
@@ -189,4 +190,27 @@ void main() {
       await unmount(tester);
     });
   }
+
+  testWidgets('no Wi-Fi only toggle on Windows, where it would do nothing',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    try {
+      final settings =
+          AppSettings(preferences: const UiPreferences(overrides: {}));
+      addTearDown(settings.dispose);
+      await tester.pumpWidget(SettingsScope(
+        settings: settings,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: DownloadsScreen(db: db, manager: downloads),
+        ),
+      ));
+      await pumpFrames(tester);
+      expect(find.text('Download on Wi-Fi only'), findsNothing);
+      expect(find.text('In progress'), findsOneWidget);
+      await unmount(tester);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }

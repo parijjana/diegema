@@ -7,6 +7,7 @@ import '../domain/models/audiobook.dart';
 import 'downloads_location_io.dart';
 import 'library_locations_store.dart';
 import 'removed_books_store.dart';
+import 'storage_access_io.dart';
 import 'local_audiobook_import_io.dart' show chaptersForFiles;
 import 'local_book_metadata_io.dart';
 
@@ -43,7 +44,12 @@ Future<int> scanLibraryLocations(
   String? only,
   RemovedBooksStore removedStore = const RemovedBooksStore(),
   DownloadsLocation downloads = const DownloadsLocation(),
+  Future<bool> Function() canReadSharedAudio = hasAudioReadAccess,
 }) async {
+  // Without the audio permission (Android, right after a reinstall) every
+  // file in a location reads as missing, and the vanished-book sweep below
+  // would forget the whole shelf. Leave it alone until access is back.
+  if (!await canReadSharedAudio()) return 0;
   final removed = await removedStore.read();
   final locations = only != null ? [only] : await store.read();
   final skip = await downloads.all();

@@ -59,13 +59,14 @@ void main() {
     ));
     await pumpFrames(tester);
     await tester.tap(find.descendant(
-        of: find.byType(NavigationBar), matching: find.text('Settings')));
+        of: find.byType(NavigationBar), matching: find.byTooltip('Settings')));
     await pumpFrames(tester);
   }
 
   Future<void> openLinkedDevices(WidgetTester tester) async {
     final row = find.text('Linked devices');
     await tester.scrollUntilVisible(row, 120,
+        maxScrolls: 200,
         scrollable: find
             .descendant(
                 of: find.byType(ListView), matching: find.byType(Scrollable))

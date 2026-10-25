@@ -69,6 +69,21 @@ class LibraryTileGrid extends StatelessWidget {
   }
 }
 
+/// The label ("Version 2") shown under a title when several library books
+/// share it. Wraps rather than truncates: the part that differs must stay
+/// readable.
+class VariantLabel extends StatelessWidget {
+  final String label;
+  const VariantLabel({super.key, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Text(label,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: AppType.caption.copyWith(
+          color: context.colors.accentText, fontWeight: FontWeight.w600));
+}
+
 /// One book as a card: cover, title (2 lines), author (1 line), and a
 /// progress bar or caption. Presentational only; the caller supplies the
 /// same tap and long-press callbacks its list row uses.
@@ -80,6 +95,9 @@ class LibraryTile extends StatefulWidget {
   final Widget cover;
   final String title;
   final String author;
+
+  /// Set only when other library books share this title.
+  final String? variant;
 
   /// 0.0-1.0 draws the thin accent bar; null draws none.
   final double? progress;
@@ -101,6 +119,7 @@ class LibraryTile extends StatefulWidget {
     required this.semanticsLabel,
     required this.onTap,
     this.onLongPress,
+    this.variant,
     this.progress,
     this.caption,
     this.captionAccent = false,
@@ -162,6 +181,8 @@ class _LibraryTileState extends State<LibraryTile> {
                     overflow: TextOverflow.ellipsis,
                     style: AppType.caption.copyWith(color: c.textSecondary),
                   ),
+                if (widget.variant != null)
+                  VariantLabel(label: widget.variant!),
                 if (widget.progress != null) ...[
                   const SizedBox(height: Sp.x2),
                   ClipRRect(

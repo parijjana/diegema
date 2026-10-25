@@ -8,7 +8,9 @@ import '../services/hidden_books_store.dart';
 import '../services/local_library_scanner.dart';
 import '../services/sync/sync_controller.dart';
 import '../sync/sync_view.dart';
+import '../core/utils/book_identity.dart';
 import '../core/utils/sync_format.dart';
+import '../core/utils/title_variants.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
@@ -96,6 +98,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
   /// dividing by zero.
   final Map<String, double?> _progressById = {};
 
+  /// Last-played time, fraction and finished flag for every book that has a
+  /// saved position; what Sort and Filter work from.
+  final Map<String, LibraryBookStats> _stats = {};
+
   bool _loading = true;
   Object? _error;
 
@@ -146,10 +152,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
           localKeys = (await sync.portableKeys()).values.toSet();
         } catch (_) {}
       }
-      final progressById = <String, double?>{};
-      for (final book in inProgress) {
-        progressById[book.id] = await _fractionComplete(book);
+      final stats = <String, LibraryBookStats>{};
+      for (final book in books) {
+        final st = await _statsFor(book);
+        if (st != null) stats[book.id] = st;
       }
+      final progressById = <String, double?>{
+        for (final book in inProgress) book.id: stats[book.id]?.fraction,
+      };
       if (!mounted) return;
       setState(() {
         _hidden = hidden;
@@ -159,6 +169,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
         _progressById
           ..clear()
           ..addAll(progressById);
+        _stats
+          ..clear()
+          ..addAll(stats);
         _loading = false;
       });
     } catch (e) {
@@ -174,24 +187,35 @@ class _LibraryScreenState extends State<LibraryScreen> {
   /// `PlaybackProgress.positionSeconds` is a position *within
   /// `chapterIndex`*, not an absolute offset into the book, so the
   /// fraction is the sum of every prior chapter's duration plus the
-  /// current position, over the sum of all chapter durations. Returns
-  /// `null` when the total is `0` (nothing probed yet) rather than
-  /// dividing by zero.
-  Future<double?> _fractionComplete(UnifiedAudiobook book) async {
+  /// current position, over the sum of all chapter durations. The fraction
+  /// is `null` when the total is `0` (nothing probed yet) rather than
+  /// dividing by zero. A negative position is the "finished" marker.
+  Future<LibraryBookStats?> _statsFor(UnifiedAudiobook book) async {
     final progress = await widget.db.getProgress(book.id);
     if (progress == null) return null;
+    final marked = progress.positionSeconds < 0;
 
+    double? fraction;
     final totalSeconds =
         book.chapters.fold<int>(0, (sum, ch) => sum + ch.durationSeconds);
-    if (totalSeconds <= 0) return null;
-
-    var elapsedSeconds = progress.positionSeconds;
-    for (var i = 0;
-        i < progress.chapterIndex && i < book.chapters.length;
-        i++) {
-      elapsedSeconds += book.chapters[i].durationSeconds;
+    if (marked) {
+      fraction = 1;
+    } else if (totalSeconds > 0) {
+      var elapsedSeconds = progress.positionSeconds;
+      for (var i = 0;
+          i < progress.chapterIndex && i < book.chapters.length;
+          i++) {
+        elapsedSeconds += book.chapters[i].durationSeconds;
+      }
+      fraction = (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
     }
-    return (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
+    return LibraryBookStats(
+      lastPlayed: progress.updatedAt,
+      fraction: fraction,
+      finished: marked ||
+          (fraction != null &&
+              fraction >= AppDatabase.continueListeningMaxProgressFraction),
+    );
   }
 
   void _import() =>
@@ -436,6 +460,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final remote = _remoteBooks(syncView);
     final settings = SettingsScope.maybeOf(context);
     final tiles = settings?.libraryLayout == LibraryLayout.tiles;
+    final sort = settings?.librarySort ?? LibrarySort.recent;
+    final filter = settings?.libraryFilter ?? LibraryFilter.all;
+    final inProgressIds = {for (final b in _inProgress) b.id};
+    final variants = libraryVariantLabels(_books);
+    final shown = applyLibraryView(
+      _books,
+      sort: sort,
+      filter: filter,
+      stats: _stats,
+      inProgressIds: inProgressIds,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -488,6 +523,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ),
             ),
           );
+        } else if (shown.isEmpty && filter != LibraryFilter.all) {
+          body = AppStateView.empty(
+            icon: Icons.filter_list_off_rounded,
+            headline: 'No ${filter.label.toLowerCase()} books',
+            body: 'Nothing in your library matches this filter.',
+            action: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: FilledButton(
+                style: _pairedButton,
+                onPressed: () => settings?.setLibraryFilter(LibraryFilter.all),
+                child: const Text('Show all books'),
+              ),
+            ),
+          );
         } else {
           // "In progress" is omitted entirely when nothing qualifies — no
           // empty-state placeholder for it — so the plain all-books list
@@ -495,7 +544,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           // existed. A book that is in progress deliberately appears in
           // both sections; see `_inProgress`'s doc comment.
           final rows = <Widget>[
-            if (_inProgress.isNotEmpty) ...[
+            if (_inProgress.isNotEmpty && filter == LibraryFilter.all) ...[
               const _SectionHeader(title: 'In progress'),
               const SizedBox(height: Sp.x3),
               if (tiles)
@@ -506,6 +555,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     final p = _progressById[book.id];
                     return _BookTile(
                       book: book,
+                      variant: variants[book.id],
                       coverSize: size,
                       progress: p,
                       caption: p == null
@@ -526,6 +576,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     padding: const EdgeInsets.only(bottom: Sp.listGap),
                     child: _InProgressRow(
                       book: book,
+                      variant: variants[book.id],
                       progress: _progressById[book.id],
                       compact: !wide,
                       onTap: () => _openDetail(context, book, wide: wide),
@@ -539,14 +590,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ],
             if (tiles)
               LibraryTileGrid(
-                count: _books.length,
+                count: shown.length,
                 itemBuilder: (context, i, size) {
-                  final book = _books[i];
-                  final isInProgress = _inProgress.any((b) => b.id == book.id);
+                  final book = shown[i];
+                  final isInProgress = inProgressIds.contains(book.id);
                   final p = isInProgress ? _progressById[book.id] : null;
                   final chapters = book.chapters.length;
                   return _BookTile(
                     book: book,
+                    variant: variants[book.id],
                     coverSize: size,
                     progress: p,
                     caption: isInProgress
@@ -568,19 +620,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 },
               )
             else
-              ..._books.map(
+              ...shown.map(
                 (book) => Padding(
                   padding: const EdgeInsets.only(bottom: Sp.listGap),
                   child: _BookRow(
                     book: book,
-                    inProgress: _inProgress.any((b) => b.id == book.id),
+                    variant: variants[book.id],
+                    inProgress: inProgressIds.contains(book.id),
                     progress: _progressById[book.id],
                     onTap: () => _openDetail(context, book, wide: wide),
                     onLongPress: () => _showTileMenu(context, book),
                   ),
                 ),
               ),
-            if (remote.isNotEmpty) ...[
+            if (remote.isNotEmpty && filter == LibraryFilter.all) ...[
               const SizedBox(height: Sp.sectionGap),
               RemoteBooksSection(
                 view: syncView!,
@@ -604,16 +657,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
             // screen instead of trailing off into blank space — it costs
             // nothing when the list is already tall enough to fill the
             // viewport, since remaining space is then zero. The extra
-            // bottom padding keeps the floating Import button clear of
-            // the last row.
+            // bottom padding is just breathing room: the Import button
+            // has its own strip below the list.
             body = RefreshIndicator(
               onRefresh: _load,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                        gutter, 0, gutter, _LibraryFab.reservedHeight),
+                    padding: EdgeInsets.fromLTRB(gutter, 0, gutter, Sp.x4),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
                         ...rows,
@@ -632,9 +684,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
           }
         }
 
-        return Stack(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Column(
+            Expanded(
+                child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
@@ -698,14 +752,31 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     ],
                   ),
                 ),
+                if (settings != null &&
+                    !_loading &&
+                    _error == null &&
+                    _books.isNotEmpty)
+                  _SortFilterBar(
+                    gutter: gutter,
+                    sort: sort,
+                    filter: filter,
+                    onSort: settings.setLibrarySort,
+                    onFilter: settings.setLibraryFilter,
+                  ),
                 Expanded(child: body),
               ],
-            ),
+            )),
+            // Phone: the button gets its own strip under the list rather
+            // than floating over it, so no row is ever under the button,
+            // at the top of the list or the end. One-handed: it stays at
+            // the bottom right, in the thumb zone, above the mini player.
             if (!wide)
-              Positioned(
-                right: gutter,
-                bottom: Sp.x4,
-                child: _LibraryFab(onPressed: _import),
+              Padding(
+                padding: EdgeInsets.fromLTRB(gutter, Sp.x2, gutter, Sp.x2),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: _LibraryFab(onPressed: _import),
+                ),
               ),
           ],
         );
@@ -723,7 +794,8 @@ const ButtonStyle _pairedButton = ButtonStyle(
   ),
 );
 
-/// Phone-only floating "Import a book" button, replacing the header icon.
+/// Phone-only "Import a book" button in its own strip under the list,
+/// replacing the header icon.
 /// Sits above the mini player without any explicit coordination with it:
 /// `AppShell` renders the mini player as a sibling *below* this screen's
 /// own `Expanded` slot, so a `Positioned` bottom-anchored inside this
@@ -732,10 +804,6 @@ class _LibraryFab extends StatelessWidget {
   final VoidCallback onPressed;
   const _LibraryFab({required this.onPressed});
 
-  /// Vertical space the list must reserve at its end so the last row is
-  /// never covered: the button's own height plus the margin on each side
-  /// of it.
-  static const double reservedHeight = _height + Sp.x4 + Sp.x4;
   static const double _height = 56;
 
   @override
@@ -754,21 +822,27 @@ class _LibraryFab extends StatelessWidget {
           onTap: onPressed,
           borderRadius: R.md,
           child: Ink(
-            height: _height,
-            padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x5, 0),
+            // At least 56 tall, taller as the label grows with the text.
+            padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x5, Sp.x2),
             decoration: BoxDecoration(
               color: c.accentFill,
               borderRadius: R.md,
               boxShadow: c.shadow2,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.add_rounded, color: c.textOnAccent),
-                const SizedBox(width: Sp.x2),
-                Text('Import a book',
-                    style: AppType.label.copyWith(color: c.textOnAccent)),
-              ],
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _height - 2 * Sp.x2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_rounded, color: c.textOnAccent),
+                  const SizedBox(width: Sp.x2),
+                  // Flexible: wraps to a second line before it ever overflows.
+                  Flexible(
+                    child: Text('Import a book',
+                        style: AppType.label.copyWith(color: c.textOnAccent)),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -873,9 +947,11 @@ class _InProgressRow extends StatelessWidget {
   /// Phone gets a tighter card (per the approved mockup: a 64x64 cover
   /// rather than the 56x56 one wide keeps).
   final bool compact;
+  final String? variant;
 
   const _InProgressRow({
     required this.book,
+    this.variant,
     required this.progress,
     required this.onTap,
     this.onLongPress,
@@ -941,6 +1017,7 @@ class _InProgressRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppType.body.copyWith(color: c.textSecondary),
                       ),
+                      if (variant != null) VariantLabel(label: variant!),
                       const SizedBox(height: Sp.x2),
                       if (percentLabel != null) ...[
                         _AccentProgressBar(value: progress!),
@@ -985,9 +1062,11 @@ class _BookTile extends StatelessWidget {
   final String semanticsLabel;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final String? variant;
 
   const _BookTile({
     required this.book,
+    this.variant,
     required this.coverSize,
     required this.progress,
     required this.caption,
@@ -1009,6 +1088,7 @@ class _BookTile extends StatelessWidget {
       ),
       title: book.title,
       author: book.author,
+      variant: variant,
       progress: progress,
       caption: caption,
       captionAccent: captionAccent,
@@ -1035,9 +1115,11 @@ class _BookRow extends StatelessWidget {
   final bool inProgress;
   final double? progress;
   final VoidCallback? onLongPress;
+  final String? variant;
 
   const _BookRow({
     required this.book,
+    this.variant,
     required this.onTap,
     this.onLongPress,
     this.inProgress = false,
@@ -1102,6 +1184,7 @@ class _BookRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppType.body.copyWith(color: c.textSecondary),
                       ),
+                      if (variant != null) VariantLabel(label: variant!),
                       const SizedBox(height: Sp.x1),
                       if (inProgress && progress != null) ...[
                         _AccentProgressBar(value: progress!),
@@ -1137,6 +1220,226 @@ class _BookRow extends StatelessWidget {
                     size: Dim.iconXl, color: c.accentText),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What Sort and Filter know about one book's listening.
+class LibraryBookStats {
+  final DateTime lastPlayed;
+
+  /// 0..1 of the book, or null when its runtime is unknown.
+  final double? fraction;
+  final bool finished;
+
+  const LibraryBookStats({
+    required this.lastPlayed,
+    required this.fraction,
+    required this.finished,
+  });
+}
+
+/// Filters then sorts [books] for the Library. Pure, so it is tested
+/// directly. The caller passes the already un-hidden list; hidden books
+/// never reach here, whatever the filter. Sorts are stable, so ties keep
+/// the library's own order.
+///
+/// - Recent: last played first; never-played books follow in library order.
+/// - Progress: furthest along first; never-started books last.
+List<UnifiedAudiobook> applyLibraryView(
+  List<UnifiedAudiobook> books, {
+  required LibrarySort sort,
+  required LibraryFilter filter,
+  required Map<String, LibraryBookStats> stats,
+  required Set<String> inProgressIds,
+}) {
+  bool keep(UnifiedAudiobook b) {
+    switch (filter) {
+      case LibraryFilter.all:
+        return true;
+      case LibraryFilter.inProgress:
+        return inProgressIds.contains(b.id);
+      case LibraryFilter.finished:
+        return stats[b.id]?.finished ?? false;
+      case LibraryFilter.downloaded:
+        // Downloaded from LibriVox. Local books are on the device too (their
+        // isDownloaded is true), but they have the Local filter; counting
+        // them here made Downloaded match almost the whole library.
+        return b.origin == BookIdentity.originLibrivox && b.isDownloaded;
+      case LibraryFilter.local:
+        return b.origin == BookIdentity.originLocal;
+    }
+  }
+
+  final indexed = [
+    for (var i = 0; i < books.length; i++)
+      if (keep(books[i])) (i, books[i]),
+  ];
+  int byText(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
+  int compare((int, UnifiedAudiobook) x, (int, UnifiedAudiobook) y) {
+    final a = x.$2, b = y.$2;
+    final int r;
+    switch (sort) {
+      case LibrarySort.recent:
+        final ta = stats[a.id]?.lastPlayed, tb = stats[b.id]?.lastPlayed;
+        r = ta == null && tb == null
+            ? 0
+            : ta == null
+                ? 1
+                : tb == null
+                    ? -1
+                    : tb.compareTo(ta);
+      case LibrarySort.title:
+        r = byText(a.title, b.title);
+      case LibrarySort.author:
+        r = byText(a.author, b.author);
+      case LibrarySort.progress:
+        double f(UnifiedAudiobook k) => stats[k.id]?.fraction ?? -1;
+        r = f(b).compareTo(f(a));
+    }
+    return r != 0 ? r : x.$1.compareTo(y.$1);
+  }
+
+  indexed.sort(compare);
+  return [for (final e in indexed) e.$2];
+}
+
+/// Sort menu and filter chips, one horizontally scrolling row so it never
+/// overflows at large text scales. Every control is at least 48dp tall.
+class _SortFilterBar extends StatefulWidget {
+  final double gutter;
+  final LibrarySort sort;
+  final LibraryFilter filter;
+  final ValueChanged<LibrarySort> onSort;
+  final ValueChanged<LibraryFilter> onFilter;
+
+  const _SortFilterBar({
+    required this.gutter,
+    required this.sort,
+    required this.filter,
+    required this.onSort,
+    required this.onFilter,
+  });
+
+  @override
+  State<_SortFilterBar> createState() => _SortFilterBarState();
+}
+
+class _SortFilterBarState extends State<_SortFilterBar> {
+  final _scroll = ScrollController();
+
+  /// Which edges have more row beyond them; drives the fades that tell the
+  /// reader the chips scroll.
+  bool _moreStart = false;
+  bool _moreEnd = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_update);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _update() {
+    if (!_scroll.hasClients) return;
+    final p = _scroll.position;
+    final start = p.pixels > 1;
+    final end = p.pixels < p.maxScrollExtent - 1;
+    if (start != _moreStart || end != _moreEnd) {
+      setState(() {
+        _moreStart = start;
+        _moreEnd = end;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final gutter = widget.gutter;
+    final sort = widget.sort;
+    final filter = widget.filter;
+    final onSort = widget.onSort;
+    final onFilter = widget.onFilter;
+    // The extents are only known after layout; check once it has happened.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _update();
+    });
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sp.x2),
+      child: ShaderMask(
+        // Fade the clipped edge out so a half-visible chip reads as "more
+        // this way" rather than as a mistake. Not a Material scrollbar:
+        // those do not show on touch.
+        shaderCallback: (rect) => LinearGradient(
+          colors: [
+            _moreStart ? Colors.transparent : Colors.white,
+            Colors.white,
+            Colors.white,
+            _moreEnd ? Colors.transparent : Colors.white,
+          ],
+          stops: const [0, 0.08, 0.92, 1],
+        ).createShader(rect),
+        blendMode: BlendMode.dstIn,
+        child: SingleChildScrollView(
+          controller: _scroll,
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: gutter),
+          child: Row(
+            children: [
+              PopupMenuButton<LibrarySort>(
+                tooltip: 'Sort books',
+                initialValue: sort,
+                onSelected: onSort,
+                itemBuilder: (context) => [
+                  for (final s in LibrarySort.values)
+                    PopupMenuItem(
+                      value: s,
+                      child: Text(s.label, style: AppType.body),
+                    ),
+                ],
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                      minHeight: Dim.tapMin, minWidth: Dim.tapMin),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.sort_rounded, color: c.textSecondary),
+                        const SizedBox(width: Sp.x2),
+                        Text('Sort: ${sort.label}',
+                            style: AppType.label.copyWith(color: c.text)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: Sp.x2),
+              for (final f in LibraryFilter.values)
+                Padding(
+                  padding: const EdgeInsets.only(right: Sp.x2),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: Dim.tapMin),
+                    child: Center(
+                      child: ChoiceChip(
+                        label: Text(f.label),
+                        selected: f == filter,
+                        materialTapTargetSize: MaterialTapTargetSize.padded,
+                        onSelected: (_) => onFilter(f),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

@@ -6,6 +6,7 @@ import 'core/app_settings.dart';
 import 'core/demo_deeplink.dart';
 import 'core/demo_mode.dart';
 import 'core/host_page_demo_notice.dart';
+import 'core/text_size.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'main.dart';
@@ -19,6 +20,7 @@ import 'services/librivox_service.dart';
 import 'services/ambience_service.dart';
 import 'services/local_cover_backfill_service.dart';
 import 'services/local_import_migration_service.dart';
+import 'services/narrator_backfill_service.dart';
 import 'theme/app_theme.dart';
 
 /// Root widget. [database], [libriVoxService], [downloader], and
@@ -34,6 +36,11 @@ class AudiobookApp extends StatefulWidget {
   /// Whether to run the once-per-launch cover backfill for imported books.
   /// Only `main.dart` turns this on.
   final bool runCoverBackfill;
+
+  /// One-off fill of readers for LibriVox books saved before schema v5
+  /// (see `services/narrator_backfill_service.dart`). Opt-in like
+  /// [runCoverBackfill]: tests and the demo never make the network calls.
+  final bool runNarratorBackfill;
 
   /// Whether to run the once-per-launch local-import path migration (moves
   /// already-imported chapters that still point outside
@@ -90,6 +97,7 @@ class AudiobookApp extends StatefulWidget {
     this.initialThemeMode,
     this.database,
     this.runCoverBackfill = false,
+    this.runNarratorBackfill = false,
     this.runImportMigration = false,
     this.libriVoxService,
     this.downloader,
@@ -140,7 +148,10 @@ class _AudiobookAppState extends State<AudiobookApp>
     // too (for background playback), which would silently disable this in
     // the real app. Tests leave both off so they never touch real storage
     // or hit [CoverLookupService]'s real network client.
-    if (!kDemoMode && (widget.runImportMigration || widget.runCoverBackfill)) {
+    if (!kDemoMode &&
+        (widget.runImportMigration ||
+            widget.runCoverBackfill ||
+            widget.runNarratorBackfill)) {
       unawaited(_runStartupMaintenance());
     }
   }
@@ -151,6 +162,11 @@ class _AudiobookAppState extends State<AudiobookApp>
     }
     if (widget.runCoverBackfill) {
       await LocalCoverBackfillService(db: _db).run();
+    }
+    if (widget.runNarratorBackfill) {
+      await NarratorBackfillService(
+              db: _db, service: widget.libriVoxService ?? LibriVoxService())
+          .run();
     }
   }
 
@@ -235,6 +251,16 @@ class _AudiobookAppState extends State<AudiobookApp>
             background: _settings.background,
             shadows: _settings.shadows),
         themeMode: _settings.themeMode,
+        builder: (context, child) {
+          final choice = _settings.textSize;
+          if (choice == TextSizeChoice.system) return child!;
+          final media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(
+                textScaler: AppTextScaler(media.textScaler, choice.factor)),
+            child: child!,
+          );
+        },
         home: HomeScreen(
           db: _db,
           preferences: widget.preferences,

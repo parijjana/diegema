@@ -64,16 +64,12 @@ class DiscoverScreen extends StatefulWidget {
 }
 
 class _DiscoverScreenState extends State<DiscoverScreen> {
-  /// Vertical space kept clear at the bottom of every scrollable on phone
-  /// widths, so the floating search field never permanently covers the
-  /// last shelf heading or an empty state's button. The field is ~52px
-  /// tall and sits [Sp.x4] off the bottom; the rest is breathing room.
-  ///
-  /// It floats *over* content by design (thumb reach beats a fixed bar),
-  /// but "floats over" has to mean "you can scroll past it", not "the
-  /// bottom of the page is unreachable" — which is what a 360x800 capture
-  /// showed: the "Top fiction" heading sat permanently behind the field.
-  static const double _floatingSearchReserve = 96;
+  /// Breathing room under the last row on phone widths. The search field
+  /// has its own strip below the list, so nothing needs reserving for it.
+  static const double _floatingSearchReserve = Sp.x4;
+
+  /// Results per search page. A short page means the catalog has run out.
+  static const int _searchPageSize = 20;
 
   static const List<({String name, String query})> _categories = [
     (name: 'Featured', query: ''),
@@ -100,6 +96,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _shelvesLoading = true;
   Object? _shelvesError;
   List<LibriVoxBook> _results = [];
+
+  /// Paging state for the current search. The next page is only fetched on
+  /// an explicit "Load more" tap, never ahead of time: archive.org is a
+  /// shared, free service and most searches never need page two.
+  String _searchTerm = '';
+  int _pagesLoaded = 0;
+  bool _hasMore = false;
+  bool _loadingMore = false;
+  bool _loadMoreFailed = false;
+
+  /// Bumped by every new search or clear, so a page that was still in
+  /// flight for the old one is dropped when it lands.
+  int _searchGeneration = 0;
   LibriVoxBook? _selected;
   bool _loading = true;
   bool _searching = false;
@@ -196,21 +205,30 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       setState(() => _searching = false);
       return;
     }
+    final generation = ++_searchGeneration;
     setState(() {
       _loading = true;
       _searching = true;
       _error = null;
+      _searchTerm = term;
+      _pagesLoaded = 0;
+      _hasMore = false;
+      _loadingMore = false;
+      _loadMoreFailed = false;
     });
     try {
-      final results = await widget.libriVoxService.searchBooks(term, limit: 20);
-      if (!mounted) return;
+      final results = await widget.libriVoxService
+          .searchBooks(term, limit: _searchPageSize);
+      if (!mounted || generation != _searchGeneration) return;
       setState(() {
         _results = results;
+        _pagesLoaded = 1;
+        _hasMore = results.length >= _searchPageSize;
         _loading = false;
         if (results.isNotEmpty) _selected = results.first;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _searchGeneration) return;
       setState(() {
         _error = e;
         _loading = false;
@@ -218,11 +236,44 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
+  /// Fetches the next page of the current search and appends it, skipping
+  /// anything already listed (a catalog that shifts between pages can
+  /// repeat a book). The service caches each page under its own key.
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    final generation = _searchGeneration;
+    setState(() {
+      _loadingMore = true;
+      _loadMoreFailed = false;
+    });
+    try {
+      final page = await widget.libriVoxService.searchBooks(_searchTerm,
+          limit: _searchPageSize, offset: _pagesLoaded * _searchPageSize);
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() {
+        final seen = {for (final b in _results) b.id};
+        _results = [..._results, ...page.where((b) => seen.add(b.id))];
+        _pagesLoaded++;
+        _hasMore = page.length >= _searchPageSize;
+        _loadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() {
+        _loadingMore = false;
+        _loadMoreFailed = true;
+      });
+    }
+  }
+
   void _clearSearch() {
     _search.clear();
+    _searchGeneration++;
     setState(() {
       _searching = false;
       _results = [];
+      _hasMore = false;
+      _loadingMore = false;
     });
   }
 
@@ -351,6 +402,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               : _SearchResults(
                   results: _results,
                   selected: _selected,
+                  hasMore: _hasMore,
+                  loadingMore: _loadingMore,
+                  loadMoreFailed: _loadMoreFailed,
+                  onLoadMore: _loadMore,
                   bottomInset: bottomInset,
                   onSelect: (b) => _select(context, b, wide: wide),
                 );
@@ -439,35 +494,27 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           return main;
         }
 
-        // Phone: search floats bottom centre, within thumb reach. It sits
-        // on a short gradient of the page background rather than directly
-        // on the shelves — without it, a shelf heading passing behind the
-        // field reads as a clipping bug rather than as content scrolling
-        // underneath an overlay.
-        return Stack(
+        // Phone: the search field sits bottom centre, within thumb reach,
+        // in its own strip under the list. It used to float over the
+        // shelves and the results grid, which left a row of covers under
+        // it whenever the list was not scrolled to its end; a strip means
+        // no content is ever beneath it, and "Load more" stays reachable
+        // above it.
+        return Column(
           children: [
-            Positioned.fill(child: main),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x6, Sp.x4, Sp.x4),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [c.bg.withValues(alpha: 0), c.bg, c.bg],
-                    stops: const [0, 0.55, 1],
-                  ),
-                ),
-                child: _SearchField(
-                  controller: _search,
-                  onSubmitted: _performSearch,
-                  onClear: _clearSearch,
-                  searching: _searching,
-                  elevated: true,
-                ),
+            Expanded(child: main),
+            Container(
+              padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, Sp.x3),
+              decoration: BoxDecoration(
+                color: c.bg,
+                border: Border(top: BorderSide(color: c.border)),
+              ),
+              child: _SearchField(
+                controller: _search,
+                onSubmitted: _performSearch,
+                onClear: _clearSearch,
+                searching: _searching,
+                elevated: true,
               ),
             ),
           ],
@@ -541,6 +588,13 @@ class _SearchResults extends StatelessWidget {
   final LibriVoxBook? selected;
   final ValueChanged<LibriVoxBook> onSelect;
 
+  /// More pages may exist: the list ends in a "Load more" button, and the
+  /// count reads "20+ results" rather than claiming a total.
+  final bool hasMore;
+  final bool loadingMore;
+  final bool loadMoreFailed;
+  final VoidCallback onLoadMore;
+
   /// Space kept clear for the floating search field; see
   /// `_DiscoverScreenState._floatingSearchReserve`.
   final double bottomInset;
@@ -549,6 +603,10 @@ class _SearchResults extends StatelessWidget {
     required this.results,
     required this.selected,
     required this.onSelect,
+    required this.hasMore,
+    required this.loadingMore,
+    required this.loadMoreFailed,
+    required this.onLoadMore,
     required this.bottomInset,
   });
 
@@ -565,29 +623,64 @@ class _SearchResults extends StatelessWidget {
           child: Semantics(
             header: true,
             child: Text(
-              '${results.length} '
+              '${results.length}${hasMore ? '+' : ''} '
               '${results.length == 1 ? 'result' : 'results'}',
               style: AppType.titleSm.copyWith(color: c.text),
             ),
           ),
         ),
         Expanded(
-          child: GridView.builder(
-            padding: EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, bottomInset),
-            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: LibriVoxBookItem.tileWidth + Sp.x4,
-              mainAxisExtent: LibriVoxBookItem.coverHeight +
-                  Sp.x2 +
-                  (26 * 2 + 18) * textScale,
-              crossAxisSpacing: Sp.x3,
-              mainAxisSpacing: Sp.x4,
-            ),
-            itemCount: results.length,
-            itemBuilder: (context, i) => LibriVoxBookItem(
-              book: results[i],
-              isSelected: selected?.id == results[i].id,
-              onTap: () => onSelect(results[i]),
-            ),
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: Sp.x4),
+                sliver: SliverGrid.builder(
+                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: LibriVoxBookItem.tileWidth + Sp.x4,
+                    mainAxisExtent: LibriVoxBookItem.coverHeight +
+                        Sp.x2 +
+                        (26 * 2 + 18) * textScale,
+                    crossAxisSpacing: Sp.x3,
+                    mainAxisSpacing: Sp.x4,
+                  ),
+                  itemCount: results.length,
+                  itemBuilder: (context, i) => LibriVoxBookItem(
+                    book: results[i],
+                    isSelected: selected?.id == results[i].id,
+                    onTap: () => onSelect(results[i]),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(Sp.x4, Sp.x4, Sp.x4, bottomInset),
+                sliver: SliverToBoxAdapter(
+                  child: hasMore
+                      ? Center(
+                          child: loadingMore
+                              ? const Padding(
+                                  padding: EdgeInsets.all(Sp.x3),
+                                  child: SizedBox.square(
+                                    dimension: 24,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2.5),
+                                  ),
+                                )
+                              : OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size(0, Dim.tapMin)),
+                                  onPressed: onLoadMore,
+                                  icon: Icon(loadMoreFailed
+                                      ? Icons.refresh_rounded
+                                      : Icons.expand_more_rounded),
+                                  label: Text(loadMoreFailed
+                                      ? 'Could not load more. Try again'
+                                      : 'Load more'),
+                                ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ],
           ),
         ),
       ],

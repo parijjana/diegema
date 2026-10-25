@@ -71,7 +71,7 @@ void main() {
   Future<void> goTo(WidgetTester tester, String destination) async {
     await tester.tap(find.descendant(
       of: find.byType(NavigationBar),
-      matching: find.text(destination),
+      matching: find.byTooltip(destination),
     ));
     await pumpFrames(tester);
   }
@@ -85,7 +85,7 @@ void main() {
                   of: find.byType(ListView), matching: find.byType(Scrollable))
               .first);
 
-  testWidgets('the skip interval reaches the transport controls',
+  testWidgets('back and forward intervals are set independently',
       (tester) async {
     final store = <String, Object>{};
     final db = await pumpApp(tester, store);
@@ -94,25 +94,33 @@ void main() {
     await audio.loadBook(book);
     await pumpFrames(tester);
 
-    // The default, and the number the buttons are stamped with.
+    // The defaults.
     expect(find.bySemanticsLabel('Skip forward 15 seconds'), findsOneWidget);
+    expect(find.bySemanticsLabel('Skip back 15 seconds'), findsOneWidget);
 
     await goTo(tester, 'Settings');
-    await reveal(tester, find.text('30 seconds'));
-    await tester.ensureVisible(find.text('30 seconds'));
+    // Each group lists the same options, so the first "30 seconds" is the
+    // Skip back group's and the first "10 seconds" after it is... both
+    // groups' own; pick by position: back group first, forward group second.
+    await reveal(tester, find.text('Skip back'));
+    await tester.ensureVisible(find.text('30 seconds').first);
     await pumpFrames(tester);
-    await tester.tap(find.text('30 seconds'));
+    await tester.tap(find.text('30 seconds').first);
+    await pumpFrames(tester);
+    await reveal(tester, find.text('Skip forward'));
+    await tester.ensureVisible(find.text('10 seconds').last);
+    await pumpFrames(tester);
+    await tester.tap(find.text('10 seconds').last);
     await pumpFrames(tester);
 
     await goTo(tester, 'Now playing');
 
-    expect(find.bySemanticsLabel('Skip forward 30 seconds'), findsOneWidget,
-        reason: 'the seek and the number on the glyph come from one value, '
-            'so the label moving proves both did');
     expect(find.bySemanticsLabel('Skip back 30 seconds'), findsOneWidget);
+    expect(find.bySemanticsLabel('Skip forward 10 seconds'), findsOneWidget);
     expect(find.bySemanticsLabel('Skip forward 15 seconds'), findsNothing);
 
-    expect(store['playback.skip_seconds'], 30);
+    expect(store['playback.skip_back_seconds'], 30);
+    expect(store['playback.skip_forward_seconds'], 10);
 
     await unmount(tester);
   });
@@ -346,7 +354,25 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('a stored skip interval is applied on launch', (tester) async {
+  testWidgets('stored intervals are applied on launch, one per direction',
+      (tester) async {
+    final db = await pumpApp(tester, <String, Object>{
+      'playback.skip_back_seconds': 5,
+      'playback.skip_forward_seconds': 60,
+    });
+
+    final book = await seedBook(db, id: 'z', title: 'Persuasion');
+    await audio.loadBook(book);
+    await pumpFrames(tester);
+
+    expect(find.bySemanticsLabel('Skip back 5 seconds'), findsOneWidget);
+    expect(find.bySemanticsLabel('Skip forward 60 seconds'), findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  testWidgets('the legacy single interval seeds both directions',
+      (tester) async {
     final db =
         await pumpApp(tester, <String, Object>{'playback.skip_seconds': 60});
 
@@ -354,6 +380,7 @@ void main() {
     await audio.loadBook(book);
     await pumpFrames(tester);
 
+    expect(find.bySemanticsLabel('Skip back 60 seconds'), findsOneWidget);
     expect(find.bySemanticsLabel('Skip forward 60 seconds'), findsOneWidget);
 
     await unmount(tester);
@@ -363,13 +390,16 @@ void main() {
       (tester) async {
     // Otherwise a value written by a build with different options would be
     // stuck on the device with no UI able to change it.
-    final db =
-        await pumpApp(tester, <String, Object>{'playback.skip_seconds': 7});
+    final db = await pumpApp(tester, <String, Object>{
+      'playback.skip_seconds': 7,
+      'playback.skip_back_seconds': 7,
+    });
 
     final book = await seedBook(db, id: 'z', title: 'Persuasion');
     await audio.loadBook(book);
     await pumpFrames(tester);
 
+    expect(find.bySemanticsLabel('Skip back 15 seconds'), findsOneWidget);
     expect(find.bySemanticsLabel('Skip forward 15 seconds'), findsOneWidget);
 
     await unmount(tester);

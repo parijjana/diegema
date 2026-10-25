@@ -11,6 +11,7 @@ import '../services/download_manager.dart';
 import '../services/sync/sync_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/library_folders_section.dart';
+import '../widgets/storage_section.dart';
 import 'downloads_screen.dart';
 import 'hidden_books_screen.dart';
 import 'linked_devices_screen.dart';
@@ -80,6 +81,29 @@ class SettingsScreen extends StatelessWidget {
                     _Choice(ThemeMode.dark, 'Dark'),
                   ],
                   onChanged: settings.setThemeMode,
+                ),
+                const SizedBox(height: Sp.x5),
+                _ChoiceGroup<TextSizeChoice>(
+                  label: 'Text size',
+                  description: 'Scales text on top of your device setting. '
+                      'Device setting uses it as is.',
+                  value: settings.textSize,
+                  options: [
+                    for (final v in TextSizeChoice.values) _Choice(v, v.label),
+                  ],
+                  onChanged: settings.setTextSize,
+                ),
+                const SizedBox(height: Sp.x5),
+                _ChoiceGroup<CoverSize>(
+                  label: 'Cover size',
+                  description: 'How big the cover is on Now Playing. You can '
+                      'also press and hold the cover to change it.',
+                  value: settings.coverSize,
+                  options: [
+                    for (final v in CoverSize.values)
+                      _Choice(v, '${v.label} - ${v.description}'),
+                  ],
+                  onChanged: settings.setCoverSize,
                 ),
                 const SizedBox(height: Sp.x5),
                 _ThreeWayToggle<LibraryLayout>(
@@ -160,16 +184,27 @@ class SettingsScreen extends StatelessWidget {
               title: 'Playback',
               children: [
                 _ChoiceGroup<int>(
-                  label: 'Skip interval',
-                  description:
-                      'How far the rewind and fast-forward buttons jump.',
-                  value: settings.skipSeconds,
+                  label: 'Skip back',
+                  description: 'How far the rewind button jumps.',
+                  value: settings.skipBackSeconds,
                   options: [
                     for (final seconds in kSkipSecondsOptions)
                       _Choice(seconds, '$seconds seconds'),
                   ],
-                  onChanged: settings.setSkipSeconds,
+                  onChanged: settings.setSkipBackSeconds,
                 ),
+                const SizedBox(height: Sp.x5),
+                _ChoiceGroup<int>(
+                  label: 'Skip forward',
+                  description: 'How far the fast-forward button jumps.',
+                  value: settings.skipForwardSeconds,
+                  options: [
+                    for (final seconds in kSkipSecondsOptions)
+                      _Choice(seconds, '$seconds seconds'),
+                  ],
+                  onChanged: settings.setSkipForwardSeconds,
+                ),
+                const SizedBox(height: Sp.x5),
                 _ChoiceGroup<double>(
                   label: 'Default speed',
                   description: 'The speed a book starts at until you change '
@@ -180,6 +215,29 @@ class SettingsScreen extends StatelessWidget {
                       _Choice(speed, '${speed}x'),
                   ],
                   onChanged: settings.setDefaultSpeed,
+                ),
+                const SizedBox(height: Sp.x5),
+                _ChoiceGroup<SkipBackOnResume>(
+                  label: 'Skip back on resume',
+                  description: 'After a pause of more than a few seconds, '
+                      'playback steps back this far when you resume.',
+                  value: settings.skipBackOnResume,
+                  options: [
+                    for (final v in SkipBackOnResume.values)
+                      _Choice(v, v.label),
+                  ],
+                  onChanged: settings.setSkipBackOnResume,
+                ),
+                const SizedBox(height: Sp.x5),
+                _ChoiceGroup<AutoAdvance>(
+                  label: 'When a book ends',
+                  description: 'Stop, or carry on with the next unfinished '
+                      'book in your library.',
+                  value: settings.autoAdvance,
+                  options: [
+                    for (final v in AutoAdvance.values) _Choice(v, v.label),
+                  ],
+                  onChanged: settings.setAutoAdvance,
                 ),
               ],
             ),
@@ -198,6 +256,11 @@ class SettingsScreen extends StatelessWidget {
                             DownloadsScreen(db: db!, manager: downloads))),
                   ),
                 ],
+              ),
+            if (db != null && !kIsWeb)
+              _Section(
+                title: 'Storage',
+                children: [StorageSection(db: db!)],
               ),
             if (db != null && !kIsWeb)
               _Section(
@@ -281,8 +344,10 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const _InfoRow(
                   label: 'Ambience sounds',
-                  value: 'Recordings by Joseph Sardin, BigSoundBank.com, '
-                      'released under CC0. The white, pink and brown noise '
+                  value:
+                      'Recordings by Joseph Sardin and others, BigSoundBank.com, '
+                      'banan_ and freefire66 on Freesound (battle sounds), all released '
+                      'under CC0. The white, pink and brown noise '
                       'is generated by $kAppName. Details in '
                       'assets/ambience/CREDITS.md.',
                 ),

@@ -19,6 +19,99 @@ enum LibraryLayout {
       .firstWhere((l) => l.name == name, orElse: () => LibraryLayout.list);
 }
 
+/// How the Library orders its books. Stored by name; unknown falls back to
+/// [recent].
+enum LibrarySort {
+  recent('Recent'),
+  title('Title'),
+  author('Author'),
+  progress('Progress');
+
+  final String label;
+  const LibrarySort(this.label);
+
+  static LibrarySort fromName(String? name) => LibrarySort.values
+      .firstWhere((s) => s.name == name, orElse: () => LibrarySort.recent);
+}
+
+/// Which books the Library shows. Stored by name; unknown falls back to
+/// [all].
+enum LibraryFilter {
+  all('All'),
+  inProgress('In progress'),
+  finished('Finished'),
+  downloaded('Downloaded'),
+  local('Local');
+
+  final String label;
+  const LibraryFilter(this.label);
+
+  static LibraryFilter fromName(String? name) => LibraryFilter.values
+      .firstWhere((f) => f.name == name, orElse: () => LibraryFilter.all);
+}
+
+/// How far playback rewinds when resumed after a pause. Stored by name.
+enum SkipBackOnResume {
+  off('Off', 0),
+  s5('Back 5 seconds', 5),
+  s10('Back 10 seconds', 10),
+  s30('Back 30 seconds', 30);
+
+  final String label;
+  final int seconds;
+  const SkipBackOnResume(this.label, this.seconds);
+
+  static SkipBackOnResume fromName(String? name) => SkipBackOnResume.values
+      .firstWhere((s) => s.name == name, orElse: () => SkipBackOnResume.s5);
+}
+
+/// What happens when a book finishes. Stored by name.
+enum AutoAdvance {
+  stop('Stop'),
+  nextBook('Next book');
+
+  final String label;
+  const AutoAdvance(this.label);
+
+  static AutoAdvance fromName(String? name) => AutoAdvance.values
+      .firstWhere((a) => a.name == name, orElse: () => AutoAdvance.stop);
+}
+
+/// In-app text size, applied on top of the system text scale. Stored by
+/// name; unknown falls back to [system].
+enum TextSizeChoice {
+  system('Device setting', 1.0),
+  small('Small', 0.9),
+  large('Large', 1.15),
+  larger('Larger', 1.3);
+
+  final String label;
+  final double factor;
+  const TextSizeChoice(this.label, this.factor);
+
+  static TextSizeChoice fromName(String? name) => TextSizeChoice.values
+      .firstWhere((t) => t.name == name, orElse: () => TextSizeChoice.system);
+}
+
+/// How big the cover is on Now Playing (phone layout). Stored by name;
+/// unknown falls back to [large], the original layout.
+enum CoverSize {
+  large('Large', 'Cover fills the screen width'),
+  medium('Medium', 'Smaller cover, bigger chapter details'),
+  stamp('Stamp', 'Postage-stamp cover beside the title');
+
+  final String label;
+  final String description;
+  const CoverSize(this.label, this.description);
+
+  /// The next size in the Large -> Medium -> Stamp -> Large cycle used by
+  /// the quick toggle on Now Playing.
+  CoverSize get next => CoverSize.values[(index + 1) % CoverSize.values.length];
+
+  static CoverSize fromName(String? name) => CoverSize.values
+      .firstWhere((c) => c.name == name, orElse: () => CoverSize.large);
+}
+
 /// Every user-adjustable preference, in one place, read from and written
 /// back to [UiPreferences].
 ///
@@ -43,7 +136,8 @@ class AppSettings extends ChangeNotifier {
   final ThemeMode? _forcedThemeMode;
 
   ThemeMode _themeMode;
-  int _skipSeconds;
+  int _skipBackSeconds = kSkipSeconds;
+  int _skipForwardSeconds = kSkipSeconds;
   double _defaultSpeed = 1.0;
   PlayerControlsStyle _controlsStyle = PlayerControlsStyle.tiles;
   PlayerControlsStyle _transportStyle = PlayerControlsStyle.round;
@@ -52,20 +146,29 @@ class AppSettings extends ChangeNotifier {
   ShadowStyle _shadows = ShadowStyle.off;
   bool _downloadsWifiOnly = false;
   LibraryLayout _libraryLayout = LibraryLayout.list;
+  LibrarySort _librarySort = LibrarySort.recent;
+  LibraryFilter _libraryFilter = LibraryFilter.all;
+  SkipBackOnResume _skipBackOnResume = SkipBackOnResume.s5;
+  AutoAdvance _autoAdvance = AutoAdvance.stop;
+  TextSizeChoice _textSize = TextSizeChoice.system;
+  CoverSize _coverSize = CoverSize.large;
 
   AppSettings({
     required UiPreferences preferences,
     ThemeMode? initialThemeMode,
   })  : _preferences = preferences,
         _forcedThemeMode = initialThemeMode,
-        _themeMode = initialThemeMode ?? ThemeMode.system,
-        _skipSeconds = kSkipSeconds;
+        _themeMode = initialThemeMode ?? ThemeMode.system;
 
   ThemeMode get themeMode => _themeMode;
 
-  /// How far the rewind/fast-forward controls jump. Always one of
+  /// How far the rewind control jumps. Always one of
+  /// [kSkipSecondsOptions]. Independent of [skipForwardSeconds].
+  int get skipBackSeconds => _skipBackSeconds;
+
+  /// How far the fast-forward control jumps. Always one of
   /// [kSkipSecondsOptions].
-  int get skipSeconds => _skipSeconds;
+  int get skipForwardSeconds => _skipForwardSeconds;
 
   /// The speed books open at unless they have their own. Always one of
   /// [kPlaybackSpeedOptions].
@@ -92,10 +195,30 @@ class AppSettings extends ChangeNotifier {
   /// List or tiles in the Library (header toggle and Settings > Appearance).
   LibraryLayout get libraryLayout => _libraryLayout;
 
+  /// Library ordering and filter (Library header controls).
+  LibrarySort get librarySort => _librarySort;
+  LibraryFilter get libraryFilter => _libraryFilter;
+
+  /// Rewind applied when resuming after a pause (Settings > Playback).
+  /// The playback service reads the stored value itself.
+  SkipBackOnResume get skipBackOnResume => _skipBackOnResume;
+
+  /// What happens when a book ends (Settings > Playback).
+  AutoAdvance get autoAdvance => _autoAdvance;
+
+  /// In-app text size (Settings > Appearance).
+  TextSizeChoice get textSize => _textSize;
+
+  /// Cover size on Now Playing (Settings > Appearance, and a long-press on
+  /// the cover itself).
+  CoverSize get coverSize => _coverSize;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
+    await _loadCoverSize();
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
-    final storedSkip = await _preferences.getSkipSeconds();
+    final storedSkipBackSeconds = await _preferences.getSkipBackSeconds();
+    final storedSkipForwardSeconds = await _preferences.getSkipForwardSeconds();
     final storedSpeed = await _preferences.getDefaultSpeed();
     final storedStyle = await _preferences.getPlayerControlsStyle();
     final storedTransport = await _preferences.getTransportStyle();
@@ -107,9 +230,20 @@ class AppSettings extends ChangeNotifier {
     final storedWifiOnly = await _preferences.getDownloadsWifiOnly();
     final storedLayout =
         LibraryLayout.fromName(await _preferences.getLibraryLayoutName());
+    final storedSort =
+        LibrarySort.fromName(await _preferences.getLibrarySortName());
+    final storedFilter =
+        LibraryFilter.fromName(await _preferences.getLibraryFilterName());
+    final storedSkipBack =
+        SkipBackOnResume.fromName(await _preferences.getSkipBackOnResumeName());
+    final storedAdvance =
+        AutoAdvance.fromName(await _preferences.getAutoAdvanceName());
+    final storedTextSize =
+        TextSizeChoice.fromName(await _preferences.getTextSizeName());
 
     if (storedTheme == _themeMode &&
-        storedSkip == _skipSeconds &&
+        storedSkipBackSeconds == _skipBackSeconds &&
+        storedSkipForwardSeconds == _skipForwardSeconds &&
         storedSpeed == _defaultSpeed &&
         storedStyle == _controlsStyle &&
         storedTransport == _transportStyle &&
@@ -117,11 +251,17 @@ class AppSettings extends ChangeNotifier {
         storedBackground == _background &&
         storedShadows == _shadows &&
         storedWifiOnly == _downloadsWifiOnly &&
-        storedLayout == _libraryLayout) {
+        storedLayout == _libraryLayout &&
+        storedSort == _librarySort &&
+        storedFilter == _libraryFilter &&
+        storedSkipBack == _skipBackOnResume &&
+        storedAdvance == _autoAdvance &&
+        storedTextSize == _textSize) {
       return;
     }
     _themeMode = storedTheme;
-    _skipSeconds = storedSkip;
+    _skipBackSeconds = storedSkipBackSeconds;
+    _skipForwardSeconds = storedSkipForwardSeconds;
     _defaultSpeed = storedSpeed;
     _controlsStyle = storedStyle;
     _transportStyle = storedTransport;
@@ -130,7 +270,26 @@ class AppSettings extends ChangeNotifier {
     _shadows = storedShadows;
     _downloadsWifiOnly = storedWifiOnly;
     _libraryLayout = storedLayout;
+    _librarySort = storedSort;
+    _libraryFilter = storedFilter;
+    _skipBackOnResume = storedSkipBack;
+    _autoAdvance = storedAdvance;
+    _textSize = storedTextSize;
     notifyListeners();
+  }
+
+  Future<void> _loadCoverSize() async {
+    final stored = CoverSize.fromName(await _preferences.getCoverSizeName());
+    if (stored == _coverSize) return;
+    _coverSize = stored;
+    notifyListeners();
+  }
+
+  Future<void> setCoverSize(CoverSize value) async {
+    if (value == _coverSize) return;
+    _coverSize = value;
+    notifyListeners();
+    await _preferences.setCoverSizeName(value.name);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -140,13 +299,23 @@ class AppSettings extends ChangeNotifier {
     await _preferences.setThemeMode(mode);
   }
 
-  Future<void> setSkipSeconds(int seconds) async {
-    if (seconds == _skipSeconds || !kSkipSecondsOptions.contains(seconds)) {
+  Future<void> setSkipBackSeconds(int seconds) async {
+    if (seconds == _skipBackSeconds || !kSkipSecondsOptions.contains(seconds)) {
       return;
     }
-    _skipSeconds = seconds;
+    _skipBackSeconds = seconds;
     notifyListeners();
-    await _preferences.setSkipSeconds(seconds);
+    await _preferences.setSkipBackSeconds(seconds);
+  }
+
+  Future<void> setSkipForwardSeconds(int seconds) async {
+    if (seconds == _skipForwardSeconds ||
+        !kSkipSecondsOptions.contains(seconds)) {
+      return;
+    }
+    _skipForwardSeconds = seconds;
+    notifyListeners();
+    await _preferences.setSkipForwardSeconds(seconds);
   }
 
   Future<void> setDefaultSpeed(double speed) async {
@@ -198,6 +367,41 @@ class AppSettings extends ChangeNotifier {
     _libraryLayout = layout;
     notifyListeners();
     await _preferences.setLibraryLayoutName(layout.name);
+  }
+
+  Future<void> setLibrarySort(LibrarySort sort) async {
+    if (sort == _librarySort) return;
+    _librarySort = sort;
+    notifyListeners();
+    await _preferences.setLibrarySortName(sort.name);
+  }
+
+  Future<void> setLibraryFilter(LibraryFilter filter) async {
+    if (filter == _libraryFilter) return;
+    _libraryFilter = filter;
+    notifyListeners();
+    await _preferences.setLibraryFilterName(filter.name);
+  }
+
+  Future<void> setSkipBackOnResume(SkipBackOnResume value) async {
+    if (value == _skipBackOnResume) return;
+    _skipBackOnResume = value;
+    notifyListeners();
+    await _preferences.setSkipBackOnResumeName(value.name);
+  }
+
+  Future<void> setAutoAdvance(AutoAdvance value) async {
+    if (value == _autoAdvance) return;
+    _autoAdvance = value;
+    notifyListeners();
+    await _preferences.setAutoAdvanceName(value.name);
+  }
+
+  Future<void> setTextSize(TextSizeChoice value) async {
+    if (value == _textSize) return;
+    _textSize = value;
+    notifyListeners();
+    await _preferences.setTextSizeName(value.name);
   }
 
   Future<void> setDownloadsWifiOnly(bool value) async {

@@ -52,7 +52,8 @@ void main() {
 
   setUp(() {
     fake = FakePlaybackService();
-    handler = DiegemaAudioHandler(fake, skipSeconds: () => 30);
+    handler = DiegemaAudioHandler(fake,
+        skipBackSeconds: () => 30, skipForwardSeconds: () => 30);
   });
 
   tearDown(() {
@@ -71,19 +72,33 @@ void main() {
       expect(fake.seekCalls, 1);
     });
 
-    test('fastForward and rewind use the injected skip interval', () async {
+    test('fastForward and rewind each use their own interval, read live',
+        () async {
+      // Asserts the seconds each direction was asked for rather than the
+      // resulting position: the real service's player stream resets the
+      // position notifier on its own schedule, which an async interval
+      // read (as in main.dart) gives time to happen.
       final recording = _RecordingPlaybackService();
-      final recordingHandler =
-          DiegemaAudioHandler(recording, skipSeconds: () => 30);
+      var back = 30;
+      var forward = 10;
+      final recordingHandler = DiegemaAudioHandler(recording,
+          skipBackSeconds: () => back,
+          // Async on purpose: main.dart reads storage on every press.
+          skipForwardSeconds: () async => forward);
       addTearDown(recordingHandler.disposeHandler);
 
-      recording.positionNotifier.value = const Duration(minutes: 5);
       await recordingHandler.fastForward();
-      expect(recording.lastSeek, const Duration(minutes: 5, seconds: 30));
-
-      recording.positionNotifier.value = const Duration(minutes: 5);
+      expect(recording.lastSkipForward, 10);
       await recordingHandler.rewind();
-      expect(recording.lastSeek, const Duration(minutes: 4, seconds: 30));
+      expect(recording.lastSkipBack, 30);
+
+      // A settings change applies to the very next press, no restart.
+      back = 60;
+      forward = 5;
+      await recordingHandler.fastForward();
+      expect(recording.lastSkipForward, 5);
+      await recordingHandler.rewind();
+      expect(recording.lastSkipBack, 60);
     });
 
     test('skipToNext/skipToPrevious call chapter navigation, not seeking',

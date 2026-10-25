@@ -1,26 +1,35 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 /// Which way a [SkipIntervalIcon] skips.
 enum SkipDirection { backward, forward }
 
-/// A skip-interval control glyph: an open circular-arrow icon with the
-/// actual skip amount (in seconds) stamped inside it. Forward mirrors the
-/// same glyph rather than using a different one, so the pair matches.
+/// The largest the number under a skip arrow is allowed to scale to. The
+/// control sits in a fixed-size tap target, so letting the number follow the
+/// system text scale without limit (2.0 = 26px) would burst out of it; 1.5
+/// is still 19.5px, well above the 13px floor, and the number is a
+/// supplement to the arrow, not prose.
+const double kSkipNumberMaxTextScale = 1.5;
+
+/// A skip control glyph: a plain arrow with the skip amount (in seconds)
+/// **underneath** it, never inside it.
 ///
-/// Material Icons only ships `_10_` and `_30_` suffixed skip icons — there
-/// is no `_15_` variant — which is why this app used to pair a "10" icon
-/// with code that actually skipped 15 seconds. Labelling a generic glyph
-/// with the real number sidesteps the problem for any interval, with no
-/// icon/behaviour mismatch possible.
+/// The layout rule, the same for every transport style and the mini player:
+/// the arrow on top, the number centred directly below it, the pair centred
+/// in the tap target. (Beside-the-arrow on the outer side was rejected: it
+/// widens the transport row past 360dp at larger text, where a column does
+/// not.) Back is [Icons.replay_rounded]; forward is its clockwise
+/// counterpart [Icons.refresh_rounded]; neither has anything inside it,
+/// which is what lets the number be crisp at the 13px floor.
 ///
-/// Carries its own [Semantics] label (e.g. "Skip back 15 seconds") since
-/// the icon glyph alone conveys nothing to screen reader users; wrap this
-/// in an [IconButton] as the `icon:` widget as usual.
+/// [size] is the arrow's size; the whole control is at least [size] +
+/// the number's line tall and is meant to be centred in a 48dp+ target by
+/// the caller. Carries its own [Semantics] label (e.g. "Skip back 30
+/// seconds"); the caller's button usually repeats it, which is harmless.
 class SkipIntervalIcon extends StatelessWidget {
   final SkipDirection direction;
   final int seconds;
+
+  /// The arrow's size.
   final double size;
   final Color color;
 
@@ -32,60 +41,44 @@ class SkipIntervalIcon extends StatelessWidget {
     required this.color,
   });
 
+  /// The arrow glyph, exposed so tests can find it.
+  static IconData iconFor(SkipDirection direction) =>
+      direction == SkipDirection.backward
+          ? Icons.replay_rounded
+          : Icons.refresh_rounded;
+
   @override
   Widget build(BuildContext context) {
-    // Both directions use the same open circular-arrow glyph, the forward
-    // one mirrored. `Icons.fast_forward_rounded` was used here for forward
-    // and it does not work: it is a *filled* double-triangle, so the number
-    // stamped on top of it is illegible and the control just reads as a
-    // generic fast-forward — losing the "15" that is the whole point. The
-    // replay glyph is an open ring with empty space in the middle, which is
-    // where the number belongs, and mirroring it keeps the two skip buttons
-    // a matched pair (the convention every audiobook player uses).
-    final forward = direction == SkipDirection.forward;
     final label = direction == SkipDirection.backward
         ? 'Skip back $seconds seconds'
         : 'Skip forward $seconds seconds';
-
-    // Derive the label size from the theme's type scale rather than a
-    // hardcoded magic number, so it stays proportionate wherever this is
-    // dropped in (48px circular buttons on Now Playing, 20px inline icons
-    // on the persistent bar).
-    final baseLabelStyle =
+    final base =
         Theme.of(context).textTheme.labelSmall ?? const TextStyle(fontSize: 13);
 
     return Semantics(
       label: label,
       excludeSemantics: true,
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Only the glyph is mirrored — the number must not be, so it
-            // stays a sibling in the Stack rather than a child of this.
-            Transform.scale(
-              scaleX: forward ? -1.0 : 1.0,
-              child: Icon(Icons.replay_rounded, size: size, color: color),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(iconFor(direction), size: size, color: color),
+          Text(
+            '$seconds',
+            maxLines: 1,
+            softWrap: false,
+            textAlign: TextAlign.center,
+            textScaler: MediaQuery.textScalerOf(context)
+                .clamp(maxScaleFactor: kSkipNumberMaxTextScale),
+            style: base.copyWith(
+              // 13px is this design system's type floor.
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: color,
+              height: 1.0,
             ),
-            Text(
-              '$seconds',
-              style: baseLabelStyle.copyWith(
-                // 0.34 put the number at 8.2px inside a 24px glyph — below
-                // this design system's own 13px type floor, and verified
-                // illegible in a rendered screenshot. The ring's inner hole
-                // is what caps this; going much past 0.42 collides with it.
-                // 13 is the floor: callers should pass a [size] of at least
-                // ~31 so the number still clears the ring at that size.
-                fontSize: math.max(13.0, size * 0.42),
-                fontWeight: FontWeight.w800,
-                color: color,
-                height: 1.0,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

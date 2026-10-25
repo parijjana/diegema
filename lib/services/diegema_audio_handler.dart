@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 
@@ -24,11 +26,13 @@ import 'audio_playback_service.dart' as playback;
 class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
   final playback.AudioPlaybackService _playbackService;
 
-  /// How far [fastForward]/[rewind] jump, in seconds. A closure rather than
-  /// a fixed value so it can track the user's skip-interval setting
-  /// (`AppSettings.skipSeconds`) live, the same way [MiniPlayerBar] and
-  /// `NowPlayingScreen` already do — see `core/playback_constants.dart`.
-  final int Function() _skipSeconds;
+  /// How far [rewind] / [fastForward] jump, in seconds. Closures (possibly
+  /// async) rather than fixed values so each press reads the user's current
+  /// setting (`AppSettings.skipBackSeconds` / `skipForwardSeconds`, as
+  /// persisted by `UiPreferences`): a change in Settings applies to the very
+  /// next headset or lock-screen press, with no restart.
+  final FutureOr<int> Function() _skipBackSeconds;
+  final FutureOr<int> Function() _skipForwardSeconds;
 
   /// The background-sound channel. When it plays while the book does not,
   /// the notification (and so Android's foreground service, which keeps
@@ -44,9 +48,11 @@ class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
 
   DiegemaAudioHandler(
     this._playbackService, {
-    int Function() skipSeconds = _defaultSkipSeconds,
+    FutureOr<int> Function() skipBackSeconds = _defaultSkipSeconds,
+    FutureOr<int> Function() skipForwardSeconds = _defaultSkipSeconds,
     AmbienceService? ambience,
-  })  : _skipSeconds = skipSeconds,
+  })  : _skipBackSeconds = skipBackSeconds,
+        _skipForwardSeconds = skipForwardSeconds,
         _ambience = ambience {
     _broadcastMediaItem();
     _broadcastPlaybackState();
@@ -199,12 +205,12 @@ class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> seek(Duration position) => _playbackService.seek(position);
 
   @override
-  Future<void> fastForward() =>
-      _playbackService.skipForward(seconds: _skipSeconds());
+  Future<void> fastForward() async =>
+      _playbackService.skipForward(seconds: await _skipForwardSeconds());
 
   @override
-  Future<void> rewind() =>
-      _playbackService.skipBackward(seconds: _skipSeconds());
+  Future<void> rewind() async =>
+      _playbackService.skipBackward(seconds: await _skipBackSeconds());
 
   @override
   Future<void> skipToNext() => _playbackService.nextChapter();
@@ -235,13 +241,23 @@ class DiegemaAudioHandler extends BaseAudioHandler with SeekHandler {
 /// mistake on a supported platform still surfaces instead of going quiet.
 Future<DiegemaAudioHandler> initDiegemaAudioService(
   playback.AudioPlaybackService playbackService, {
-  int Function() skipSeconds = DiegemaAudioHandler._defaultSkipSeconds,
+  FutureOr<int> Function() skipBackSeconds =
+      DiegemaAudioHandler._defaultSkipSeconds,
+  FutureOr<int> Function() skipForwardSeconds =
+      DiegemaAudioHandler._defaultSkipSeconds,
   AmbienceService? ambience,
 }) {
   return AudioService.init(
     builder: () => DiegemaAudioHandler(playbackService,
-        skipSeconds: skipSeconds, ambience: ambience),
+        skipBackSeconds: skipBackSeconds,
+        skipForwardSeconds: skipForwardSeconds,
+        ambience: ambience),
     config: const AudioServiceConfig(
+      // The notification's own rewind/fast-forward actions map to
+      // [DiegemaAudioHandler.rewind]/[fastForward]; these intervals only seed
+      // the platform's default display and are not what actually seeks.
+      rewindInterval: Duration(seconds: kSkipSeconds),
+      fastForwardInterval: Duration(seconds: kSkipSeconds),
       androidNotificationChannelId:
           'com.overengineeredhobbies.diegema.playback',
       androidNotificationChannelName: 'Playback',

@@ -21,10 +21,10 @@ import 'skip_interval_icon.dart';
 /// - **No coloured bloom** behind the play button (the 24px teal glow was
 ///   neon-pass residue). Elevation comes from `shadow-2`.
 /// - Skip buttons render their interval from the same value that drives the
-///   seek, via [SkipIntervalIcon], so the old "icon says 10, code does 15"
-///   mismatch is structurally impossible. That value is now the user's
-///   `playback.skip_seconds` setting rather than a constant, which the
-///   stamped-number approach supports for free.
+///   seek, via [SkipIntervalIcon] (arrow with the number under it), so the
+///   old "icon says 10, code does 15" mismatch is structurally impossible.
+///   Back and forward are separate user settings (`skipBackSeconds`,
+///   `skipForwardSeconds`).
 /// - Play/pause is **one toggle whose label changes**, not two icons that
 ///   swap with no accessible name.
 class PlayerTransport extends StatelessWidget {
@@ -42,12 +42,13 @@ class PlayerTransport extends StatelessWidget {
     final c = context.colors;
     final settings = SettingsScope.maybeOf(context);
     // Read live rather than passed in: the interval is a user setting
-    // (`playback.skip_seconds`) and both the seek and the number
+    // (`playback.skip_back_seconds` / `skip_forward_seconds`) and both the seek and the number
     // stamped on the glyph must come from the same value, which is
     // what makes an "icon says 10, code does 15" mismatch impossible.
     // Falls back to the default when no scope is present, so a test
     // pumping this widget alone needs no settings plumbing.
-    final skipSeconds = settings?.skipSeconds ?? kSkipSeconds;
+    final skipBack = settings?.skipBackSeconds ?? kSkipSeconds;
+    final skipForward = settings?.skipForwardSeconds ?? kSkipSeconds;
     // The shape and size of the cluster (Settings > "Playback controls").
     final style = settings?.transportStyle ?? PlayerControlsStyle.round;
 
@@ -66,27 +67,27 @@ class PlayerTransport extends StatelessWidget {
             color: c.text),
       ),
       _TransportSpec(
-        semanticLabel: 'Skip back $skipSeconds seconds',
+        semanticLabel: 'Skip back $skipBack seconds',
         weight: 1.25,
-        onPressed: () => audioService.skipBackward(seconds: skipSeconds),
+        onPressed: () => audioService.skipBackward(seconds: skipBack),
         child: SkipIntervalIcon(
           direction: SkipDirection.backward,
-          seconds: skipSeconds,
-          // iconXl, not iconMd: these two carry a number inside them, and
-          // it must stay at the 13px floor without touching the ring.
-          size: Dim.iconXl,
+          seconds: skipBack,
+          // The number sits under the arrow, so the arrow is iconMd to
+          // leave the column room inside a 56dp target at large text.
+          size: Dim.iconMd,
           color: c.text,
         ),
       ),
       null, // play/pause
       _TransportSpec(
-        semanticLabel: 'Skip forward $skipSeconds seconds',
+        semanticLabel: 'Skip forward $skipForward seconds',
         weight: 1.25,
-        onPressed: () => audioService.skipForward(seconds: skipSeconds),
+        onPressed: () => audioService.skipForward(seconds: skipForward),
         child: SkipIntervalIcon(
           direction: SkipDirection.forward,
-          seconds: skipSeconds,
-          size: Dim.iconXl,
+          seconds: skipForward,
+          size: Dim.iconMd,
           color: c.text,
         ),
       ),

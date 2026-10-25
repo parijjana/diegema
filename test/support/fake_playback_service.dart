@@ -73,12 +73,20 @@ class FakePlaybackService extends AudioPlaybackService {
   }
 
   @override
-  Future<void> skipForward({int seconds = kSkipSeconds}) async =>
-      seek(positionNotifier.value + Duration(seconds: seconds));
+  Future<void> skipForward({int seconds = kSkipSeconds}) async {
+    lastSkipForward = seconds;
+    return seek(positionNotifier.value + Duration(seconds: seconds));
+  }
 
   @override
-  Future<void> skipBackward({int seconds = kSkipSeconds}) async =>
-      seek(positionNotifier.value - Duration(seconds: seconds));
+  Future<void> skipBackward({int seconds = kSkipSeconds}) async {
+    lastSkipBack = seconds;
+    return seek(positionNotifier.value - Duration(seconds: seconds));
+  }
+
+  /// The `seconds` of the most recent skip in each direction.
+  int? lastSkipForward;
+  int? lastSkipBack;
 
   @override
   Future<void> retryCurrentChapter() async {

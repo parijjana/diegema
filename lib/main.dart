@@ -124,7 +124,15 @@ Future<void> main() async {
         AudioPlaybackService(db: nativeDb, preferences: const UiPreferences());
     ambience = AmbienceService(book: audioService);
     try {
-      await initDiegemaAudioService(audioService, ambience: ambience);
+      const prefs = UiPreferences();
+      await initDiegemaAudioService(
+        audioService,
+        // Read from storage on every press, so a change in Settings reaches
+        // the headset and lock-screen skips with no restart.
+        skipBackSeconds: prefs.getSkipBackSeconds,
+        skipForwardSeconds: prefs.getSkipForwardSeconds,
+        ambience: ambience,
+      );
     } catch (e) {
       // A platform `audio_service` cannot set up on (or a misconfigured
       // manifest) must not block the app from starting — playback itself

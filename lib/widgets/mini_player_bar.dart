@@ -41,8 +41,9 @@ class MiniPlayerBar extends StatelessWidget {
     // what makes an "icon says 10, code does 15" mismatch impossible.
     // Falls back to the default when no scope is present, so a test
     // pumping this widget alone needs no settings plumbing.
-    final skipSeconds =
-        SettingsScope.maybeOf(context)?.skipSeconds ?? kSkipSeconds;
+    final settings = SettingsScope.maybeOf(context);
+    final skipBack = settings?.skipBackSeconds ?? kSkipSeconds;
+    final skipForward = settings?.skipForwardSeconds ?? kSkipSeconds;
 
     return ValueListenableBuilder<UnifiedAudiobook?>(
       valueListenable: audioService.currentBookNotifier,
@@ -87,26 +88,26 @@ class MiniPlayerBar extends StatelessWidget {
                         const SizedBox(width: Sp.x2),
                         if (showSkips)
                           _BarIconButton(
-                            label: 'Skip back $skipSeconds seconds',
+                            label: 'Skip back $skipBack seconds',
                             onPressed: () =>
-                                audioService.skipBackward(seconds: skipSeconds),
+                                audioService.skipBackward(seconds: skipBack),
                             child: SkipIntervalIcon(
                               direction: SkipDirection.backward,
-                              seconds: skipSeconds,
-                              size: Dim.iconLg,
+                              seconds: skipBack,
+                              size: Dim.iconSm,
                               color: c.text,
                             ),
                           ),
                         _MiniPlayPause(audioService: audioService),
                         if (showSkips)
                           _BarIconButton(
-                            label: 'Skip forward $skipSeconds seconds',
+                            label: 'Skip forward $skipForward seconds',
                             onPressed: () =>
-                                audioService.skipForward(seconds: skipSeconds),
+                                audioService.skipForward(seconds: skipForward),
                             child: SkipIntervalIcon(
                               direction: SkipDirection.forward,
-                              seconds: skipSeconds,
-                              size: Dim.iconLg,
+                              seconds: skipForward,
+                              size: Dim.iconSm,
                               color: c.text,
                             ),
                           ),
@@ -244,10 +245,20 @@ class _BarIconButton extends StatelessWidget {
       button: true,
       label: label,
       excludeSemantics: true,
-      child: IconButton(
-        tooltip: label,
-        onPressed: onPressed,
-        icon: child,
+      child: Tooltip(
+        message: label,
+        // A plain 48dp-wide, 52dp-tall target rather than an IconButton:
+        // IconButton's 8dp padding leaves too little room for an arrow
+        // with the number under it.
+        child: InkResponse(
+          onTap: onPressed,
+          radius: Dim.tapMin / 2,
+          child: SizedBox(
+            width: Dim.tapMin,
+            height: Dim.tapMin + 4,
+            child: Center(child: child),
+          ),
+        ),
       ),
     );
   }

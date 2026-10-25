@@ -26,6 +26,18 @@ class SearchCacheStore {
     }
   }
 
+  /// Forgets the saved search results (Settings > Storage > Clear caches).
+  Future<void> clear() async {
+    final overrides = _overrides;
+    if (overrides != null) {
+      overrides.remove(_key);
+      return;
+    }
+    try {
+      await (await SharedPreferences.getInstance()).remove(_key);
+    } catch (_) {}
+  }
+
   Future<void> write(String value) async {
     final overrides = _overrides;
     if (overrides != null) {

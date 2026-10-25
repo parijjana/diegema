@@ -1,3 +1,5 @@
+import '../core/utils/title_variants.dart';
+import '../core/utils/book_identity.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -118,9 +120,12 @@ class LibriVoxService {
       call: () async {
         if (term.isNotEmpty) {
           // Use Internet Archive LibriVox collection search for keyword queries
-          final searchResults =
-              await _searchInternetArchiveLibriVox(term, limit: limit);
+          final searchResults = await _searchInternetArchiveLibriVox(term,
+              limit: limit, offset: offset);
           if (searchResults.isNotEmpty) return searchResults;
+          // Past the first page an empty answer means "no more results", not
+          // "try the unrelated featured feed", which would pad the list.
+          if (offset > 0) return const <LibriVoxBook>[];
         }
 
         // Fetch direct LibriVox API feed
@@ -162,10 +167,13 @@ class LibriVoxService {
   }
 
   Future<List<LibriVoxBook>> _searchInternetArchiveLibriVox(String term,
-      {int limit = 20}) async {
+      {int limit = 20, int offset = 0}) async {
     try {
+      // archive.org pages by whole pages of [limit] rows, so [offset] is
+      // expected to be a multiple of it (Discover pages by its page size).
+      final page = limit > 0 ? offset ~/ limit + 1 : 1;
       final archiveQuery =
-          '$_archiveUrl?q=collection:(librivoxaudio) AND mediatype:(audio) AND (title:(${Uri.encodeComponent(term)}) OR creator:(${Uri.encodeComponent(term)}))&fl[]=identifier,title,creator,description,publicdate&sort[]=downloads+desc&rows=$limit&output=json';
+          '$_archiveUrl?q=collection:(librivoxaudio) AND mediatype:(audio) AND (title:(${Uri.encodeComponent(term)}) OR creator:(${Uri.encodeComponent(term)}))&fl[]=identifier,title,creator,description,publicdate&sort[]=downloads+desc&rows=$limit&page=$page&output=json';
 
       final response = await _client
           .get(Uri.parse(archiveQuery), headers: _headers)
@@ -211,6 +219,82 @@ class LibriVoxService {
       debugPrint('Internet Archive search error: $e');
     }
     return [];
+  }
+
+  /// The `title=^...` queries to try for a stored [title], most specific
+  /// first. LibriVox drops a leading article and writes "(version N)", so
+  /// the query is the lower-cased base title; a "Vol. 032" title is first
+  /// tried with its bare number ("... collection 032"), which is how
+  /// LibriVox names those.
+  static List<String> narratorSearchTerms(String title) {
+    final split = splitTitleVariant(title);
+    final base = split.base
+        .toLowerCase()
+        .replaceFirst(RegExp(r'^(the|an|a)\s+'), '')
+        .trim();
+    final terms = <String>[];
+    final number = RegExp(r'^(?:vol\.?|volume)\s*(\d+)$', caseSensitive: false)
+        .firstMatch(split.label ?? '');
+    if (number != null) terms.add('$base ${number.group(1)}');
+    terms.add(base);
+    return terms;
+  }
+
+  /// The readers of the book archived as [archiveId] (the id the Library
+  /// stores), for the one-off narrator backfill. The LibriVox feed has no
+  /// lookup by archive identifier, so this searches by [title] (see
+  /// [narratorSearchTerms]) and picks the result whose `url_iarchive` is
+  /// [archiveId]. Rate limited, at most [maxPages] requests per term.
+  ///
+  /// `names` is null when nothing matched; `sawBooks` says whether any
+  /// search returned books (false means the queries found nothing at all,
+  /// which may be a bad query rather than a missing book). Throws when a
+  /// request itself failed.
+  Future<({List<String>? names, bool sawBooks})> narratorsForArchiveId(
+      String archiveId, String title,
+      {int maxPages = 2}) async {
+    const pageSize = 50;
+    var sawBooks = false;
+    for (final term in narratorSearchTerms(title)) {
+      for (var page = 0; page < maxPages; page++) {
+        final url = '$_baseUrl/?format=json&extended=1&limit=$pageSize'
+            '&offset=${page * pageSize}'
+            '&title=${Uri.encodeQueryComponent('^$term')}';
+        final books = await _rateLimiter.dispatch<List<LibriVoxBook>>(
+          apiId: 'librivox',
+          call: () async {
+            final response = await _client
+                .get(Uri.parse(url), headers: _headers)
+                .timeout(const Duration(seconds: 30));
+            // LibriVox answers 404 "could not be found" for no results.
+            if (response.statusCode == 404) return const <LibriVoxBook>[];
+            if (response.statusCode != 200) {
+              throw http.ClientException(
+                  'LibriVox answered ${response.statusCode}');
+            }
+            final data = await compute(json.decode, response.body) as JsonMap;
+            final raw = data['books'];
+            final items = raw is JsonMap
+                ? raw.values
+                : raw is List
+                    ? raw
+                    : const [];
+            return [
+              for (final item in items)
+                if (item is JsonMap) LibriVoxBook.fromJson(item)
+            ];
+          },
+        );
+        if (books.isNotEmpty) sawBooks = true;
+        for (final book in books) {
+          final id = BookIdentity.archiveIdentifierFor(
+              librivoxApiId: book.id, urlIarchive: book.urlIarchive);
+          if (id == archiveId) return (names: book.narrators, sawBooks: true);
+        }
+        if (books.length < pageSize) break;
+      }
+    }
+    return (names: null, sawBooks: sawBooks);
   }
 
   Future<LibriVoxBook?> getBookById(String id) async {

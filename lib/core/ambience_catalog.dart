@@ -15,7 +15,7 @@ enum AmbienceGroup {
 }
 
 /// One bundled, seamlessly looping background sound. Built by
-/// `tool/ambience/prepare_ambience.py`; recordings are CC0 (BigSoundBank),
+/// `tool/ambience/prepare_ambience.py`; recordings are CC0 (BigSoundBank, plus `battle` and `sword_fight` from Freesound),
 /// the three noises are synthesised (see `assets/ambience/CREDITS.md`).
 class AmbienceSound {
   final String id;
@@ -44,6 +44,25 @@ class AmbienceSound {
         Icons.thunderstorm_rounded),
     AmbienceSound('city_street', 'City street', AmbienceGroup.places,
         Icons.location_city_rounded),
+    AmbienceSound('river', 'River', AmbienceGroup.water, Icons.water_rounded),
+    AmbienceSound(
+        'gulls', 'Seagulls', AmbienceGroup.nature, Icons.flutter_dash_rounded),
+    AmbienceSound('jungle_insects', 'Jungle insects', AmbienceGroup.nature,
+        Icons.bug_report_rounded),
+    AmbienceSound('night_crickets', 'Night crickets', AmbienceGroup.nature,
+        Icons.nightlight_round),
+    AmbienceSound('wind', 'Wind', AmbienceGroup.weather, Icons.air_rounded),
+    AmbienceSound('tavern_crowd', 'Tavern crowd', AmbienceGroup.places,
+        Icons.local_bar_rounded),
+    AmbienceSound('fireplace', 'Fireplace', AmbienceGroup.places,
+        Icons.fireplace_rounded),
+    AmbienceSound('ship_timbers', 'Ship timbers', AmbienceGroup.places,
+        Icons.sailing_rounded),
+    AmbienceSound('horses', 'Horses', AmbienceGroup.places, Icons.pets_rounded),
+    AmbienceSound('battle', 'Battlefield', AmbienceGroup.places,
+        Icons.shield_rounded),
+    AmbienceSound('sword_fight', 'Sword fight', AmbienceGroup.places,
+        Icons.sports_martial_arts_rounded),
     AmbienceSound('white_noise', 'White noise', AmbienceGroup.noise,
         Icons.graphic_eq_rounded),
     AmbienceSound('pink_noise', 'Pink noise', AmbienceGroup.noise,

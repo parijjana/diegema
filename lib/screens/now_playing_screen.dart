@@ -2,10 +2,12 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import '../core/app_settings.dart';
 import '../core/player_controls_style.dart';
 import '../core/ui_preferences.dart';
+import '../core/utils/duration_format.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
 import '../services/hidden_books_store.dart';
@@ -16,6 +18,7 @@ import '../theme/app_theme.dart';
 import '../widgets/download_controls.dart';
 import '../widgets/app_book_cover.dart';
 import '../widgets/app_state_view.dart';
+import '../widgets/bookmarks_sheet.dart';
 import '../widgets/continue_from_banner.dart';
 import '../widgets/listeners_sheet.dart';
 import '../widgets/player_scrubber.dart';
@@ -900,12 +903,14 @@ class _ActiveView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  AppBookCover(
-                    bookId: book.id,
-                    title: book.title,
-                    coverUrl: book.coverArtUrlOrPath,
-                    width: size,
-                    height: size,
+                  _CoverSizeCycler(
+                    child: AppBookCover(
+                      bookId: book.id,
+                      title: book.title,
+                      coverUrl: book.coverArtUrlOrPath,
+                      width: size,
+                      height: size,
+                    ),
                   ),
                   const SizedBox(height: Sp.x5),
                   Padding(
@@ -926,8 +931,8 @@ class _ActiveView extends StatelessWidget {
                     builder: (context, index, _) {
                       final chapterLabel = index < book.chapters.length &&
                               book.chapters.isNotEmpty
-                          ? '${book.author} · ${book.chapters[index].title} of '
-                              '${book.chapters.length}'
+                          ? '${book.author} · ${chapterPositionLabel(index, book.chapters.length)}'
+                              '${chapterNameOf(book.chapters[index].title) == null ? '' : ' · ${chapterNameOf(book.chapters[index].title)}'}'
                           : book.author;
                       return Padding(
                         padding:
@@ -963,11 +968,14 @@ class _ActiveView extends StatelessWidget {
                       children: [
                         SpeedSelector(audioService: audioService),
                         SleepTimerSelector(audioService: audioService),
+                        BookmarksButton(
+                            book: book, audioService: audioService, db: db),
                       ],
                     )
                   : _ActionRow(
                       audioService: audioService,
                       book: book,
+                      db: db,
                       onShowUpNext: onShowUpNext,
                     ),
             ],
@@ -1094,9 +1102,31 @@ class _ActiveView extends StatelessWidget {
                                         box.maxHeight - titleReserve)
                                     .clamp(120.0, box.maxWidth)
                                     .toDouble();
-                                return SingleChildScrollView(
-                                  child: headerFor(size, bleed: true),
-                                );
+                                final coverChoice =
+                                    SettingsScope.maybeOf(context)?.coverSize ??
+                                        CoverSize.large;
+                                switch (coverChoice) {
+                                  case CoverSize.large:
+                                    return SingleChildScrollView(
+                                      child: headerFor(size, bleed: true),
+                                    );
+                                  case CoverSize.medium:
+                                    return SingleChildScrollView(
+                                      child: _MediumHeader(
+                                        book: book,
+                                        audioService: audioService,
+                                        coverSize: (size * 0.7)
+                                            .clamp(96.0, box.maxWidth)
+                                            .toDouble(),
+                                      ),
+                                    );
+                                  case CoverSize.stamp:
+                                    return _StampHeader(
+                                      book: book,
+                                      audioService: audioService,
+                                      maxHeight: box.maxHeight,
+                                    );
+                                }
                               },
                             ),
                           ),
@@ -1179,10 +1209,12 @@ class _CoverBackdrop extends StatelessWidget {
 class _ActionRow extends StatelessWidget {
   final AudioPlaybackService audioService;
   final UnifiedAudiobook book;
+  final AppDatabase db;
   final VoidCallback onShowUpNext;
   const _ActionRow({
     required this.audioService,
     required this.book,
+    required this.db,
     required this.onShowUpNext,
   });
 
@@ -1211,6 +1243,12 @@ class _ActionRow extends StatelessWidget {
       ),
       SpeedSelector(audioService: audioService, face: face),
       SleepTimerSelector(audioService: audioService, face: face),
+      BookmarksButton(
+          book: book,
+          audioService: audioService,
+          db: db,
+          face: face,
+          radius: radius),
     ];
     final count = children.length;
 
@@ -1223,31 +1261,53 @@ class _ActionRow extends StatelessWidget {
     // `SizedBox`es sidestep flex layout entirely.
     return LayoutBuilder(
       builder: (context, constraints) {
+        final scale = MediaQuery.textScalerOf(context).scale(1);
+        // Four across while the longest label (seven characters: "Up next",
+        // "Chapter") fits a quarter of the row on one line; otherwise the
+        // row folds into two rows of two instead of clipping or breaking
+        // words. An estimate, not a measurement, so the layout does not
+        // depend on which font is loaded (0.6 em a character errs wide).
+        final quarter = (constraints.maxWidth - Sp.x2 * (count - 1)) / count;
+        final needed = 7 * 0.6 * 13 * scale + 2 * Sp.x1;
+        final cols = needed > quarter ? 2 : count;
+        final rows = (count / cols).ceil();
+        List<Widget> rowOf(int r, double width, double? height,
+                {Widget? divider}) =>
+            [
+              for (var i = r * cols;
+                  i < math.min(count, (r + 1) * cols);
+                  i++) ...[
+                if (i > r * cols) divider ?? const SizedBox(width: Sp.x2),
+                SizedBox(width: width, height: height, child: children[i]),
+              ],
+            ];
         switch (style) {
           case PlayerControlsStyle.tiles:
           case PlayerControlsStyle.round:
-            // A tile holds two lines (caption over value), so it grows
-            // with the text scale rather than clipping them at 2x.
-            final scale = MediaQuery.textScalerOf(context).scale(1);
+            // Icon, then the caption, then the value: three lines that grow
+            // with the text scale.
             final height = style == PlayerControlsStyle.tiles
-                ? math.max(56.0, 20 + 37 * scale)
+                ? math.max(Dim.tapMin + 8, 12 + 16 + 2 + (18 + 20) * scale)
                 : null;
-            final width = (constraints.maxWidth - Sp.x2 * (count - 1)) / count;
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            final width = (constraints.maxWidth - Sp.x2 * (cols - 1)) / cols;
+            return Column(
               children: [
-                for (var i = 0; i < children.length; i++) ...[
-                  if (i > 0) const SizedBox(width: Sp.x2),
-                  SizedBox(width: width, height: height, child: children[i]),
+                for (var r = 0; r < rows; r++) ...[
+                  if (r > 0) const SizedBox(height: Sp.x2),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: rowOf(r, width, height),
+                  ),
                 ],
               ],
             );
           case PlayerControlsStyle.bar:
             // Icon over label, so four segments still fit; grows with text.
-            final scale = MediaQuery.textScalerOf(context).scale(1);
-            final height = math.max(56.0, 32 + 18 * scale);
+            final height = math.max(56.0, 8 + 20 + 2 + 18 * scale);
             // 1px border each side, a 1px divider between segments.
-            final width = (constraints.maxWidth - 2 - (count - 1)) / count;
+            final width = (constraints.maxWidth - 2 - (cols - 1)) / cols;
+            final vDivider =
+                Container(width: 1, height: height - 20, color: c.border);
             return Container(
               decoration: BoxDecoration(
                 color: c.glassSurface,
@@ -1256,12 +1316,11 @@ class _ActionRow extends StatelessWidget {
                 boxShadow: c.shadowUi,
               ),
               clipBehavior: Clip.antiAlias,
-              child: Row(
+              child: Column(
                 children: [
-                  for (var i = 0; i < children.length; i++) ...[
-                    if (i > 0)
-                      Container(width: 1, height: height - 20, color: c.border),
-                    SizedBox(width: width, height: height, child: children[i]),
+                  for (var r = 0; r < rows; r++) ...[
+                    if (r > 0) Container(height: 1, color: c.border),
+                    Row(children: rowOf(r, width, height, divider: vDivider)),
                   ],
                 ],
               ),
@@ -1394,32 +1453,29 @@ class _TileFace extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: Sp.x2),
+      padding: const EdgeInsets.symmetric(horizontal: Sp.x1, vertical: 6),
       decoration: BoxDecoration(
         color: face.active ? c.accentWash : c.glassSurface,
         borderRadius: R.md,
         border: Border.all(color: face.active ? c.accent : c.border),
         boxShadow: c.shadowUi,
       ),
+      // Icon above the caption above the value: the narrow slot (a quarter
+      // of a phone's width) is spent on height, not on an icon beside the
+      // word, so the caption reads in full. It wraps rather than clips.
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(face.icon, size: 16, color: c.accentText),
-              const SizedBox(width: Sp.x1),
-              Flexible(
-                child: Text(face.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppType.caption.copyWith(color: c.textSecondary)),
-              ),
-            ],
-          ),
+          Icon(face.icon, size: 16, color: c.accentText),
+          Text(face.caption,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppType.caption.copyWith(color: c.textSecondary)),
           Text(face.value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: AppType.label
                   .copyWith(color: c.text, fontWeight: FontWeight.w700)),
         ],
@@ -1485,6 +1541,7 @@ class _BarFace extends StatelessWidget {
           Text(face.short,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: AppType.caption
                   .copyWith(color: c.text, fontWeight: FontWeight.w600)),
         ],
@@ -1508,6 +1565,7 @@ class _PlaybackErrorNote extends StatefulWidget {
 
 class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
   bool _filesUnreadable = false;
+  bool _needsAccess = false;
   String? _failed;
 
   /// The re-download's phase last time the queue notified, to catch the
@@ -1534,10 +1592,26 @@ class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
 
   Future<void> _checkFiles() async {
     final book = widget.service.currentBookNotifier.value;
-    if (book == null || !canRedownload(book)) return;
+    if (book == null) return;
     final ok = await downloadedChapterReadable(
         book, widget.service.chapterIndexNotifier.value);
-    if (mounted && !ok) setState(() => _filesUnreadable = true);
+    if (ok) return;
+    // After a reinstall on Android the files are still there; only the
+    // permission is gone. Ask for it before offering a whole new download.
+    final needsAccess = await needsAudioReadAccess();
+    if (!mounted) return;
+    if (needsAccess) {
+      setState(() => _needsAccess = true);
+    } else if (canRedownload(book)) {
+      setState(() => _filesUnreadable = true);
+    }
+  }
+
+  Future<void> _allowAccess() async {
+    if (!await requestAudioReadAccess() || !mounted) return;
+    setState(() => _needsAccess = false);
+    await widget.service.retryCurrentChapter();
+    await _checkFiles();
   }
 
   /// Through the app-wide queue, so it carries on if the app is
@@ -1592,11 +1666,18 @@ class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
                   (download?.phase == DownloadPhase.failed
                       ? download!.error
                       : null) ??
-                  (_filesUnreadable
-                      ? "This book's downloaded files can't be read"
-                      : "Couldn't play this chapter"),
+                  (_needsAccess
+                      ? 'Diegema needs permission to read your audiobooks'
+                      : _filesUnreadable
+                          ? "This book's downloaded files can't be read"
+                          : "Couldn't play this chapter"),
               style: AppType.label.copyWith(color: c.danger)),
-          if (_filesUnreadable && download != null && download.isActive)
+          if (_needsAccess)
+            TextButton(
+              onPressed: _allowAccess,
+              child: const Text('Allow access'),
+            )
+          else if (_filesUnreadable && download != null && download.isActive)
             Text(downloadLabel(downloads!, download),
                 style: AppType.label.copyWith(color: c.text))
           else if (_filesUnreadable && downloads != null)
@@ -1619,4 +1700,302 @@ class _PlaybackErrorNoteState extends State<_PlaybackErrorNote> {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Chapter labels and the cover-size variants (phone layout only)
+// ---------------------------------------------------------------------------
+
+final RegExp _chapterPrefix =
+    RegExp(r'^\s*chapter\s+\d+\s*[:.\-\u2013\u2014]?\s*', caseSensitive: false);
+
+/// "Chapter 1 of 40": the 1-based position in the book, never glued to the
+/// chapter's own title (that used to read "Chapter 1: The Riddle House of
+/// 40", because the count was appended straight onto the title).
+String chapterPositionLabel(int index, int count) =>
+    'Chapter ${index + 1} of $count';
+
+/// The chapter's own name with any leading "Chapter N:" removed, since the
+/// position is shown separately. Null when nothing is left ("Chapter 1").
+String? chapterNameOf(String title) {
+  final name = title.replaceFirst(_chapterPrefix, '').trim();
+  return name.isEmpty ? null : name;
+}
+
+/// Long-press cycles the cover size Large -> Medium -> Stamp and says which
+/// size it landed on. Chosen over a button so the default layout keeps
+/// exactly its current pixels; also exposed as a screen-reader custom
+/// action, and the Settings row mentions it.
+class _CoverSizeCycler extends StatelessWidget {
+  final Widget child;
+  const _CoverSizeCycler({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = SettingsScope.maybeOf(context);
+    if (settings == null) return child;
+    void cycle() {
+      final next = settings.coverSize.next;
+      settings.setCoverSize(next);
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      messenger?.hideCurrentSnackBar();
+      messenger?.showSnackBar(SnackBar(
+        content: Text('Cover size: ${next.label}'),
+        duration: const Duration(seconds: 2),
+      ));
+    }
+
+    return Semantics(
+      hint: 'Press and hold to change the cover size',
+      customSemanticsActions: {
+        const CustomSemanticsAction(label: 'Change cover size'): cycle,
+      },
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: cycle,
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Medium: a 70% cover and the chapter given the room.
+class _MediumHeader extends StatelessWidget {
+  final UnifiedAudiobook book;
+  final AudioPlaybackService audioService;
+  final double coverSize;
+  const _MediumHeader({
+    required this.book,
+    required this.audioService,
+    required this.coverSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _CoverSizeCycler(
+            child: AppBookCover(
+              bookId: book.id,
+              title: book.title,
+              coverUrl: book.coverArtUrlOrPath,
+              width: coverSize,
+              height: coverSize,
+            ),
+          ),
+          const SizedBox(height: Sp.x4),
+          Text(book.title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.body.copyWith(
+                  color: c.textSecondary, fontWeight: FontWeight.w600)),
+          Text(book.author,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.caption.copyWith(color: c.textSecondary)),
+          const SizedBox(height: Sp.x3),
+          ValueListenableBuilder<int>(
+            valueListenable: audioService.chapterIndexNotifier,
+            builder: (context, index, _) {
+              if (book.chapters.isEmpty || index >= book.chapters.length) {
+                return const SizedBox.shrink();
+              }
+              final name = chapterNameOf(book.chapters[index].title);
+              return Column(
+                children: [
+                  Text(chapterPositionLabel(index, book.chapters.length),
+                      key: const Key('chapter_position'),
+                      textAlign: TextAlign.center,
+                      style: AppType.label.copyWith(color: c.accent)),
+                  if (name != null) ...[
+                    const SizedBox(height: Sp.x1),
+                    Text(name,
+                        key: const Key('chapter_name'),
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.titleMd.copyWith(
+                            color: c.text,
+                            fontSize: 26,
+                            height: 32 / 26,
+                            fontWeight: FontWeight.w800)),
+                  ],
+                  const SizedBox(height: Sp.x2),
+                  _TimeLeft(
+                      book: book, audioService: audioService, index: index),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "12:34 left in chapter" and "1:02:03 left in book", from the live
+/// position/duration plus the sum of the later chapters' stored durations.
+/// Either line is left out when its input is unknown (zero).
+class _TimeLeft extends StatelessWidget {
+  final UnifiedAudiobook book;
+  final AudioPlaybackService audioService;
+  final int index;
+  const _TimeLeft(
+      {required this.book, required this.audioService, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AnimatedBuilder(
+      animation: Listenable.merge(
+          [audioService.positionNotifier, audioService.durationNotifier]),
+      builder: (context, _) {
+        final total = audioService.durationNotifier.value;
+        final left = total - audioService.positionNotifier.value;
+        final laterSecs = [
+          for (var i = index + 1; i < book.chapters.length; i++)
+            book.chapters[i].durationSeconds
+        ];
+        final laterKnown = laterSecs.every((s) => s > 0);
+        final chapterLeft =
+            total > Duration.zero && left >= Duration.zero ? left : null;
+        final bookLeft = chapterLeft != null && laterKnown
+            ? chapterLeft +
+                Duration(seconds: laterSecs.fold<int>(0, (a, b) => a + b))
+            : null;
+        final style = AppType.tabularBody(c.textSecondary);
+        return Column(
+          children: [
+            if (chapterLeft != null)
+              Text('${formatTimecode(chapterLeft)} left in chapter',
+                  key: const Key('chapter_left'),
+                  textAlign: TextAlign.center,
+                  style: style),
+            if (bookLeft != null)
+              Text('${formatTimecode(bookLeft)} left in book',
+                  key: const Key('book_left'),
+                  textAlign: TextAlign.center,
+                  style: style),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Stamp: a ~64dp rounded cover beside the text, and below it deliberately
+/// empty space that fills the rest of the area.
+class _StampHeader extends StatelessWidget {
+  final UnifiedAudiobook book;
+  final AudioPlaybackService audioService;
+  final double maxHeight;
+  const _StampHeader({
+    required this.book,
+    required this.audioService,
+    required this.maxHeight,
+  });
+
+  static const double stampSize = 64;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Column(
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _CoverSizeCycler(
+                    child: ConstrainedBox(
+                      // Never below the 48dp tap size.
+                      constraints:
+                          const BoxConstraints(minWidth: 48, minHeight: 48),
+                      child: ClipRRect(
+                        key: const Key('stamp_cover'),
+                        borderRadius: BorderRadius.circular(8),
+                        child: AppBookCover(
+                          bookId: book.id,
+                          title: book.title,
+                          coverUrl: book.coverArtUrlOrPath,
+                          width: stampSize,
+                          height: stampSize,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: Sp.x3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(book.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.serif(AppType.titleSm)
+                                .copyWith(color: c.text)),
+                        ValueListenableBuilder<int>(
+                          valueListenable: audioService.chapterIndexNotifier,
+                          builder: (context, index, _) {
+                            if (book.chapters.isEmpty ||
+                                index >= book.chapters.length) {
+                              return Text(book.author,
+                                  style: AppType.body
+                                      .copyWith(color: c.textSecondary));
+                            }
+                            final name =
+                                chapterNameOf(book.chapters[index].title);
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                    '${book.author} · '
+                                    '${chapterPositionLabel(index, book.chapters.length)}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppType.body
+                                        .copyWith(color: c.textSecondary)),
+                                if (name != null)
+                                  Text(name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppType.body.copyWith(
+                                          color: c.text,
+                                          fontWeight: FontWeight.w600)),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const Expanded(child: _ReclaimedSpace()),
+      ],
+    );
+  }
+}
+
+/// The space the Stamp layout frees up. Deliberately EMPTY: the owner will
+/// decide what goes here. Put the new content inside this widget's build.
+class _ReclaimedSpace extends StatelessWidget {
+  const _ReclaimedSpace();
+
+  @override
+  Widget build(BuildContext context) =>
+      const SizedBox.expand(key: Key('reclaimed_space'));
 }

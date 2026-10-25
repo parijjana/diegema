@@ -14,6 +14,7 @@
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:diegema/database/app_database_io.dart';
+import 'package:diegema/domain/models/audiobook.dart';
 
 import '../generated_migrations/schema.dart';
 
@@ -241,6 +242,73 @@ void main() {
       expect(row.portableKey, isNull);
       expect(await migratedDb.select(migratedDb.syncRecords).get(), isEmpty);
       await migratedDb.close();
+    });
+
+    test(
+        'upgrade from v4 to v5 keeps every row, adds a null narrators column, '
+        'and narrators then round-trip', () async {
+      final v4 = await verifier.schemaAt(4);
+      final raw = v4.rawDatabase;
+      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      for (var i = 0; i < 3; i++) {
+        raw.execute(
+          "INSERT INTO audiobooks (id, title, author, description, source, "
+          "origin, cover_url, user_cover_path, is_downloaded, is_pinned, "
+          "pin_order, hidden_from_continue, portable_key, created_at) VALUES "
+          "('b$i', 'Book $i', 'Author', 'd', 'LibriVox', 'librivox', NULL, "
+          "NULL, 1, 0, NULL, 0, 'lv:b$i', $now)",
+        );
+        raw.execute(
+          "INSERT INTO chapters (id, audiobook_id, chapter_index, title, "
+          "audio_path_or_url, duration_seconds, is_stream, start_ms, end_ms) "
+          "VALUES ('b${i}_c0', 'b$i', 0, 'One', '/x/$i.mp3', 60, 0, NULL, "
+          "NULL)",
+        );
+        raw.execute(
+          "INSERT INTO playback_progress (audiobook_id, chapter_index, "
+          "position_seconds, updated_at) VALUES ('b$i', 0, ${100 + i}, $now)",
+        );
+        raw.execute(
+          "INSERT INTO bookmarks (id, audiobook_id, chapter_index, "
+          "position_seconds, end_position_seconds, title, note, created_at) "
+          "VALUES ('bm$i', 'b$i', 0, 5, NULL, 't', 'n', $now)",
+        );
+      }
+      raw.execute(
+        "INSERT INTO sync_records (slot, kind, key, device_id, hlc, payload, "
+        "deleted) VALUES ('s1', 'progress', 'lv:gone', 'dev', 'h', '{}', 0)",
+      );
+
+      final db = AppDatabase(v4.newConnection());
+      await verifier.migrateAndValidate(db, 5);
+
+      expect((await db.select(db.audiobooks).get()).length, 3);
+      expect((await db.select(db.chapters).get()).length, 3);
+      expect((await db.select(db.playbackProgress).get()).length, 3);
+      expect((await db.select(db.bookmarks).get()).length, 3);
+      expect((await db.select(db.syncRecords).get()).length, 1);
+      final b1 = (await db.getAudiobook('b1'))!;
+      expect(b1.narrators, isEmpty);
+      expect(b1.chapters.single.audioPathOrUrl, '/x/1.mp3');
+      final keys = [
+        for (final r in await db.select(db.audiobooks).get()) r.portableKey
+      ]..sort();
+      expect(keys, ['lv:b0', 'lv:b1', 'lv:b2']);
+
+      // Round trip, and an empty-narrator save must not erase the readers.
+      await db.saveAudiobook(UnifiedAudiobook(
+          id: 'b1',
+          title: 'Book 1',
+          author: 'Author',
+          description: 'd',
+          narrators: const ['Ann Reader', 'Bob "Q" Voice']));
+      expect((await db.getAudiobook('b1'))!.narrators,
+          ['Ann Reader', 'Bob "Q" Voice']);
+      await db.saveAudiobook(UnifiedAudiobook(
+          id: 'b1', title: 'Book 1', author: 'Author', description: 'd'));
+      expect((await db.getAudiobook('b1'))!.narrators,
+          ['Ann Reader', 'Bob "Q" Voice']);
+      await db.close();
     });
   });
 }

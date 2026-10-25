@@ -22,6 +22,7 @@ import 'services/ambience_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/diegema_audio_handler.dart';
 import 'services/download_manager.dart';
+import 'core/sync_flag.dart';
 import 'services/sync/sync_controller.dart';
 import 'services/sync/sync_scheduler.dart';
 import 'services/folder_access.dart';
@@ -112,7 +113,7 @@ Future<void> main() async {
     // linked devices on this network at launch and whenever the app goes to
     // the background or comes back. Not awaited:
     // working out a local book's key reads its files.
-    if (!kDemoMode) {
+    if (kSyncEnabled && !kDemoMode) {
       final s = sync = createSyncController(nativeDb);
       if (s != null) {
         unawaited(s.foreground());

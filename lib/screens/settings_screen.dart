@@ -8,6 +8,7 @@ import '../core/playback_constants.dart';
 import '../core/player_controls_style.dart';
 import '../database/app_database.dart';
 import '../services/download_manager.dart';
+import '../core/sync_flag.dart';
 import '../services/sync/sync_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/library_folders_section.dart';
@@ -270,7 +271,7 @@ class SettingsScreen extends StatelessWidget {
                 children: [LibraryFoldersSection(db: db!)],
               ),
             // Only where linked-device sync exists (not the web demo).
-            if (SyncScope.maybeOf(context) != null)
+            if (syncEnabled && SyncScope.maybeOf(context) != null)
               _Section(
                 title: 'Devices',
                 children: [

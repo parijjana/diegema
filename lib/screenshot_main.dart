@@ -130,8 +130,6 @@ import 'core/demo_deeplink.dart';
 import 'core/demo_mode.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
-import 'screens/linked_devices_screen.dart';
-import 'screens/settings_screen.dart';
 import 'widgets/bookmarks_sheet.dart';
 import 'screenshot_mode.dart';
 import 'screenshot_seed.dart';
@@ -307,7 +305,7 @@ const List<_Target> _targets = [
     2.0,
     ScreenshotLayout.desktop,
     ScreenshotWindowControls.none,
-    [1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 2, 3, 4, 5, 6, 8],
   ),
   _Target(
     'microsoft-store',
@@ -319,7 +317,7 @@ const List<_Target> _targets = [
     2.0,
     ScreenshotLayout.desktop,
     ScreenshotWindowControls.none,
-    [1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 2, 3, 4, 5, 6, 8],
   ),
   _Target(
     'ios-app-store',
@@ -331,7 +329,7 @@ const List<_Target> _targets = [
     3.0,
     ScreenshotLayout.mobilePhone,
     ScreenshotWindowControls.none,
-    [1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 2, 3, 4, 5, 6, 8],
   ),
   _Target(
     'ios-app-store',
@@ -343,7 +341,7 @@ const List<_Target> _targets = [
     3.0,
     ScreenshotLayout.mobilePhone,
     ScreenshotWindowControls.none,
-    [1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 2, 3, 4, 5, 6, 8],
   ),
   _Target(
     'ios-app-store',
@@ -355,7 +353,7 @@ const List<_Target> _targets = [
     2.0,
     ScreenshotLayout.tablet,
     ScreenshotWindowControls.none,
-    [1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 2, 3, 4, 5, 6, 8],
   ),
   _Target(
     'ios-app-store',
@@ -367,7 +365,7 @@ const List<_Target> _targets = [
     2.0,
     ScreenshotLayout.tablet,
     ScreenshotWindowControls.none,
-    [1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 2, 3, 4, 5, 6, 8],
   ),
   _Target(
     'google-play',
@@ -379,7 +377,7 @@ const List<_Target> _targets = [
     3.0,
     ScreenshotLayout.mobilePhone,
     ScreenshotWindowControls.none,
-    [1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 2, 3, 4, 5, 6, 8],
   ),
   _Target(
     'google-play',
@@ -391,7 +389,7 @@ const List<_Target> _targets = [
     2.0,
     ScreenshotLayout.tablet,
     ScreenshotWindowControls.none,
-    [1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 2, 3, 4, 5, 6, 8],
   ),
   _Target(
     'google-play',
@@ -403,7 +401,7 @@ const List<_Target> _targets = [
     2.0,
     ScreenshotLayout.tablet,
     ScreenshotWindowControls.none,
-    [1, 2, 3, 4, 5, 6, 7, 8],
+    [1, 2, 3, 4, 5, 6, 8],
   ),
 ];
 
@@ -424,7 +422,6 @@ const Map<int, String> _sceneNames = {
   4: '04-bookmarks',
   5: '05-ambience',
   6: '06-settings',
-  7: '07-linked-devices',
   8: '08-now-playing-light',
   9: '09-book-detail',
 };
@@ -485,7 +482,6 @@ const Map<int, String> _expectedWidget = {
   4: 'NowPlayingScreen', // the sheet is opened over it by _afterMount
   5: 'AmbienceScreen',
   6: 'SettingsScreen',
-  7: 'SettingsScreen', // Linked devices is pushed over it by _afterMount
   8: 'NowPlayingScreen',
   9: 'BookDetailPane',
 };
@@ -497,18 +493,7 @@ const Map<int, String> _afterWidget = {
   3: 'LibriVoxBookItem',
   4: 'BookmarksSheet',
   5: 'AmbienceScreen',
-  7: 'LinkedDevicesScreen',
 };
-
-/// This device's name on the Linked devices shot, by store.
-String _deviceName(_Target t) => switch (t.device) {
-      'mac' => 'MacBook Air',
-      'desktop' => 'Surface Laptop',
-      'iphone-6.9' || 'iphone-6.5' => 'iPhone',
-      'ipad-13' || 'ipad-13-landscape' => 'iPad',
-      'phone' => 'Pixel 9',
-      _ => 'Galaxy Tab',
-    };
 
 // ---------------------------------------------------------------------------
 // SELECTIVE CAPTURE — optional filters. BOTH EMPTY (the default) means capture
@@ -818,10 +803,7 @@ class _CaptureAppState extends State<_CaptureApp> {
       artworkService: DemoArtworkService(),
       audioService: audio,
       ambience: ambience,
-      sync: ScreenshotSyncController(
-        thisDevice: _deviceName(t),
-        canScan: t.layout != ScreenshotLayout.desktop,
-      ),
+      // No sync controller: sync is off in v1, so no sync UI appears anywhere.
       // An empty override map: reads return defaults without touching the
       // `shared_preferences` platform channel, so no shot can inherit the
       // developer's own saved skip interval.
@@ -1160,17 +1142,6 @@ class _CaptureAppState extends State<_CaptureApp> {
           await Scrollable.ensureVisible(places,
               alignment: 0.12, duration: Duration.zero);
         }
-      case 7: // Settings -> Linked devices
-        final settings = _findElement(ctx, (w) => w is SettingsScreen);
-        if (settings == null) return false;
-        unawaited(
-          Navigator.of(settings).push(
-            MaterialPageRoute<void>(
-              builder: (_) =>
-                  LinkedDevicesScreen(pollForScanner: t.device == 'mac'),
-            ),
-          ),
-        );
       default:
         return true;
     }

@@ -22,7 +22,6 @@
 // fixed position instead of decoding audio.
 
 import 'package:drift/native.dart';
-import 'package:flutter/foundation.dart';
 
 import 'core/demo_mode.dart';
 import 'database/app_database.dart';
@@ -30,10 +29,6 @@ import 'domain/models/audiobook.dart';
 import 'services/ambience_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/demo_catalog.dart';
-import 'services/sync/sync_controller.dart';
-import 'sync/hlc.dart';
-import 'sync/sync_record.dart';
-import 'sync/sync_view.dart';
 
 /// The book the hero shot shows mid-listen. Pinned by id rather than picked
 /// dynamically ("first playable with enough chapters") so that reordering the
@@ -303,77 +298,3 @@ const AmbienceState kBattleMix = AmbienceState(
   ],
 );
 
-// ---------------------------------------------------------------------------
-// Linked-device sync
-
-/// A [SyncController] that reports a linked group of three devices and does
-/// nothing else. Only `status`, `view`, `lastSync`, `deviceName` and
-/// `canScan` are read by Settings -> Linked devices.
-class ScreenshotSyncController implements SyncController {
-  ScreenshotSyncController({required this.thisDevice, this.canScan = false}) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    SyncRecord device(String id, String name, String platform) => SyncRecord(
-          kind: SyncKind.device,
-          key: id,
-          hlc: Hlc(now, 0, id),
-          payload: {'name': name, 'platform': platform},
-        );
-    view = ValueNotifier(
-      SyncView('this-device', [
-        device('kitchen-ipad', 'Kitchen iPad', 'ios'),
-        device('study-mac', 'Study Mac', 'macos'),
-        device('windows-pc', 'Windows PC', 'windows'),
-      ]),
-    );
-    lastSync = ValueNotifier(
-      LastSync(DateTime.now().subtract(const Duration(minutes: 3)), 3),
-    );
-  }
-
-  final String thisDevice;
-
-  @override
-  late final ValueNotifier<SyncView?> view;
-  @override
-  late final ValueNotifier<LastSync?> lastSync;
-
-  @override
-  final bool canScan;
-  @override
-  Future<SyncStatus> status() async => SyncStatus.linked;
-  @override
-  Future<bool> isLinked() async => true;
-  @override
-  Future<String> deviceName() async => thisDevice;
-  @override
-  Future<void> setDeviceName(String name) async {}
-  @override
-  Future<void> refresh() async {}
-  @override
-  Future<void> foreground() async {}
-  @override
-  Future<void> background() async {}
-  @override
-  Future<int> syncNow() async => 3;
-  @override
-  Future<LinkOffer> createLinkOffer() =>
-      Future.error(UnsupportedError('screenshot sync'));
-  @override
-  Future<JoinOutcome> joinWithCode(String code, {bool replaceGroup = false}) =>
-      Future.error(UnsupportedError('screenshot sync'));
-  @override
-  Future<void> forgetDevice(String deviceId) async {}
-  @override
-  Future<void> unlink() async {}
-  @override
-  Future<void> resetKeys() async {}
-  @override
-  Future<Map<String, String>> portableKeys() async => const {};
-  @override
-  Future<void> linkBook(String bookId, String key) async {}
-  @override
-  Future<SyncFileExport> exportSyncFile() =>
-      Future.error(UnsupportedError('screenshot sync'));
-  @override
-  Future<int> importSyncFile(List<int> bytes) async => 0;
-}

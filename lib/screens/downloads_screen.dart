@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../core/app_settings.dart';
@@ -75,8 +77,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         return ListView(
           padding: EdgeInsets.fromLTRB(gutter, Sp.x4, gutter, Sp.x8),
           children: [
-            const DownloadsWifiToggle(),
-            const SizedBox(height: Sp.x6),
+            if (DownloadsWifiToggle.applies) ...[
+              const DownloadsWifiToggle(),
+              const SizedBox(height: Sp.x6),
+            ],
             _heading(context, 'In progress'),
             if (queue.isEmpty)
               _note(context, 'Nothing is downloading.')
@@ -126,6 +130,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 /// section. Off by default.
 class DownloadsWifiToggle extends StatelessWidget {
   const DownloadsWifiToggle({super.key});
+
+  /// Hidden on Windows: the desktop downloader cannot tell Wi-Fi from
+  /// Ethernet and ignores the setting, so the switch would do nothing.
+  static bool get applies => defaultTargetPlatform != TargetPlatform.windows;
 
   @override
   Widget build(BuildContext context) {

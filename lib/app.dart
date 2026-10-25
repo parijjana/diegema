@@ -13,6 +13,7 @@ import 'main.dart';
 import 'screens/library_screen.dart' show LibraryScanner;
 import 'services/artwork_enrichment_service.dart';
 import 'services/audio_playback_service.dart';
+import 'core/sync_flag.dart';
 import 'services/sync/sync_controller.dart';
 import 'services/download_manager.dart';
 import 'services/librivox_downloader.dart';
@@ -278,7 +279,7 @@ class _AudiobookAppState extends State<AudiobookApp>
   Widget _withAmbience(Widget app) {
     final ambience = widget.ambience;
     final downloads = widget.downloads;
-    final sync = widget.sync;
+    final sync = syncEnabled ? widget.sync : null;
     final withSync =
         sync == null ? app : SyncScope(controller: sync, child: app);
     final withDownloads = downloads == null

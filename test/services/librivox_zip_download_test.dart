@@ -80,8 +80,8 @@ void main() {
 
     expect(paths.map(p.basename), ['01.mp3', '02.mp3']);
     expect(File(paths.first).lengthSync(), 3000);
-    expect(
-        filesUnder(downloads)..sort(), ['Emma [1]/01.mp3', 'Emma [1]/02.mp3']);
+    expect(filesUnder(downloads)..sort(),
+        [p.join('Emma [1]', '01.mp3'), p.join('Emma [1]', '02.mp3')]);
     expect(progress.last, 1.0);
   });
 
@@ -95,7 +95,7 @@ void main() {
     await LibriVoxStreamAndDownloader(client: _serve(body))
         .downloadAndExtractZip(_book(), saveDirectoryPath: downloads);
 
-    expect(filesUnder(root.path), ['downloads/Emma [1]/01.mp3']);
+    expect(filesUnder(root.path), [p.join('downloads', 'Emma [1]', '01.mp3')]);
   });
 
   test('a dropped connection leaves no partial zip behind', () async {

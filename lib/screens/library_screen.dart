@@ -136,7 +136,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _load() async {
-    final sync = context.getInheritedWidgetOfExactType<SyncScope>()?.controller;
+    final sync = SyncScope.peek(context);
     setState(() {
       _loading = true;
       _error = null;

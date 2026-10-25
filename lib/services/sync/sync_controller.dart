@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../core/sync_flag.dart';
 import '../../database/app_database.dart';
 import '../../sync/sync_file.dart';
 import '../../sync/sync_view.dart';
@@ -134,8 +135,9 @@ enum JoinOutcome {
   otherGroup,
 }
 
+/// Null while sync is off (v1): nothing is constructed, so nothing listens.
 SyncController? createSyncController(AppDatabase db) =>
-    platform.createSyncController(db);
+    syncEnabled ? platform.createSyncController(db) : null;
 
 /// Puts the [SyncController]'s view in scope; dependents rebuild when it
 /// changes.
@@ -145,9 +147,19 @@ class SyncScope extends InheritedNotifier<ValueListenable<SyncView?>> {
   SyncScope({super.key, required this.controller, required super.child})
       : super(notifier: controller.view);
 
-  static SyncController? maybeOf(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<SyncScope>()?.controller;
+  // All three read as "no sync" while sync is off, whatever is in the tree.
+  static SyncController? maybeOf(BuildContext context) => !syncEnabled
+      ? null
+      : context.dependOnInheritedWidgetOfExactType<SyncScope>()?.controller;
 
-  static SyncView? viewOf(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<SyncScope>()?.notifier?.value;
+  static SyncController? peek(BuildContext context) => !syncEnabled
+      ? null
+      : context.getInheritedWidgetOfExactType<SyncScope>()?.controller;
+
+  static SyncView? viewOf(BuildContext context) => !syncEnabled
+      ? null
+      : context
+          .dependOnInheritedWidgetOfExactType<SyncScope>()
+          ?.notifier
+          ?.value;
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../helpers/sync_enabled.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:diegema/screens/linked_devices_screen.dart';
@@ -10,6 +11,7 @@ import '../helpers/fake_sync_controller.dart';
 import '../support/test_harness.dart';
 
 void main() {
+  enableSyncForTests();
   late FakeSyncController sync;
 
   // Built in setUp (the real zone), as the FakeAsync lesson asks.

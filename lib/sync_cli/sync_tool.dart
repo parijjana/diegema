@@ -70,15 +70,16 @@ class AppData {
       );
     }
     if (Platform.isWindows) {
-      // Unverified until the Windows build exists (SYNC_DESIGN S10).
-      final appData = env['APPDATA'] ?? '';
+      // The app's support folder (appDataDirectory, named by Runner.rc).
+      // An MSIX install redirects it under
+      // %LOCALAPPDATA%\Packages\<package>\LocalCache\Roaming: pass --db there.
+      final data =
+          p.join(env['APPDATA'] ?? '', 'Overengineered Hobbies', 'Diegema');
       return AppData(
-        database: File(database ?? p.join(home, 'Documents', 'diegema.sqlite')),
-        secrets: secrets == null ? null : File(secrets),
+        database: File(database ?? p.join(data, 'diegema.sqlite')),
+        secrets: File(secrets ?? p.join(data, syncSecretsFileName)),
         deviceId: deviceId ??
-            await _jsonPreference(
-                p.join(appData, 'com.overengineeredhobbies', 'diegema',
-                    'shared_preferences.json'),
+            await _jsonPreference(p.join(data, 'shared_preferences.json'),
                 'flutter.$_deviceIdKey'),
       );
     }

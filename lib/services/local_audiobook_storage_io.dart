@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../core/app_data_directory.dart';
+
 /// Result of [copyIntoLibrary]: the original-path -> durable-path mapping
 /// for every audio file copied, plus the durable cover path if a cover was
 /// copied too.
@@ -43,7 +45,7 @@ Future<LibraryCopyResult> copyIntoLibrary({
   required List<String> audioPaths,
   String? coverPath,
 }) async {
-  final appDocs = await getApplicationDocumentsDirectory();
+  final appDocs = await appDataDirectory();
   final libraryDir =
       Directory(p.join(appDocs.path, 'diegema', 'library', bookId));
   await libraryDir.create(recursive: true);

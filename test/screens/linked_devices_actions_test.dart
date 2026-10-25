@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../helpers/sync_enabled.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:diegema/screens/linked_devices_screen.dart';
@@ -11,6 +12,7 @@ import '../helpers/fake_sync_controller.dart';
 import '../support/test_harness.dart';
 
 void main() {
+  enableSyncForTests();
   // Built in setUp (the real zone), as the FakeAsync lesson asks.
   late FakeSyncController sync;
   var clockNow = DateTime(2026, 10, 3, 12);

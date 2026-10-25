@@ -204,8 +204,10 @@ Future<List<String>> _extractInto(
     for (final entry in archive) {
       if (!entry.isFile || entry.isSymbolicLink) continue;
       if (!entry.name.toLowerCase().endsWith('.mp3')) continue;
-      final target = p.canonicalize(p.join(root, p.normalize(entry.name)));
-      if (!p.isWithin(root, target)) continue; // zip-slip
+      final target = p.normalize(p.join(dir.path, entry.name));
+      // canonicalize lowercases on Windows, so it is for the check only:
+      // the stored chapter path keeps the folder's real case.
+      if (!p.isWithin(root, p.canonicalize(target))) continue; // zip-slip
       await Directory(p.dirname(target)).create(recursive: true);
       final out = OutputFileStream(target);
       written.add(File(target));

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../helpers/sync_enabled.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:diegema/screens/linked_devices_screen.dart';
@@ -34,6 +35,7 @@ class _FakePicker extends SyncFilePicker {
 }
 
 void main() {
+  enableSyncForTests();
   late FakeSyncController sync;
   late _FakePicker picker;
 

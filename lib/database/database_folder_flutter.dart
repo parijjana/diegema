@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import '../core/app_data_directory.dart';
 
-/// Where the app keeps its database (the app's documents folder).
-Future<Directory> defaultDatabaseFolder() => getApplicationDocumentsDirectory();
+/// Where the app keeps its database (see [appDataDirectory]).
+Future<Directory> defaultDatabaseFolder() => appDataDirectory();

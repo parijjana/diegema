@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/painting.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import '../core/app_data_directory.dart';
 
 import '../database/app_database.dart';
 import 'downloads_location.dart';
@@ -34,8 +34,7 @@ class StorageUsage {
 
 Future<String?> _coversDir(String? documentsPath) async {
   try {
-    final docs =
-        documentsPath ?? (await getApplicationDocumentsDirectory()).path;
+    final docs = documentsPath ?? (await appDataDirectory()).path;
     return p.join(docs, 'diegema', 'covers');
   } catch (_) {
     return null;

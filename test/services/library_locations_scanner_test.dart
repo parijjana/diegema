@@ -28,7 +28,7 @@ void main() {
   });
 
   String write(String relative) {
-    final file = File(p.join(location.path, relative))
+    final file = File(p.normalize(p.join(location.path, relative)))
       ..createSync(recursive: true)
       ..writeAsBytesSync(const [0]);
     return file.path;

@@ -37,6 +37,7 @@ class UiPreferences {
   static const String _skipBackOnResumeKey = 'playback.skip_back_on_resume';
   static const String _autoAdvanceKey = 'playback.auto_advance';
   static const String _textSizeKey = 'appearance.text_size';
+  static const String _coverSizeKey = 'appearance.cover_size';
   static const String _ambienceKey = 'ambience.v1';
   static const String _downloadsWifiOnlyKey = 'downloads.wifi_only';
 
@@ -330,6 +331,11 @@ class UiPreferences {
   /// The in-app text size, by enum name (see `TextSizeChoice`).
   Future<String?> getTextSizeName() => _getString(_textSizeKey);
   Future<void> setTextSizeName(String name) => _setString(_textSizeKey, name);
+
+  /// The Now Playing cover size, by enum name (see `CoverSize`).
+  Future<String?> getCoverSizeName() => _getString(_coverSizeKey);
+  Future<void> setCoverSizeName(String name) =>
+      _setString(_coverSizeKey, name);
 
   /// The ambience mixer's saved settings, as JSON (see `AmbienceState`).
   Future<String?> getAmbienceJson() => _getString(_ambienceKey);

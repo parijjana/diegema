@@ -94,6 +94,18 @@ class SettingsScreen extends StatelessWidget {
                   onChanged: settings.setTextSize,
                 ),
                 const SizedBox(height: Sp.x5),
+                _ChoiceGroup<CoverSize>(
+                  label: 'Cover size',
+                  description: 'How big the cover is on Now Playing. You can '
+                      'also press and hold the cover to change it.',
+                  value: settings.coverSize,
+                  options: [
+                    for (final v in CoverSize.values)
+                      _Choice(v, '${v.label} - ${v.description}'),
+                  ],
+                  onChanged: settings.setCoverSize,
+                ),
+                const SizedBox(height: Sp.x5),
                 _ThreeWayToggle<LibraryLayout>(
                   label: 'Library layout',
                   description: 'Books as a list, or as a grid of covers.',

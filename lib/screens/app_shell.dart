@@ -204,7 +204,8 @@ class _AppShellState extends State<AppShell> {
   /// they mean. Ambience (where the build has it; not the web demo) and
   /// Settings follow.
   static const _nowPlaying = _Destination(_Tab.nowPlaying, 'Now playing',
-      Icons.headphones_outlined, Icons.headphones_rounded);
+      Icons.headphones_outlined, Icons.headphones_rounded,
+      shortLabel: 'Playing');
   static const _library = _Destination(
       _Tab.library, 'Library', Icons.book_outlined, Icons.book_rounded);
   static const _discover = _Destination(
@@ -309,7 +310,11 @@ class _Destination {
   final String label;
   final IconData icon;
   final IconData selectedIcon;
-  const _Destination(this.tab, this.label, this.icon, this.selectedIcon);
+
+  /// Shorter label used when the full one would not fit its tile.
+  final String? shortLabel;
+  const _Destination(this.tab, this.label, this.icon, this.selectedIcon,
+      {this.shortLabel});
 }
 
 class _BottomNav extends StatelessWidget {
@@ -341,19 +346,54 @@ class _BottomNav extends StatelessWidget {
             ),
         ],
       ),
-      child: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: onSelect,
-        destinations: [
-          for (final d in destinations)
-            NavigationDestination(
-              icon: Icon(d.icon),
-              selectedIcon: Icon(d.selectedIcon),
-              label: d.label,
-              tooltip: d.label,
-            ),
-        ],
-      ),
+      child: LayoutBuilder(builder: (context, constraints) {
+        // A label that wraps ("Ambienc/e") is worse than none, so pick the
+        // richest label set that fits every tile on one line: full labels,
+        // then short ones, then icons only (tooltips and semantics keep the
+        // names). Tile width is the bar's width over the destination count;
+        // the text is measured at the user's text scale.
+        final scaler = MediaQuery.textScalerOf(context);
+        final tile = constraints.maxWidth / destinations.length - 4;
+        final style = Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontSize: _navLabelSize,
+                  fontWeight: FontWeight.w600,
+                ) ??
+            const TextStyle(fontSize: _navLabelSize);
+        bool fits(String Function(_Destination) pick) => destinations.every(
+            (d) => _estimatedWidth(pick(d), scaler) <= tile);
+        String Function(_Destination) pick = (d) => d.label;
+        var showLabels = true;
+        if (!fits(pick)) {
+          pick = (d) => d.shortLabel ?? d.label;
+          if (!fits(pick)) showLabels = false;
+        }
+        return NavigationBar(
+          selectedIndex: index,
+          onDestinationSelected: onSelect,
+          labelBehavior: showLabels
+              ? NavigationDestinationLabelBehavior.alwaysShow
+              : NavigationDestinationLabelBehavior.alwaysHide,
+          labelTextStyle: WidgetStatePropertyAll(style),
+          destinations: [
+            for (final d in destinations)
+              NavigationDestination(
+                icon: Icon(d.icon),
+                selectedIcon: Icon(d.selectedIcon),
+                label: pick(d),
+                tooltip: d.label,
+              ),
+          ],
+        );
+      }),
     );
   }
 }
+
+const double _navLabelSize = 13;
+
+/// Estimated label width. Deliberately an estimate, not a TextPainter
+/// measurement: it is deterministic, so the layout (and every test that
+/// finds a tab by its label) does not depend on which font is loaded, and
+/// 0.6 em per character errs on the wide side for a semi-bold sans.
+double _estimatedWidth(String text, TextScaler scaler) =>
+    text.length * 0.6 * scaler.scale(_navLabelSize);

@@ -64,16 +64,9 @@ class DiscoverScreen extends StatefulWidget {
 }
 
 class _DiscoverScreenState extends State<DiscoverScreen> {
-  /// Vertical space kept clear at the bottom of every scrollable on phone
-  /// widths, so the floating search field never permanently covers the
-  /// last shelf heading or an empty state's button. The field is ~52px
-  /// tall and sits [Sp.x4] off the bottom; the rest is breathing room.
-  ///
-  /// It floats *over* content by design (thumb reach beats a fixed bar),
-  /// but "floats over" has to mean "you can scroll past it", not "the
-  /// bottom of the page is unreachable" — which is what a 360x800 capture
-  /// showed: the "Top fiction" heading sat permanently behind the field.
-  static const double _floatingSearchReserve = 96;
+  /// Breathing room under the last row on phone widths. The search field
+  /// has its own strip below the list, so nothing needs reserving for it.
+  static const double _floatingSearchReserve = Sp.x4;
 
   /// Results per search page. A short page means the catalog has run out.
   static const int _searchPageSize = 20;
@@ -501,35 +494,27 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           return main;
         }
 
-        // Phone: search floats bottom centre, within thumb reach. It sits
-        // on a short gradient of the page background rather than directly
-        // on the shelves — without it, a shelf heading passing behind the
-        // field reads as a clipping bug rather than as content scrolling
-        // underneath an overlay.
-        return Stack(
+        // Phone: the search field sits bottom centre, within thumb reach,
+        // in its own strip under the list. It used to float over the
+        // shelves and the results grid, which left a row of covers under
+        // it whenever the list was not scrolled to its end; a strip means
+        // no content is ever beneath it, and "Load more" stays reachable
+        // above it.
+        return Column(
           children: [
-            Positioned.fill(child: main),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x6, Sp.x4, Sp.x4),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [c.bg.withValues(alpha: 0), c.bg, c.bg],
-                    stops: const [0, 0.55, 1],
-                  ),
-                ),
-                child: _SearchField(
-                  controller: _search,
-                  onSubmitted: _performSearch,
-                  onClear: _clearSearch,
-                  searching: _searching,
-                  elevated: true,
-                ),
+            Expanded(child: main),
+            Container(
+              padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x2, Sp.x4, Sp.x3),
+              decoration: BoxDecoration(
+                color: c.bg,
+                border: Border(top: BorderSide(color: c.border)),
+              ),
+              child: _SearchField(
+                controller: _search,
+                onSubmitted: _performSearch,
+                onClear: _clearSearch,
+                searching: _searching,
+                elevated: true,
               ),
             ),
           ],

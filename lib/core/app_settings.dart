@@ -93,6 +93,25 @@ enum TextSizeChoice {
       .firstWhere((t) => t.name == name, orElse: () => TextSizeChoice.system);
 }
 
+/// How big the cover is on Now Playing (phone layout). Stored by name;
+/// unknown falls back to [large], the original layout.
+enum CoverSize {
+  large('Large', 'Cover fills the screen width'),
+  medium('Medium', 'Smaller cover, bigger chapter details'),
+  stamp('Stamp', 'Postage-stamp cover beside the title');
+
+  final String label;
+  final String description;
+  const CoverSize(this.label, this.description);
+
+  /// The next size in the Large -> Medium -> Stamp -> Large cycle used by
+  /// the quick toggle on Now Playing.
+  CoverSize get next => CoverSize.values[(index + 1) % CoverSize.values.length];
+
+  static CoverSize fromName(String? name) => CoverSize.values
+      .firstWhere((c) => c.name == name, orElse: () => CoverSize.large);
+}
+
 /// Every user-adjustable preference, in one place, read from and written
 /// back to [UiPreferences].
 ///
@@ -131,6 +150,7 @@ class AppSettings extends ChangeNotifier {
   SkipBackOnResume _skipBackOnResume = SkipBackOnResume.s5;
   AutoAdvance _autoAdvance = AutoAdvance.stop;
   TextSizeChoice _textSize = TextSizeChoice.system;
+  CoverSize _coverSize = CoverSize.large;
 
   AppSettings({
     required UiPreferences preferences,
@@ -185,8 +205,13 @@ class AppSettings extends ChangeNotifier {
   /// In-app text size (Settings > Appearance).
   TextSizeChoice get textSize => _textSize;
 
+  /// Cover size on Now Playing (Settings > Appearance, and a long-press on
+  /// the cover itself).
+  CoverSize get coverSize => _coverSize;
+
   /// Pulls the persisted values in. Safe to call once, from `initState`.
   Future<void> load() async {
+    await _loadCoverSize();
     final storedTheme = _forcedThemeMode ?? await _preferences.getThemeMode();
     final storedSkip = await _preferences.getSkipSeconds();
     final storedSpeed = await _preferences.getDefaultSpeed();
@@ -244,6 +269,20 @@ class AppSettings extends ChangeNotifier {
     _autoAdvance = storedAdvance;
     _textSize = storedTextSize;
     notifyListeners();
+  }
+
+  Future<void> _loadCoverSize() async {
+    final stored = CoverSize.fromName(await _preferences.getCoverSizeName());
+    if (stored == _coverSize) return;
+    _coverSize = stored;
+    notifyListeners();
+  }
+
+  Future<void> setCoverSize(CoverSize value) async {
+    if (value == _coverSize) return;
+    _coverSize = value;
+    notifyListeners();
+    await _preferences.setCoverSizeName(value.name);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {

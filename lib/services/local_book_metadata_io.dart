@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
+import '../core/app_data_directory.dart';
 import '../core/utils/id3_metadata.dart';
 import '../core/utils/local_media_metadata.dart';
 import '../core/utils/mp4_metadata.dart';
@@ -89,7 +89,7 @@ Future<String?> findFolderCoverImageForFiles(List<String> paths) async {
 Future<String?> saveCoverBytes(
     Uint8List bytes, String? mime, String bookId) async {
   try {
-    final appDir = await getApplicationDocumentsDirectory();
+    final appDir = await appDataDirectory();
     final ext = mime == 'image/png' ? 'png' : 'jpg';
     final dir = Directory(p.join(appDir.path, 'diegema', 'covers'));
     await dir.create(recursive: true);

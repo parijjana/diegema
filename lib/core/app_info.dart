@@ -2,11 +2,11 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 /// Identity shown in the About section of the settings panel.
 ///
-/// ⚠️ **Diegema is a WORKING title, not the settled name.** The intent
-/// (owner, 2026-08-14) is to let the LibriVox community choose the real one
-/// if they are receptive to the project — so this will very likely change,
-/// and changing it should stay a one-line edit here plus `MaterialApp.title`
-/// in `app.dart`.
+/// **Diegema is the app's name** on every platform and store (settled for
+/// v1; it was a working title from 2026-08-14 until the store listings).
+/// The native display names (Android label, iOS/macOS bundle name, Windows
+/// Runner.rc and window title, web manifest, MSIX `display_name`) are set
+/// separately and must stay in step with this.
 ///
 /// Greek *διήγημα*, "a narrative" — the root of *diegesis*. Chosen partly
 /// because it was clear across the App Store, Play, GitHub, npm and the

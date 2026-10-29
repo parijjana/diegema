@@ -5,7 +5,6 @@ import 'core/app_info.dart';
 import 'core/app_settings.dart';
 import 'core/demo_deeplink.dart';
 import 'core/demo_mode.dart';
-import 'core/host_page_demo_notice.dart';
 import 'core/text_size.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
@@ -116,8 +115,7 @@ class AudiobookApp extends StatefulWidget {
   State<AudiobookApp> createState() => _AudiobookAppState();
 }
 
-class _AudiobookAppState extends State<AudiobookApp>
-    with WidgetsBindingObserver {
+class _AudiobookAppState extends State<AudiobookApp> {
   late final AppDatabase _db;
   late final AppSettings _settings;
 
@@ -134,10 +132,8 @@ class _AudiobookAppState extends State<AudiobookApp>
     );
     _settings.addListener(_onSettingsChanged);
     _db = widget.database ?? AppDatabase();
-    WidgetsBinding.instance.addObserver(this);
     _settings.load().then((_) => _syncDownloads());
     widget.ambience?.init();
-    _syncHostPageTheme();
 
     // Once per launch, before the cover backfill: migrate already-imported
     // local books whose chapters still point outside
@@ -173,9 +169,8 @@ class _AudiobookAppState extends State<AudiobookApp>
 
   void _onSettingsChanged() {
     _syncDownloads();
-    // `MaterialApp.themeMode` is read in `build`, so the app itself needs a
-    // rebuild; the host page's CSS chrome needs telling separately.
-    setState(_syncHostPageTheme);
+    // `MaterialApp.themeMode` is read in `build`, so the app needs a rebuild.
+    setState(() {});
   }
 
   /// The Wi-Fi only toggle lives in [AppSettings] like every preference;
@@ -183,48 +178,8 @@ class _AudiobookAppState extends State<AudiobookApp>
   void _syncDownloads() =>
       widget.downloads?.setWifiOnly(_settings.downloadsWifiOnly);
 
-  /// Only relevant under [ThemeMode.system]: the app's own colours follow the
-  /// OS automatically via [MaterialApp.themeMode], but the demo host page's
-  /// chrome is plain CSS and has to be told, or it stays on the old theme
-  /// while the app inside it flips.
-  @override
-  void didChangePlatformBrightness() {
-    super.didChangePlatformBrightness();
-    if (_settings.themeMode != ThemeMode.system) return;
-    setState(_syncHostPageTheme);
-  }
-
-  /// Whether the app is *showing* dark right now — which under
-  /// [ThemeMode.system] is a question about the OS, not about [_themeMode].
-  /// Read from the platform dispatcher rather than a [MediaQuery] because
-  /// this widget sits above [MaterialApp], so there is no guaranteed
-  /// `MediaQuery` ancestor to read from. Reached via `WidgetsBinding` — not
-  /// `PlatformDispatcher.instance` — so that a widget test driving
-  /// `tester.platformDispatcher` is actually obeyed.
-  bool get _isDarkMode => switch (_settings.themeMode) {
-        ThemeMode.light => false,
-        ThemeMode.dark => true,
-        ThemeMode.system =>
-          WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-              Brightness.dark,
-      };
-
-  /// Keeps the demo host page's chrome (the preview banner and the stage
-  /// around the app — see `web/demo_banner.css`) on the same theme as the
-  /// app. Demo-only and web-only: a no-op everywhere else, and never called
-  /// at all outside `kDemoMode`, so a normal build is untouched.
-  ///
-  /// Without this the chrome follows the OS `prefers-color-scheme` while the
-  /// app follows its own toggle, so flipping the theme inside the demo leaves
-  /// a light page wrapped around a dark app.
-  void _syncHostPageTheme() {
-    if (!kDemoMode) return;
-    setHostPageTheme(dark: _isDarkMode);
-  }
-
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _settings.removeListener(_onSettingsChanged);
     _settings.dispose();
     _db.close();

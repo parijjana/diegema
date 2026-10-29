@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Run a flutter command with assets/demo/** bundled. Store builds leave the demo
-# assets out (see pubspec.yaml); the web demo and the screenshot harness need them.
+# assets out (see pubspec.yaml); the screenshot harness needs them.
 #
-#   tool/with_demo_assets.sh flutter build web --release --dart-define=DEMO_MODE=true --pwa-strategy=none
 #   tool/with_demo_assets.sh flutter run -d macos -t lib/screenshot_main.dart --dart-define=DEMO_MODE=true
 #
 # pubspec.yaml is edited for the duration of the command and always restored.

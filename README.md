@@ -126,22 +126,6 @@ flutter run -d windows
 flutter build windows --release
 ```
 
-### Web demo (demo only)
-
-The web build is a demo with a canned 18-book catalogue and bundled cover art. It
-needs the demo assets, which are left out of normal builds, so go through the
-wrapper script that adds them for one command:
-
-```bash
-tool/with_demo_assets.sh flutter build web --release --dart-define=DEMO_MODE=true --pwa-strategy=none
-```
-
-`--pwa-strategy=none` matters: a stale service worker will otherwise serve cached
-HTML against new CSS, and the app renders as a grey box. See
-`assets/demo/covers/CREDITS.md` for the source and rights of every bundled cover.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how demo assets are kept out of store
-builds and how to run the store-screenshot harness.
-
 ---
 
 ## Credit and support for LibriVox

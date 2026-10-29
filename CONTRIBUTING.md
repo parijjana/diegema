@@ -32,10 +32,10 @@ fixes, documentation, UI polish and features are all welcome.
 
 ---
 
-## Demo assets, the web demo and screenshots
+## Demo assets and screenshots
 
-`assets/demo/**` (a canned catalogue and cover art) is used only by the web demo
-(`DEMO_MODE`) and by the store-screenshot harness (`lib/screenshot_main.dart`). It
+`assets/demo/**` (a canned catalogue and cover art) is used only by the
+store-screenshot harness (`lib/screenshot_main.dart`, built with `DEMO_MODE`). It
 is deliberately **not** listed in `pubspec.yaml`, so Android, iOS, macOS and
 Windows release builds do not ship it.
 
@@ -44,16 +44,12 @@ To build or run something that needs it, wrap the command in
 duration of the command and always restores the file afterwards:
 
 ```bash
-# Web demo
-tool/with_demo_assets.sh flutter build web --release \
-  --dart-define=DEMO_MODE=true --pwa-strategy=none
-
 # Store-screenshot harness (debug, so overflow detection is on)
 tool/with_demo_assets.sh flutter run -d macos \
   -t lib/screenshot_main.dart --dart-define=DEMO_MODE=true
 ```
 
-If you add a new asset that only the demo needs, put it under `assets/demo/` and
+If you add a new asset that only the screenshots need, put it under `assets/demo/` and
 extend the two lines in the script; do not list it in `pubspec.yaml`.
 
 ---

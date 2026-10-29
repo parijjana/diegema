@@ -7,7 +7,6 @@ import 'app.dart';
 import 'core/demo_deeplink.dart';
 import 'core/error_handling.dart';
 import 'core/demo_mode.dart';
-import 'core/host_page_demo_notice.dart';
 import 'core/ui_preferences.dart';
 import 'database/app_database.dart';
 import 'screens/app_shell.dart';
@@ -44,14 +43,6 @@ Future<void> main() async {
   if (!kIsWeb && await AppDatabase.isLibraryFromNewerVersion()) {
     runApp(const NewerLibraryApp());
     return;
-  }
-  // The "this is a preview" notice now lives in the host HTML page
-  // (`web/index.html`), outside the Flutter app entirely — see Task 1 of
-  // the UI redesign and `core/host_page_demo_notice.dart`. It ships
-  // hidden in the DOM on every web build and is only ever revealed here,
-  // so a non-demo build never shows it.
-  if (kDemoMode) {
-    revealHostPageDemoNotice();
   }
   // Demo builds only; `DemoDeepLink.fromUri` hands back an empty link in
   // every other build, whatever the URL says.

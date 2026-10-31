@@ -51,6 +51,11 @@ class AudioPlaybackService {
   /// or a cold start overwrites the saved place with 0.
   bool _loading = false;
 
+  /// True from the start of [loadBook] until the new chapter is being
+  /// loaded. In that window [_currentBook] is the new book while the player
+  /// still holds the old one's chapter and position, so nothing may be saved.
+  bool _switching = false;
+
   /// The book whose saved progress was just marked finished or reset. While
   /// it is the loaded (but not playing) book, pause/seek must not write its
   /// position back; cleared when it plays again or another book loads.
@@ -151,8 +156,11 @@ class AudioPlaybackService {
     });
   }
 
+  @visibleForTesting
+  Future<void> debugPersistCurrentProgress() => _persistCurrentProgress();
+
   Future<void> _persistCurrentProgress() async {
-    if (_loading) return;
+    if (_loading || _switching) return;
     if (_db != null &&
         _currentBook != null &&
         _currentBook!.id != _progressFrozenBookId) {
@@ -190,6 +198,45 @@ class AudioPlaybackService {
     bool resume = false,
   }) async {
     await init();
+    // Save the outgoing book's spot while it still owns the player, then
+    // block all saves until the new book's own chapter is loading. Without
+    // this the periodic timer could save the new book under the old book's
+    // chapter and position.
+    final state = stateNotifier.value;
+    if (_currentBook != null &&
+        _currentBook!.id != book.id &&
+        (state == PlaybackState.playing || state == PlaybackState.paused)) {
+      await _persistCurrentProgress();
+    }
+    _switching = true;
+    ({Duration position, bool resumed})? target;
+    try {
+      target = await _prepareBook(book,
+          initialChapterIndex: initialChapterIndex,
+          initialPosition: initialPosition,
+          autoPlay: autoPlay,
+          resume: resume);
+    } finally {
+      // _playCurrentChapter sets _loading synchronously, so saves stay
+      // blocked across the hand-over. Not cleared later: play() can run for
+      // the whole chapter.
+      _switching = false;
+    }
+    if (target == null) return;
+    await _playCurrentChapter(
+        seekToPosition: target.position, autoPlay: autoPlay);
+    if (target.resumed && !autoPlay) {
+      _pausedAt = _now().subtract(const Duration(hours: 1));
+    }
+  }
+
+  Future<({Duration position, bool resumed})?> _prepareBook(
+    UnifiedAudiobook book, {
+    int? initialChapterIndex,
+    Duration? initialPosition,
+    bool autoPlay = true,
+    bool resume = false,
+  }) async {
     _progressFrozenBookId = null;
     _currentBook = book;
     currentBookNotifier.value = book;
@@ -237,7 +284,7 @@ class AudioPlaybackService {
     _currentChapterIndex = targetChapter;
     chapterIndexNotifier.value = _currentChapterIndex;
 
-    if (book.chapters.isEmpty) return;
+    if (book.chapters.isEmpty) return null;
 
     // Skip back on resume. Playing now: rewind the seek. Loaded paused (cold
     // start): treat it as a long pause, so the first play() rewinds.
@@ -250,11 +297,7 @@ class AudioPlaybackService {
           rewindSeconds: choice.seconds);
     }
 
-    await _playCurrentChapter(
-        seekToPosition: targetPosition, autoPlay: autoPlay);
-    if (resumed && !autoPlay) {
-      _pausedAt = _now().subtract(const Duration(hours: 1));
-    }
+    return (position: targetPosition, resumed: resumed);
   }
 
   Future<void> _playCurrentChapter(

@@ -69,6 +69,9 @@ flutter:
     # Background ambience loops, built by tool/ambience/prepare_ambience.py
     # (CC0 recordings + generated noise; see assets/ambience/CREDITS.md).
     - assets/ambience/
+    # Inter's OFL.txt must travel with the font; shown on the licences page
+    # via lib/core/app_licenses.dart.
+    - assets/fonts/OFL.txt
 
   fonts:
     # Inter 4.0 (SIL Open Font License, assets/fonts/OFL.txt). The type

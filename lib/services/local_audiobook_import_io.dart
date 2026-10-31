@@ -8,7 +8,6 @@ import '../core/utils/book_identity.dart';
 import '../core/utils/mp4_chapters.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
-import 'cover_lookup_service.dart';
 import 'library_locations_scanner_io.dart';
 import 'folder_access.dart';
 import 'library_locations_store.dart';
@@ -215,9 +214,9 @@ Future<void> importFiles(
     await db.saveAudiobook(book);
     onSuccess();
 
-    if (coverPath == null) {
-      unawaited(_enrichCoverOnline(db, bookId, book.title, book.author));
-    }
+    // No online cover lookup here: a local book's title and author are the
+    // user's own, so they are only sent anywhere on an explicit "Find cover"
+    // request (see find_cover_service).
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -262,27 +261,4 @@ List<AudiobookChapter> _rewriteChapterPaths(
 String? _nonEmpty(String? value) {
   final trimmed = value?.trim();
   return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
-}
-
-/// The default authors assigned when no embedded tag supplied one — never
-/// meaningful as a search term, so [_enrichCoverOnline] treats them as "no
-/// author known" rather than passing them to the lookup.
-const _placeholderAuthors = {'Local Audiobook', 'Local Files'};
-
-/// Step 3 of the local-import cover pipeline: an online lookup, run after
-/// the book is already saved so it never blocks the import. Best-effort —
-/// any failure (including the lookup finding nothing) is silently
-/// swallowed; the book just keeps its placeholder cover.
-Future<void> _enrichCoverOnline(
-    AppDatabase db, String bookId, String title, String author) async {
-  try {
-    final knownAuthor = _placeholderAuthors.contains(author) ? null : author;
-    final url = await CoverLookupService()
-        .lookupCoverUrl(title: title, author: knownAuthor);
-    if (url != null) {
-      await db.setCoverUrl(bookId, url);
-    }
-  } catch (_) {
-    // Background enrichment only — never surfaces to the user.
-  }
 }

@@ -17,6 +17,7 @@ import 'app_book_cover.dart';
 import 'book_detail_pane.dart' show EmptyChaptersNote;
 import 'book_detail_parts.dart';
 import 'hide_book_action.dart';
+import '../services/find_cover_service.dart';
 import 'other_devices_section.dart';
 
 /// The Library-screen counterpart of Discover's `BookDetailPane`: the same
@@ -178,6 +179,46 @@ class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
     widget.onRemoved?.call();
   }
 
+  /// Explicit, user-requested lookup: the only time a local book's title or
+  /// author is sent to archive.org / Open Library.
+  Future<void> _findCover(BuildContext context) async {
+    final database = widget.db;
+    if (database == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Find cover online?'),
+        content: Text(
+          'This sends the title and author of "${book.title}" to '
+          'archive.org and Open Library, with your IP address.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Find cover'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final url = await findCoverOnRequest(database, book);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          url == null
+              ? 'No cover found'
+              : 'Cover found - it will show when you return to the library',
+        ),
+      ),
+    );
+    if (url != null) widget.onRemoved?.call();
+  }
+
   Future<void> _hide(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -300,6 +341,9 @@ class _LibraryBookDetailOverlayState extends State<LibraryBookDetailOverlay> {
           ? () => openFolder(folder)
           : null,
       showFolderLabel: folderLabel ?? 'Show folder',
+      onFindCover: widget.db != null && book.origin == BookIdentity.originLocal
+          ? () => _findCover(context)
+          : null,
       onHide: () => _hide(context),
       onRemove: widget.db == null ? null : () => _remove(context),
     );

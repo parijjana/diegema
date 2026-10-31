@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -10,7 +9,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:diegema/database/app_database.dart';
 import 'package:diegema/domain/models/audiobook.dart';
-import 'package:diegema/services/backfill_attempt_store.dart';
+import 'package:diegema/services/find_cover_service.dart';
 import 'package:diegema/services/cover_lookup_service.dart';
 import 'package:diegema/services/local_cover_backfill_service.dart';
 
@@ -30,8 +29,9 @@ void main() {
   late AppDatabase db;
 
   setUp(() async {
-    tempDir =
-        await Directory.systemTemp.createTemp('local_cover_backfill_test_');
+    tempDir = await Directory.systemTemp.createTemp(
+      'local_cover_backfill_test_',
+    );
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
     db = AppDatabase(NativeDatabase.memory());
   });
@@ -56,22 +56,24 @@ void main() {
     required String origin,
     required List<String> filePaths,
   }) async {
-    await db.saveAudiobook(UnifiedAudiobook(
-      id: id,
-      title: title,
-      author: author,
-      description: '',
-      origin: origin,
-      chapters: [
-        for (int i = 0; i < filePaths.length; i++)
-          AudiobookChapter(
-            id: '${id}_ch_$i',
-            title: 'Chapter $i',
-            audioPathOrUrl: filePaths[i],
-            durationSeconds: 0,
-          ),
-      ],
-    ));
+    await db.saveAudiobook(
+      UnifiedAudiobook(
+        id: id,
+        title: title,
+        author: author,
+        description: '',
+        origin: origin,
+        chapters: [
+          for (int i = 0; i < filePaths.length; i++)
+            AudiobookChapter(
+              id: '${id}_ch_$i',
+              title: 'Chapter $i',
+              audioPathOrUrl: filePaths[i],
+              durationSeconds: 0,
+            ),
+        ],
+      ),
+    );
   }
 
   test('finds embedded cover art for a local book with no cover', () async {
@@ -88,13 +90,7 @@ void main() {
       filePaths: [filePath],
     );
 
-    final service = LocalCoverBackfillService(
-      db: db,
-      store: const BackfillAttemptStore(overrides: {}),
-      lookupService: CoverLookupService(
-        client: MockClient((_) async => http.Response('', 500)),
-      ),
-    );
+    final service = LocalCoverBackfillService(db: db);
     await service.run();
 
     final updated = await db.getAudiobook('local_1');
@@ -102,15 +98,15 @@ void main() {
     expect(File(updated.coverArtUrlOrPath!).readAsBytesSync(), equals(jpeg));
   });
 
-  test(
-      'replaces a placeholder title and author from embedded tags, '
+  test('replaces a placeholder title and author from embedded tags, '
       'even when the book was already attempted', () async {
     final filePath = await writeFixture(
       'odyssey.m4b',
       buildM4bWithMetadata(
-          album: 'The Odyssey for Boys and Girls',
-          artist: 'Alfred John Church',
-          coverBytes: syntheticJpegBytes()),
+        album: 'The Odyssey for Boys and Girls',
+        artist: 'Alfred John Church',
+        coverBytes: syntheticJpegBytes(),
+      ),
     );
     await saveLocalBook(
       id: 'local_tags',
@@ -120,20 +116,7 @@ void main() {
       filePaths: [filePath],
     );
 
-    final service = LocalCoverBackfillService(
-      db: db,
-      // Attempted a minute ago: only the online step is rationed.
-      store: BackfillAttemptStore(overrides: {
-        'local_cover_backfill.attempted.v1': jsonEncode({
-          'local_tags': DateTime.now()
-              .subtract(const Duration(minutes: 1))
-              .toIso8601String(),
-        }),
-      }),
-      lookupService: CoverLookupService(
-        client: MockClient((_) async => http.Response('', 500)),
-      ),
-    );
+    final service = LocalCoverBackfillService(db: db);
     await service.run();
 
     final updated = await db.getAudiobook('local_tags');
@@ -142,37 +125,86 @@ void main() {
     expect(updated.coverArtUrlOrPath, isNotNull);
   });
 
-  test('falls back to online lookup when no embedded/folder art exists',
-      () async {
+  test('makes NO network call for a local book with no art (S-05)', () async {
     final filePath = await writeFixture('book.mp3', [0xFF, 0xFB, 0, 0]);
     await saveLocalBook(
       id: 'local_2',
-      title: 'The Odyssey for Boys and Girls',
+      title: 'A Private Recording',
       author: 'Local Audiobook',
       origin: 'local',
       filePaths: [filePath],
     );
 
-    final mockClient = MockClient((request) async {
-      if (request.url.host == 'archive.org') {
-        return http.Response(
-          '{"response":{"docs":[{"identifier":"odyssey_id","title":"The Odyssey for Boys and Girls"}]}}',
-          200,
-        );
-      }
-      return http.Response('{"docs":[]}', 200);
-    });
-
-    final service = LocalCoverBackfillService(
-      db: db,
-      store: const BackfillAttemptStore(overrides: {}),
-      lookupService: CoverLookupService(client: mockClient),
+    await HttpOverrides.runZoned(
+      () => LocalCoverBackfillService(db: db).run(),
+      createHttpClient: (_) => throw StateError('network used'),
     );
-    await service.run();
 
     final updated = await db.getAudiobook('local_2');
-    expect(updated!.coverArtUrlOrPath,
-        equals('https://archive.org/services/img/odyssey_id'));
+    expect(updated!.coverArtUrlOrPath, isNull);
+  });
+
+  test('backfill and import sources do not reference the lookup service', () {
+    for (final f in [
+      'lib/services/local_cover_backfill_service_io.dart',
+      'lib/services/local_audiobook_import_io.dart',
+      'lib/services/local_library_scanner_io.dart',
+    ]) {
+      final src = File(f).readAsStringSync();
+      expect(src.contains('CoverLookupService'), isFalse, reason: f);
+      expect(src.contains('cover_lookup_service'), isFalse, reason: f);
+    }
+  });
+
+  test('findCoverOnRequest looks up and saves for a local book', () async {
+    await saveLocalBook(
+      id: 'local_5',
+      title: 'The Odyssey for Boys and Girls',
+      author: 'Local Audiobook',
+      origin: 'local',
+      filePaths: const [],
+    );
+    final book = (await db.getAudiobook('local_5'))!;
+    final url = await findCoverOnRequest(
+      db,
+      book,
+      lookupService: CoverLookupService(
+        client: MockClient(
+          (request) async => request.url.host == 'archive.org'
+              ? http.Response(
+                  '{"response":{"docs":[{"identifier":"odyssey_id","title":"The Odyssey for Boys and Girls"}]}}',
+                  200,
+                )
+              : http.Response('{"docs":[]}', 200),
+        ),
+      ),
+    );
+    expect(url, 'https://archive.org/services/img/odyssey_id');
+    expect((await db.getAudiobook('local_5'))!.coverArtUrlOrPath, url);
+  });
+
+  test('findCoverOnRequest ignores LibriVox books', () async {
+    await saveLocalBook(
+      id: 'lv_2',
+      title: 'A LibriVox Book',
+      author: 'Someone',
+      origin: 'librivox',
+      filePaths: const [],
+    );
+    final book = (await db.getAudiobook('lv_2'))!;
+    var called = false;
+    final url = await findCoverOnRequest(
+      db,
+      book,
+      lookupService: CoverLookupService(
+        client: MockClient((_) async {
+          called = true;
+          return http.Response('{}', 200);
+        }),
+      ),
+    );
+    expect(url, isNull);
+    expect(called, isFalse);
   });
 
   test('skips a book that already has a cover', () async {
@@ -185,99 +217,11 @@ void main() {
       filePaths: [filePath],
     );
     await db.setCoverUrl('local_3', 'https://example.com/existing.jpg');
-
-    var lookupCalled = false;
-    final service = LocalCoverBackfillService(
-      db: db,
-      store: const BackfillAttemptStore(overrides: {}),
-      lookupService: CoverLookupService(
-        client: MockClient((_) async {
-          lookupCalled = true;
-          return http.Response('{"docs":[]}', 200);
-        }),
-      ),
-    );
-    await service.run();
-
-    expect(lookupCalled, isFalse);
+    await LocalCoverBackfillService(db: db).run();
     final updated = await db.getAudiobook('local_3');
     expect(
-        updated!.coverArtUrlOrPath, equals('https://example.com/existing.jpg'));
-  });
-
-  test('skips non-local (librivox) origin books', () async {
-    var lookupCalled = false;
-    await saveLocalBook(
-      id: 'lv_1',
-      title: 'A LibriVox Book',
-      author: 'Someone',
-      origin: 'librivox',
-      filePaths: const [],
+      updated!.coverArtUrlOrPath,
+      equals('https://example.com/existing.jpg'),
     );
-
-    final service = LocalCoverBackfillService(
-      db: db,
-      store: const BackfillAttemptStore(overrides: {}),
-      lookupService: CoverLookupService(
-        client: MockClient((_) async {
-          lookupCalled = true;
-          return http.Response('{"docs":[]}', 200);
-        }),
-      ),
-    );
-    await service.run();
-
-    expect(lookupCalled, isFalse);
-  });
-
-  test('does not re-query a recently attempted book, but does after 30 days',
-      () async {
-    final filePath = await writeFixture('book.mp3', [0]);
-    await saveLocalBook(
-      id: 'local_4',
-      title: 'No Findable Art',
-      author: 'Local Audiobook',
-      origin: 'local',
-      filePaths: [filePath],
-    );
-
-    var callCount = 0;
-    CoverLookupService lookupService() => CoverLookupService(
-          client: MockClient((_) async {
-            callCount++;
-            return http.Response('{"docs":[]}', 200);
-          }),
-        );
-
-    final overrides = <String, String>{};
-    final recentAttemptTime = DateTime(2026, 1, 1);
-
-    // First run: attempted, recorded. One full miss queries both sources
-    // (archive.org, then Open Library) — 2 calls.
-    await LocalCoverBackfillService(
-      db: db,
-      store: BackfillAttemptStore(overrides: overrides),
-      lookupService: lookupService(),
-      now: () => recentAttemptTime,
-    ).run();
-    expect(callCount, equals(2));
-
-    // Second run, 1 day later: skipped (within the 30-day window).
-    await LocalCoverBackfillService(
-      db: db,
-      store: BackfillAttemptStore(overrides: overrides),
-      lookupService: lookupService(),
-      now: () => recentAttemptTime.add(const Duration(days: 1)),
-    ).run();
-    expect(callCount, equals(2));
-
-    // Third run, 31 days later: retried (2 more calls).
-    await LocalCoverBackfillService(
-      db: db,
-      store: BackfillAttemptStore(overrides: overrides),
-      lookupService: lookupService(),
-      now: () => recentAttemptTime.add(const Duration(days: 31)),
-    ).run();
-    expect(callCount, equals(4));
   });
 }

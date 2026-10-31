@@ -26,6 +26,7 @@ import 'package:drift/native.dart';
 import 'core/demo_mode.dart';
 import 'database/app_database.dart';
 import 'domain/models/audiobook.dart';
+import 'services/ambience_service.dart';
 import 'services/audio_playback_service.dart';
 import 'services/demo_catalog.dart';
 
@@ -38,8 +39,26 @@ const String kHeroBookId = 'frankenstein_cs_librivox';
 /// point of the shot is a library in use, and the "Up next" list only has
 /// anything to show when there is a next.
 const int kHeroChapterIndex = 2;
+
 /// Must stay inside chapter 3's 410 s, or the scrubber pins at 100%.
 const int kHeroPositionSeconds = 187;
+
+/// Catalogue entries the store art must never show.
+const Set<String> kExcludedFromStoreArt = {'gettysburg_address_librivox'};
+
+class _SeedBookmark {
+  final int chapter;
+  final int seconds;
+  final String note;
+  const _SeedBookmark(this.chapter, this.seconds, this.note);
+}
+
+const List<_SeedBookmark> _heroBookmarks = [
+  _SeedBookmark(0, 95, 'Walton, writing home from the ice'),
+  _SeedBookmark(1, 142, 'Victor: "I beheld the wretch"'),
+  _SeedBookmark(2, 118, 'The creature wakes - reread this'),
+  _SeedBookmark(2, 187, 'Where I stopped last night'),
+];
 
 /// Two more books carrying progress, so "Continue listening" is populated
 /// rather than a single-item row. Ordered by [DateTime] below so the shelf's
@@ -62,7 +81,24 @@ Future<AppDatabase> buildScreenshotDatabase() async {
   final catalog = await DemoCatalog.load();
 
   for (final entry in catalog) {
+    // Never shown in store art: its LibriVox cover is a photograph of the
+    // battlefield dead. Left out of the library, and no scene lists it
+    // (Discover is driven through a category that does not contain it).
+    if (kExcludedFromStoreArt.contains(entry.id)) continue;
     await db.saveAudiobook(_toUnified(entry));
+  }
+
+  // Bookmarks on the hero book, so the Bookmarks sheet is a lived-in one.
+  // Chapter indices are 0-based and positions sit inside each chapter.
+  var n = 0;
+  for (final b in _heroBookmarks) {
+    await db.addBookmark(
+      id: 'store-shot-bookmark-${n++}',
+      audiobookId: kHeroBookId,
+      chapterIndex: b.chapter,
+      positionSeconds: b.seconds,
+      note: b.note,
+    );
   }
 
   // Most recent last: `getMostRecentProgress` orders on `updatedAt`, and the
@@ -183,3 +219,82 @@ class ScreenshotPlaybackService extends AudioPlaybackService {
   @override
   Future<void> setSpeed(double speed) async => speedNotifier.value = speed;
 }
+
+// ---------------------------------------------------------------------------
+// Ambience
+
+/// A channel that makes no sound: the mixer UI and the Now Playing pill read
+/// [AmbienceService.state], never the channel.
+class _SilentChannel implements AmbienceChannel {
+  @override
+  Future<void> load(String asset) async {}
+  @override
+  Future<void> setVolume(double volume) async {}
+  @override
+  Future<void> play() async {}
+  @override
+  Future<void> pause() async {}
+  @override
+  Future<void> dispose() async {}
+}
+
+/// An [AmbienceService] that starts in a fixed, seeded state instead of
+/// restoring one from preferences, and plays through [_SilentChannel]s.
+class ScreenshotAmbienceService extends AmbienceService {
+  final AmbienceState _seed;
+
+  // ignore: use_super_parameters
+  ScreenshotAmbienceService({
+    required AudioPlaybackService book,
+    required AmbienceState seed,
+  })  : _seed = seed,
+        super(
+          book: book,
+          channelFactory: _SilentChannel.new,
+          useAudioSession: false,
+          fade: Duration.zero,
+        );
+
+  @override
+  Future<void> init() async {
+    state.value = _seed;
+  }
+}
+
+/// Mix for the Now Playing hero: a stormy night to go with Frankenstein.
+const AmbienceState kStormMix = AmbienceState(
+  mix: {'thunderstorm': 0.7, 'rain': 0.5, 'fireplace': 0.35},
+  master: 0.6,
+  on: true,
+  saved: [
+    SavedAmbienceMix('Storm night', {
+      'thunderstorm': 0.7,
+      'rain': 0.5,
+      'fireplace': 0.35,
+    }),
+    SavedAmbienceMix('By the fire', {'fireplace': 0.8, 'wind': 0.25}),
+    SavedAmbienceMix('Tavern evening', {'tavern_crowd': 0.6, 'fireplace': 0.4}),
+  ],
+);
+
+/// Mix for the Ambience screen: the Places sounds, battle and swords included.
+const AmbienceState kBattleMix = AmbienceState(
+  mix: {'battle': 0.65, 'sword_fight': 0.5, 'horses': 0.4, 'wind': 0.3},
+  master: 0.6,
+  on: true,
+  saved: [
+    SavedAmbienceMix('Storm night', {
+      'thunderstorm': 0.7,
+      'rain': 0.5,
+      'fireplace': 0.35,
+    }),
+    SavedAmbienceMix('Field of battle', {
+      'battle': 0.65,
+      'sword_fight': 0.5,
+      'horses': 0.4,
+      'wind': 0.3,
+    }),
+    SavedAmbienceMix('Tavern evening', {'tavern_crowd': 0.6, 'fireplace': 0.4}),
+  ],
+);
+

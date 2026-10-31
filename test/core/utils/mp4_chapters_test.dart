@@ -204,4 +204,110 @@ void main() {
       expect(result, isNull);
     });
   });
+
+  group('malformed files are bounded, never a hang or crash', () {
+    Uint8List valid() => buildQuickTimeChapterM4b(chapters: const [
+          ChapterFixture('One', 0),
+          ChapterFixture('Two', 10000),
+          ChapterFixture('Three', 20000),
+        ]);
+
+    int indexOfType(Uint8List bytes, String type) {
+      final needle = type.codeUnits;
+      for (var i = 4; i + 4 <= bytes.length; i++) {
+        var hit = true;
+        for (var j = 0; j < 4; j++) {
+          if (bytes[i + j] != needle[j]) {
+            hit = false;
+            break;
+          }
+        }
+        if (hit) return i;
+      }
+      throw StateError('no $type atom');
+    }
+
+    void putU32(Uint8List bytes, int at, int v) =>
+        ByteData.sublistView(bytes).setUint32(at, v, Endian.big);
+
+    Future<Mp4Chapters?> readQuickly(Uint8List bytes) async {
+      final path = await writeFixture('bad.m4b', bytes);
+      return readMp4Chapters(path).timeout(const Duration(seconds: 10));
+    }
+
+    test('the unmodified fixture still reads', () async {
+      final result = await readQuickly(valid());
+      expect(result!.chapters.map((c) => c.title), ['One', 'Two', 'Three']);
+    });
+
+    test('stts claiming millions of samples is rejected', () async {
+      final bytes = valid();
+      final at = indexOfType(bytes, 'stts');
+      putU32(bytes, at + 12, 4000000); // first run's sample_count
+      expect(await readQuickly(bytes), isNull);
+    });
+
+    test('stts claiming billions of runs is rejected', () async {
+      final bytes = valid();
+      putU32(bytes, indexOfType(bytes, 'stts') + 8, 0xFFFFFFFF);
+      expect(await readQuickly(bytes), isNull);
+    });
+
+    test('stsz claiming a huge sample count is rejected', () async {
+      final bytes = valid();
+      putU32(bytes, indexOfType(bytes, 'stsz') + 12, 0xFFFFFFFF);
+      expect(await readQuickly(bytes), isNull);
+    });
+
+    test('stsz fixed-size form with a huge count is rejected', () async {
+      final bytes = valid();
+      final at = indexOfType(bytes, 'stsz');
+      putU32(bytes, at + 8, 7); // sample_size != 0
+      putU32(bytes, at + 12, 3000000);
+      expect(await readQuickly(bytes), isNull);
+    });
+
+    test('stco claiming more offsets than it holds is rejected', () async {
+      final bytes = valid();
+      putU32(bytes, indexOfType(bytes, 'stco') + 8, 0x7FFFFFFF);
+      expect(await readQuickly(bytes), isNull);
+    });
+
+    test('stsc entry count larger than the atom is rejected', () async {
+      final bytes = valid();
+      putU32(bytes, indexOfType(bytes, 'stsc') + 8, 0x7FFFFFFF);
+      expect(await readQuickly(bytes), isNull);
+    });
+
+    test('a flood of tiny atoms stops at the cap', () async {
+      final flood = <int>[for (var i = 0; i < 20000; i++) ...atom('free', [])];
+      final bytes = Uint8List.fromList([
+        ...ftyp(),
+        ...container(
+            'moov', [flood, mvhd(timescale: 1000, durationTicks: 1000)])
+      ]);
+      expect(await readQuickly(bytes), isNull);
+    });
+
+    test('truncated, zero-filled and random files read as no chapters',
+        () async {
+      final good = valid();
+      expect(await readQuickly(Uint8List.sublistView(good, 0, 90)), isNull);
+      expect(await readQuickly(Uint8List(4096)), isNull);
+      expect(
+          await readQuickly(
+              Uint8List.fromList(List.generate(5000, (i) => (i * 37) & 0xFF))),
+          isNull);
+    });
+
+    test('a scan with a bad file beside a good one keeps the good one',
+        () async {
+      final bad = valid();
+      putU32(bad, indexOfType(bad, 'stts') + 12, 4000000);
+      final badPath = await writeFixture('a_bad.m4b', bad);
+      final goodPath = await writeFixture('b_good.m4b', valid());
+      expect(await readMp4Chapters(badPath), isNull);
+      expect((await readMp4Chapters(goodPath))!.chapters, hasLength(3));
+    });
+  });
 }

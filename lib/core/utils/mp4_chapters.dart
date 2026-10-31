@@ -41,7 +41,49 @@ class Mp4Chapters {
 /// Returns `null` — never throws — when the file has no chapters, is not an
 /// MP4 at all, or is truncated/malformed enough that no chapter data could
 /// be recovered.
+///
+/// Defensive by design: a file can claim any count or size, so every
+/// file-supplied count is checked against [mp4MaxEntries] and the atom that
+/// must hold it, atom walks are capped, and the whole parse is abandoned
+/// after [mp4ParseTimeout]. A hostile or corrupt `.m4b` therefore costs a
+/// bounded, small amount of work and reads as "no chapters", never a hang
+/// or an out-of-memory kill.
 Future<Mp4Chapters?> readMp4Chapters(String path) async {
+  try {
+    return await _readMp4Chapters(path).timeout(mp4ParseTimeout);
+  } catch (_) {
+    return null; // includes TimeoutException
+  }
+}
+
+/// Most entries (chapters, samples, chunks) any one table may claim. Real
+/// audiobooks have hundreds of chapters; this leaves ample headroom.
+const int mp4MaxEntries = 100000;
+
+/// Most atoms read from one level of the atom tree.
+const int mp4MaxAtomsPerLevel = 5000;
+
+/// Longest a single file's chapter parse may take.
+const Duration mp4ParseTimeout = Duration(seconds: 20);
+
+/// Thrown internally when a count or size in the file cannot be believed.
+class _MalformedMp4 implements Exception {
+  final String reason;
+  const _MalformedMp4(this.reason);
+  @override
+  String toString() => 'Malformed MP4: $reason';
+}
+
+/// Checks a file-supplied [count] of [entryBytes]-sized rows, starting
+/// [headerBytes] into [atom]'s payload, against the cap and the atom itself.
+void _checkCount(int count, int entryBytes, int headerBytes, _Atom atom) {
+  final room = atom.end - atom.dataStart - headerBytes;
+  if (count > mp4MaxEntries || count * entryBytes > room) {
+    throw _MalformedMp4('${atom.type} claims $count entries');
+  }
+}
+
+Future<Mp4Chapters?> _readMp4Chapters(String path) async {
   RandomAccessFile? raf;
   try {
     raf = await File(path).open();
@@ -106,7 +148,7 @@ class _Atom {
 Future<List<_Atom>> _readAtoms(RandomAccessFile raf, int start, int end) async {
   final atoms = <_Atom>[];
   int pos = start;
-  while (pos + 8 <= end) {
+  while (pos + 8 <= end && atoms.length < mp4MaxAtomsPerLevel) {
     await raf.setPosition(pos);
     final header = await raf.read(8);
     if (header.length < 8) break;
@@ -361,6 +403,7 @@ Future<List<int>> _readStts(RandomAccessFile raf, _Atom stts) async {
   final header = await _readAt(raf, stts.dataStart, 8);
   if (header.length < 8) return const [];
   final entryCount = _readU32(header, 4);
+  _checkCount(entryCount, 8, 8, stts);
   final entries = await _readAt(raf, stts.dataStart + 8, entryCount * 8);
 
   final starts = <int>[];
@@ -370,6 +413,9 @@ Future<List<int>> _readStts(RandomAccessFile raf, _Atom stts) async {
     if (base + 8 > entries.length) break;
     final sampleCount = _readU32(entries, base);
     final sampleDelta = _readU32(entries, base + 4);
+    if (starts.length + sampleCount > mp4MaxEntries) {
+      throw const _MalformedMp4('stts claims too many samples');
+    }
     for (int s = 0; s < sampleCount; s++) {
       starts.add(t);
       t += sampleDelta;
@@ -385,11 +431,15 @@ Future<List<int>> _readStsz(RandomAccessFile raf, _Atom stsz) async {
   if (header.length < 12) return const [];
   final sampleSize = _readU32(header, 4);
   final sampleCount = _readU32(header, 8);
+  if (sampleCount > mp4MaxEntries) {
+    throw const _MalformedMp4('stsz claims too many samples');
+  }
 
   if (sampleSize != 0) {
     return List<int>.filled(sampleCount, sampleSize);
   }
 
+  _checkCount(sampleCount, 4, 12, stsz);
   final data = await _readAt(raf, stsz.dataStart + 12, sampleCount * 4);
   final sizes = <int>[];
   for (int i = 0; i < sampleCount; i++) {
@@ -412,13 +462,20 @@ Future<List<_StscEntry>> _readStsc(RandomAccessFile raf, _Atom stsc) async {
   final header = await _readAt(raf, stsc.dataStart, 8);
   if (header.length < 8) return const [];
   final entryCount = _readU32(header, 4);
+  _checkCount(entryCount, 12, 8, stsc);
   final data = await _readAt(raf, stsc.dataStart + 8, entryCount * 12);
 
   final entries = <_StscEntry>[];
   for (int i = 0; i < entryCount; i++) {
     final base = i * 12;
     if (base + 12 > data.length) break;
-    entries.add(_StscEntry(_readU32(data, base), _readU32(data, base + 4)));
+    final firstChunk = _readU32(data, base);
+    // Real tables ascend; a descending one makes the chunk expansion
+    // quadratic.
+    if (entries.isNotEmpty && firstChunk <= entries.last.firstChunk) {
+      throw const _MalformedMp4('stsc entries do not ascend');
+    }
+    entries.add(_StscEntry(firstChunk, _readU32(data, base + 4)));
   }
   return entries;
 }
@@ -427,6 +484,7 @@ Future<List<int>> _readStco(RandomAccessFile raf, _Atom stco) async {
   final header = await _readAt(raf, stco.dataStart, 8);
   if (header.length < 8) return const [];
   final entryCount = _readU32(header, 4);
+  _checkCount(entryCount, 4, 8, stco);
   final data = await _readAt(raf, stco.dataStart + 8, entryCount * 4);
 
   final offsets = <int>[];
@@ -442,6 +500,7 @@ Future<List<int>> _readCo64(RandomAccessFile raf, _Atom co64) async {
   final header = await _readAt(raf, co64.dataStart, 8);
   if (header.length < 8) return const [];
   final entryCount = _readU32(header, 4);
+  _checkCount(entryCount, 8, 8, co64);
   final data = await _readAt(raf, co64.dataStart + 8, entryCount * 8);
 
   final offsets = <int>[];

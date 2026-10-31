@@ -21,9 +21,6 @@
 -keep class com.mr.flutter.plugin.filepicker.** { *; }
 -keep class com.baseflow.permissionhandler.** { *; }
 -keep class com.it_nomads.fluttersecurestorage.** { *; }
--keep class dev.steenbakker.mobile_scanner.** { *; }
--keep class com.google.mlkit.** { *; }
--dontwarn com.google.mlkit.**
 
 # Play Core is referenced by Flutter's deferred components but not shipped
 -dontwarn com.google.android.play.core.**

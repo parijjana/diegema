@@ -75,7 +75,7 @@ class DetailPrimaryButton extends StatelessWidget {
   }
 }
 
-enum BookAction { markFinished, reset, showFolder, hide, remove }
+enum BookAction { markFinished, reset, showFolder, findCover, hide, remove }
 
 /// The "..." menu: everything that is not the one primary action.
 class BookActionsMenu extends StatelessWidget {
@@ -85,6 +85,9 @@ class BookActionsMenu extends StatelessWidget {
   /// Null hides "Show in Finder" (no local files, or not a desktop).
   final VoidCallback? onShowFolder;
   final String showFolderLabel;
+
+  /// Null hides "Find cover online…" (only offered for local books).
+  final VoidCallback? onFindCover;
 
   /// Null hides "Hide from library".
   final VoidCallback? onHide;
@@ -98,6 +101,7 @@ class BookActionsMenu extends StatelessWidget {
     required this.onReset,
     this.onShowFolder,
     this.showFolderLabel = 'Show folder',
+    this.onFindCover,
     this.onHide,
     this.onRemove,
   });
@@ -133,6 +137,8 @@ class BookActionsMenu extends StatelessWidget {
             onReset();
           case BookAction.showFolder:
             onShowFolder?.call();
+          case BookAction.findCover:
+            onFindCover?.call();
           case BookAction.hide:
             onHide?.call();
           case BookAction.remove:
@@ -146,6 +152,9 @@ class BookActionsMenu extends StatelessWidget {
         if (onShowFolder != null)
           item(BookAction.showFolder, Icons.folder_open_rounded,
               showFolderLabel),
+        if (onFindCover != null)
+          item(BookAction.findCover, Icons.image_search_rounded,
+              'Find cover online…'),
         if (onHide != null)
           item(BookAction.hide, Icons.visibility_off_outlined,
               'Hide from library'),

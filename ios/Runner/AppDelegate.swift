@@ -81,6 +81,24 @@ final class FolderAccessChannel: NSObject, UIDocumentPickerDelegate {
         // Deleted, or in a provider that's gone: not an error to report.
         result(nil)
       }
+    case "excludeFromBackup":
+      // Re-downloadable audiobooks must not fill the user's iCloud quota
+      // (store-compliance audit S-09). The flag is set on the directory and
+      // covers everything inside it; iOS can reset it, so Dart calls this
+      // at every launch. Files do not move.
+      guard let path = args["path"] as? String else {
+        return result(FlutterError(code: "args", message: "path", details: nil))
+      }
+      var url = URL(fileURLWithPath: path, isDirectory: true)
+      do {
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try url.setResourceValues(values)
+        result(true)
+      } catch {
+        result(FlutterError(
+          code: "exclude", message: error.localizedDescription, details: nil))
+      }
     case "close":
       if let path = args["path"] as? String, let url = open.removeValue(forKey: path) {
         url.stopAccessingSecurityScopedResource()

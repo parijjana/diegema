@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import 'package:dart_rss/dart_rss.dart';
 import 'package:archive/archive_io.dart';
@@ -172,7 +173,21 @@ String bookFolderName(String title, String identifier) {
 /// (`../…`, absolute paths, symlinks) is skipped. On any failure — disk
 /// full, corrupt ZIP, a ZIP with no audio — every file this call extracted
 /// is deleted before the error is rethrown. The ZIP itself is the caller's.
-Future<List<String>> extractAudioFromZip(File zip, Directory bookDir) async {
+///
+/// The work runs in a background isolate: the ZIP decoder writes each entry
+/// with synchronous file I/O, which on the UI isolate froze the app (an ANR
+/// on Android) for the length of a large chapter. Only paths cross the
+/// isolate boundary, and the cleanup of a failure happens inside it too.
+Future<List<String>> extractAudioFromZip(File zip, Directory bookDir) {
+  final zipPath = zip.path;
+  final dirPath = bookDir.path;
+  return Isolate.run(() => _extractAudioSync(zipPath, dirPath));
+}
+
+/// The body of [extractAudioFromZip]; runs inside the background isolate.
+Future<List<String>> _extractAudioSync(String zipPath, String dirPath) async {
+  final zip = File(zipPath);
+  final bookDir = Directory(dirPath);
   await bookDir.create(recursive: true);
   final written = <File>[];
   try {

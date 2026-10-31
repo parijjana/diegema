@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
@@ -15,6 +17,33 @@ class _RefusingPlayer extends AudioPlayer {
         'with the document first');
   }
 }
+
+/// A database whose book save can be held open, to freeze [loadBook] midway.
+class _GatedDb extends AppDatabase {
+  _GatedDb(super.e);
+  Completer<void>? gate;
+
+  @override
+  Future<void> saveAudiobook(UnifiedAudiobook book) async {
+    await gate?.future;
+    return super.saveAudiobook(book);
+  }
+}
+
+UnifiedAudiobook _twoChapterBook(String id) => UnifiedAudiobook(
+      id: id,
+      title: id,
+      author: 'A',
+      description: '',
+      chapters: [
+        for (var i = 0; i < 8; i++)
+          AudiobookChapter(
+              id: '$i',
+              title: 'c$i',
+              audioPathOrUrl: '/x/$id-$i.mp3',
+              durationSeconds: 60),
+      ],
+    );
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -216,6 +245,40 @@ void main() {
 
       expect(service.chapterIndexNotifier.value, 0);
       expect(await db.getProgress('b'), isNull);
+    });
+  });
+
+  group('switching books never saves under the wrong book', () {
+    test('a save fired mid-switch leaves the new book\'s progress alone',
+        () async {
+      final db = _GatedDb(NativeDatabase.memory());
+      final service = AudioPlaybackService(db: db);
+      final a = _twoChapterBook('a');
+      final b = _twoChapterBook('b');
+      await db.saveAudiobook(a);
+      await db.saveAudiobook(b);
+      await db.saveProgress(
+          audiobookId: 'a', chapterIndex: 7, positionSeconds: 3600);
+      await db.saveProgress(
+          audiobookId: 'b', chapterIndex: 2, positionSeconds: 50);
+
+      await service.loadBook(a, autoPlay: false);
+      expect(service.chapterIndexNotifier.value, 7);
+
+      // Hold the switch open after _currentBook has changed.
+      db.gate = Completer<void>();
+      final switching = service.loadBook(b, autoPlay: false);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      // What the 5 s timer does.
+      await service.debugPersistCurrentProgress();
+      db.gate!.complete();
+      await switching;
+
+      final saved = await db.getProgress('b');
+      expect(saved!.chapterIndex, 2);
+      expect(saved.positionSeconds, 50);
+      expect(service.chapterIndexNotifier.value, 2);
+      await db.close();
     });
   });
 }

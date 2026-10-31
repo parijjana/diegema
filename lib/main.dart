@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 
+import 'core/app_licenses.dart';
 import 'app.dart';
 import 'core/demo_deeplink.dart';
 import 'core/error_handling.dart';
@@ -41,6 +42,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installErrorHandlers();
   initWindowsAudio(); // before any AudioPlayer exists
+  registerAppLicenses();
+  unawaited(excludeDownloadsFromBackup()); // iOS only; no-op elsewhere
   if (!kIsWeb && await AppDatabase.isLibraryFromNewerVersion()) {
     runApp(const NewerLibraryApp());
     return;
@@ -103,8 +106,9 @@ Future<void> main() async {
     // move there once, and their stored paths with them.
     await moveDownloadsToVisibleFolder(nativeDb);
     // After the move above, so a download that finished while the app was
-    // dead is extracted into the folder downloads now live in. Not awaited:
-    // extracting a big book must not hold up the first frame.
+    // dead is extracted into the folder downloads now live in. Not awaited so
+    // the first frame is not held up; the extraction itself runs in a
+    // background isolate so it never blocks the UI thread either.
     if (!kDemoMode) {
       downloads = createDownloadManager(nativeDb);
       unawaited(downloads?.start());

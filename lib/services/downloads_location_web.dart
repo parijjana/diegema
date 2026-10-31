@@ -25,3 +25,8 @@ Future<void> openDownloadsFolder() async {}
 Future<int> moveDownloadsToVisibleFolder(AppDatabase db,
         {DownloadsLocation location = const DownloadsLocation()}) async =>
     0;
+
+Future<bool> excludeDownloadsFromBackup({
+  DownloadsLocation location = const DownloadsLocation(),
+  Object? access,
+}) async => false;

@@ -196,3 +196,23 @@ Future<int> moveDownloadsToVisibleFolder(AppDatabase db,
   if (moved > 0) debugPrint('Moved $moved downloads to the visible folder.');
   return moved;
 }
+
+/// iOS: keeps the app-private downloads folder out of iCloud and device
+/// backup (it is re-downloadable; store-compliance audit S-09). Applied to
+/// the existing folder and so to every download already in it and every new
+/// one, with no files moved. User imports (`<documents>/diegema/library`)
+/// stay backed up. Call at every launch. Returns whether the flag was set.
+Future<bool> excludeDownloadsFromBackup({
+  DownloadsLocation location = const DownloadsLocation(),
+  FolderAccess? access,
+}) async {
+  try {
+    final root = await location.privateRoot();
+    if (root == null) return false;
+    await Directory(root).create(recursive: true);
+    return await (access ?? FolderAccess()).excludeFromBackup(root);
+  } catch (e) {
+    debugPrint('DownloadsLocation: backup exclusion failed: $e');
+    return false;
+  }
+}

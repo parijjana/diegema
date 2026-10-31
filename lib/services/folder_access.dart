@@ -28,6 +28,23 @@ class FolderAccess {
                     defaultTargetPlatform == TargetPlatform.iOS)),
         channel = channel ?? _channel;
 
+  /// iOS only: marks [path] (and so everything inside it) as excluded from
+  /// iCloud and device backup, without moving anything. Returns whether the
+  /// native call succeeded; false elsewhere or on any error. Idempotent, so
+  /// it is safe to call at every launch (iOS can reset the flag).
+  Future<bool> excludeFromBackup(String path) async {
+    if (!enabled || defaultTargetPlatform != TargetPlatform.iOS) return false;
+    try {
+      return await channel.invokeMethod<bool>('excludeFromBackup', {
+            'path': path,
+          }) ??
+          false;
+    } catch (e) {
+      debugPrint('FolderAccess: excludeFromBackup failed: $e');
+      return false;
+    }
+  }
+
   /// Whether the folder picker must be [pickFolder] rather than
   /// file_picker's: on iOS file_picker returns a path without opening the
   /// folder's security scope, so the folder can't be read or bookmarked.

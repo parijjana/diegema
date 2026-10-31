@@ -202,6 +202,38 @@ void main() {
       expect(filesUnder(downloads), isEmpty);
     });
 
+    test('a failure midway deletes what this run extracted (off-isolate)',
+        () async {
+      final dir = Directory(p.join(downloads, 'Half [h]'))
+        ..createSync(recursive: true);
+      // Makes the second entry's write fail after the first succeeded.
+      Directory(p.join(dir.path, '02.mp3')).createSync();
+      final zip = File(p.join(root.path, 'book.zip'))
+        ..writeAsBytesSync(_zip({
+          '01.mp3': List.filled(2000, 1),
+          '02.mp3': List.filled(2000, 2),
+        }));
+      await expectLater(extractAudioFromZip(zip, dir), throwsA(anything));
+      expect(File(p.join(dir.path, '01.mp3')).existsSync(), isFalse);
+      expect(zip.existsSync(), isTrue);
+    });
+
+    test('the event loop keeps running while a big entry is extracted',
+        () async {
+      final zip = File(p.join(root.path, 'big.zip'))
+        ..writeAsBytesSync(ZipEncoder().encode(Archive()
+          ..addFile(ArchiveFile.bytes('01.mp3', List.filled(60 << 20, 3))),
+            level: DeflateLevel.none));
+      var ticks = 0;
+      final timer =
+          Timer.periodic(const Duration(milliseconds: 1), (_) => ticks++);
+      final files = await extractAudioFromZip(
+          zip, Directory(p.join(downloads, 'Big [b]')));
+      timer.cancel();
+      expect(File(files.single).lengthSync(), 60 << 20);
+      expect(ticks, greaterThan(0));
+    });
+
     test('folder names keep the title readable and the id safe', () {
       expect(bookFolderName('A/B: "C"', 'id with space'),
           'A_B_ _C_ [id_with_space]');

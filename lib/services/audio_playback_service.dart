@@ -22,6 +22,11 @@ enum PlaybackState {
 
 class AudioPlaybackService {
   final AudioPlayer _player;
+
+  /// How long a stream may take to open before it counts as failed. libmpv
+  /// (Windows) reports a refused connection, such as a failed certificate
+  /// check, by never completing the load.
+  final Duration _streamLoadTimeout;
   final AppDatabase? _db;
 
   /// The library database, for screens that change a book in place.
@@ -86,8 +91,10 @@ class AudioPlaybackService {
       AppDatabase? db,
       UiPreferences? preferences,
       HiddenBooksStore? hiddenStore,
-      DateTime Function()? now})
+      DateTime Function()? now,
+      Duration streamLoadTimeout = const Duration(seconds: 60)})
       : _player = player ?? AudioPlayer(),
+        _streamLoadTimeout = streamLoadTimeout,
         _db = db,
         _preferences = preferences,
         _hiddenStore = hiddenStore ?? const HiddenBooksStore(),
@@ -316,7 +323,9 @@ class AudioPlaybackService {
       if (chapter.isStream ||
           chapter.audioPathOrUrl.startsWith('http://') ||
           chapter.audioPathOrUrl.startsWith('https://')) {
-        await _player.setUrl(chapter.audioPathOrUrl);
+        await _player
+            .setUrl(chapter.audioPathOrUrl)
+            .timeout(_streamLoadTimeout);
       } else {
         final loaded = await playLocalFile(
           _player,

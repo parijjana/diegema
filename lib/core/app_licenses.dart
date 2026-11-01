@@ -21,34 +21,39 @@ Stream<LicenseEntry> _interLicense() async* {
 }
 
 /// mpv and FFmpeg ship inside libmpv-2.dll on Windows (via the
-/// media_kit_libs_windows_audio package). Their licence is LGPL-2.1+ or
-/// GPL-2+/3 depending on how the DLL was built.
-///
-/// TODO(S-04, owner, on the Windows PC): determine the licence variant of
-/// the bundled libmpv-2.dll (look for --enable-gpl / --enable-version3 /
-/// -Dgpl in `strings libmpv-2.dll`; see project_docs/diegema/WINDOWS_BUILD.md)
-/// and replace the generic wording below with the exact licence, its full
-/// text, and the exact source version. Do not assume LGPL.
+/// media_kit_libs_windows_audio package). Licence read from the DLL itself:
+/// mpv-configuration has -Dgpl=false; FFmpeg was configured with
+/// --disable-gpl --disable-nonfree --enable-version3 and reports "LGPL version
+/// 3 or later". Re-check if the media_kit_libs_windows_audio version changes.
 Stream<LicenseEntry> _windowsNativeLicenses() async* {
-  yield const LicenseEntryWithLineBreaks(
-      ['mpv', 'FFmpeg (Windows build)'], '''
-On Windows, Diegema plays audio with libmpv (mpv, https://mpv.io) and FFmpeg
-(https://ffmpeg.org), supplied as libmpv-2.dll by the media_kit libs for
-Windows (https://github.com/media-kit/libmpv-win32-audio-build, build
-mpv-dev-x86_64-20230924-git-652a1dd).
+  final lgpl = await rootBundle.loadString('assets/licenses/lgpl-3.0.txt');
+  final gpl = await rootBundle.loadString('assets/licenses/gpl-3.0.txt');
+  yield LicenseEntryWithLineBreaks(['mpv', 'FFmpeg (Windows build)'], '''
+On Windows, Diegema plays audio with libmpv (mpv 0.36.0-403-g652a1dd907,
+https://mpv.io) and FFmpeg (n6.0, https://ffmpeg.org), supplied as libmpv-2.dll
+by the media_kit libs for Windows, build mpv-dev-x86_64-20230924-git-652a1dd.
 
-mpv and FFmpeg are free software licensed under the GNU Lesser General Public
-License (LGPL) version 2.1 or later, or, when built with GPL components, the
-GNU General Public License (GPL). The exact licence of the bundled build has
-not yet been confirmed.
+This build of FFmpeg is licensed under the GNU Lesser General Public License
+version 3 or later. This build of mpv was made without GPL parts and is licensed
+under the GNU Lesser General Public License version 2.1 or later. Both are
+provided here under LGPL version 3, whose text and the GNU General Public License
+version 3 it builds on follow below. libmpv-2.dll is a separate file in the app
+folder. The DLL also includes third-party libraries under their own licences;
+the build recipe lists them.
 
-Licence texts:
-  https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
-  https://www.gnu.org/licenses/gpl-2.0.html
-  https://www.gnu.org/licenses/gpl-3.0.html
+Source code and build recipe:
+  https://github.com/media-kit/libmpv-win32-audio-build
+  https://github.com/mpv-player/mpv/tree/652a1dd907
+  https://ffmpeg.org/download.html
+Diegema's own source code: https://github.com/parijjana/diegema
 
-Source code for mpv and FFmpeg is available at
-https://github.com/mpv-player/mpv and https://ffmpeg.org/download.html.
-Diegema's own source code is public at https://github.com/parijjana/diegema.
+$lgpl
+
+$gpl''');
+  yield const LicenseEntryWithLineBreaks(['Mozilla CA root certificates'], '''
+On Windows, Diegema checks HTTPS connections for audio streaming against the
+Mozilla root certificate list, as published at https://curl.se/docs/caextract.html
+(data/cacert.pem in the app folder). It is licensed under the Mozilla Public
+License 2.0, https://www.mozilla.org/MPL/2.0/.
 ''');
 }

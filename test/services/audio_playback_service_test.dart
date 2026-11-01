@@ -18,6 +18,18 @@ class _RefusingPlayer extends AudioPlayer {
   }
 }
 
+/// A player whose stream never opens, the way libmpv behaves when it refuses a
+/// connection.
+class _HangingPlayer extends AudioPlayer {
+  @override
+  Future<Duration?> setUrl(String url,
+          {Map<String, String>? headers,
+          Duration? initialPosition,
+          bool preload = true,
+          dynamic tag}) =>
+      Completer<Duration?>().future;
+}
+
 /// A database whose book save can be held open, to freeze [loadBook] midway.
 class _GatedDb extends AppDatabase {
   _GatedDb(super.e);
@@ -74,6 +86,28 @@ void main() {
     test('play() does not rethrow a refused start to the caller', () {
       expect(service.play(), completes);
     });
+  });
+
+  test('a stream that never opens ends in an error, not endless loading',
+      () async {
+    final service = AudioPlaybackService(
+        player: _HangingPlayer(),
+        streamLoadTimeout: const Duration(milliseconds: 10));
+    await service.loadBook(
+        UnifiedAudiobook(
+            id: 'b',
+            title: 'b',
+            author: 'A',
+            description: '',
+            chapters: [
+              AudiobookChapter(
+                  id: '0',
+                  title: 'c',
+                  audioPathOrUrl: 'https://example.org/c.mp3',
+                  durationSeconds: 60),
+            ]),
+        autoPlay: false);
+    expect(service.stateNotifier.value, PlaybackState.error);
   });
 
   group('AudioPlaybackService Sleep Timer TDD Unit Tests', () {

@@ -42,7 +42,10 @@ dependencies:
   multicast_dns: ^0.3.3+1
   args: ^2.7.0
   sqlite3: ^3.5.2
-  just_audio_media_kit: ^2.1.0
+  # Vendored 2.1.0 with one patch, for HTTPS certificate checks on Windows;
+  # see third_party/just_audio_media_kit/VENDORED.md.
+  just_audio_media_kit:
+    path: third_party/just_audio_media_kit
   media_kit_libs_windows_audio: ^1.0.9
 
 dev_dependencies:
@@ -72,6 +75,9 @@ flutter:
     # Inter's OFL.txt must travel with the font; shown on the licences page
     # via lib/core/app_licenses.dart.
     - assets/fonts/OFL.txt
+    # Licence texts for the Windows libmpv-2.dll, same page.
+    - assets/licenses/lgpl-3.0.txt
+    - assets/licenses/gpl-3.0.txt
 
   fonts:
     # Inter 4.0 (SIL Open Font License, assets/fonts/OFL.txt). The type

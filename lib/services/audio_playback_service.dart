@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
+import '../core/network/url_policy.dart';
 import '../core/app_settings.dart';
 import '../core/playback_constants.dart';
 import '../core/utils/book_progress.dart';
@@ -323,9 +324,15 @@ class AudioPlaybackService {
       if (chapter.isStream ||
           chapter.audioPathOrUrl.startsWith('http://') ||
           chapter.audioPathOrUrl.startsWith('https://')) {
-        await _player
-            .setUrl(chapter.audioPathOrUrl)
-            .timeout(_streamLoadTimeout);
+        // https on LibriVox/archive.org only; http is upgraded, anything
+        // else (file:, other hosts) is refused (audit S-11).
+        final url = permittedRemoteUrl(chapter.audioPathOrUrl);
+        if (url == null) {
+          _loading = false;
+          stateNotifier.value = PlaybackState.error;
+          return;
+        }
+        await _player.setUrl(url).timeout(_streamLoadTimeout);
       } else {
         final loaded = await playLocalFile(
           _player,

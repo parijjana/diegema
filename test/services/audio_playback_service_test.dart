@@ -30,6 +30,20 @@ class _HangingPlayer extends AudioPlayer {
       Completer<Duration?>().future;
 }
 
+/// Records the URLs it is asked to open, and opens none of them.
+class _RecordingPlayer extends AudioPlayer {
+  final urls = <String>[];
+  @override
+  Future<Duration?> setUrl(String url,
+      {Map<String, String>? headers,
+      Duration? initialPosition,
+      bool preload = true,
+      dynamic tag}) async {
+    urls.add(url);
+    return const Duration(seconds: 60);
+  }
+}
+
 /// A database whose book save can be held open, to freeze [loadBook] midway.
 class _GatedDb extends AppDatabase {
   _GatedDb(super.e);
@@ -103,11 +117,49 @@ void main() {
               AudiobookChapter(
                   id: '0',
                   title: 'c',
-                  audioPathOrUrl: 'https://example.org/c.mp3',
+                  audioPathOrUrl: 'https://archive.org/download/b/c.mp3',
                   durationSeconds: 60),
             ]),
         autoPlay: false);
     expect(service.stateNotifier.value, PlaybackState.error);
+  });
+
+  group('URL policy (S-11)', () {
+    Future<(AudioPlaybackService, _RecordingPlayer)> load(String url) async {
+      final player = _RecordingPlayer();
+      final service = AudioPlaybackService(player: player);
+      await service.loadBook(
+          UnifiedAudiobook(
+              id: 'p',
+              title: 'p',
+              author: 'A',
+              description: '',
+              chapters: [
+                AudiobookChapter(
+                    id: '0',
+                    title: 'c',
+                    audioPathOrUrl: url,
+                    durationSeconds: 60,
+                    isStream: true),
+              ]),
+          autoPlay: false);
+      return (service, player);
+    }
+
+    test('cleartext http on archive.org is upgraded to https', () async {
+      final (service, player) =
+          await load('http://archive.org/download/p/c.mp3');
+      expect(player.urls, ['https://archive.org/download/p/c.mp3']);
+      expect(service.stateNotifier.value, isNot(PlaybackState.error));
+    });
+
+    test('an unknown host or a file: URL is refused, never opened', () async {
+      for (final url in ['http://example.com/c.mp3', 'file:///etc/hosts']) {
+        final (service, player) = await load(url);
+        expect(player.urls, isEmpty, reason: url);
+        expect(service.stateNotifier.value, PlaybackState.error, reason: url);
+      }
+    });
   });
 
   group('AudioPlaybackService Sleep Timer TDD Unit Tests', () {

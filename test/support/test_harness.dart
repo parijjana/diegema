@@ -82,7 +82,7 @@ Future<UnifiedAudiobook> seedBook(
       AudiobookChapter(
         id: '$id-c0',
         title: 'Chapter 1',
-        audioPathOrUrl: 'https://example.invalid/$id.mp3',
+        audioPathOrUrl: 'https://archive.org/download/$id/$id.mp3',
         durationSeconds: runtimeSeconds,
         isStream: true,
       ),

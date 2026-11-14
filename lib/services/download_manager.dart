@@ -16,6 +16,7 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 
+import '../core/network/url_policy.dart';
 import '../core/utils/book_identity.dart';
 import '../database/app_database.dart';
 import '../domain/models/audiobook.dart';
@@ -87,6 +88,15 @@ class DownloadChapter {
 /// as the engine task's metadata so a download that finishes while the app
 /// is dead can still be saved on the next launch.
 @immutable
+
+/// A catalogue URL that the URL policy refuses (see `url_policy.dart`).
+class UnsupportedUrlException implements Exception {
+  final String url;
+  const UnsupportedUrlException(this.url);
+  @override
+  String toString() => 'UnsupportedUrlException: $url';
+}
+
 class DownloadJob {
   /// The archive.org identifier: the task id and the saved book's id.
   final String id;
@@ -132,13 +142,17 @@ class DownloadJob {
     final prebuilt = book.urlIarchive.isEmpty
         ? null
         : 'https://archive.org/download/$id/${id}_64kb_mp3.zip';
-    final hasFallback = prebuilt != null &&
-        book.urlZipFile.isNotEmpty &&
-        book.urlZipFile != prebuilt;
+    // The catalogue's own link is used only if the URL policy allows it (S-11).
+    final zip = permittedRemoteUrl(book.urlZipFile);
+    final url = prebuilt ?? zip;
+    if (url == null) {
+      throw UnsupportedUrlException(book.urlZipFile);
+    }
+    final hasFallback = prebuilt != null && zip != null && zip != prebuilt;
     return DownloadJob(
       id: id,
-      url: prebuilt ?? book.urlZipFile,
-      fallbackUrl: hasFallback ? book.urlZipFile : null,
+      url: url,
+      fallbackUrl: hasFallback ? zip : null,
       title: book.title,
       author: book.authorNames,
       description: book.description,
@@ -429,8 +443,17 @@ class DownloadManager extends ChangeNotifier {
 
   /// Queues a Discover download of [book]. [feed] is its RSS chapter list,
   /// whose titles and lengths the saved book takes when they line up.
-  Future<void> download(LibriVoxBook book, {List<AudiobookChapter>? feed}) =>
-      _enqueue(DownloadJob.fromLibriVox(book, feed: feed));
+  Future<void> download(LibriVoxBook book,
+      {List<AudiobookChapter>? feed}) async {
+    final DownloadJob job;
+    try {
+      job = DownloadJob.fromLibriVox(book, feed: feed);
+    } on UnsupportedUrlException catch (e) {
+      debugPrint('DownloadManager: refused download URL: ${e.url}');
+      return;
+    }
+    await _enqueue(job);
+  }
 
   /// Queues a Re-download of [book], whose files can no longer be read.
   Future<void> redownload(UnifiedAudiobook book) =>

@@ -305,7 +305,11 @@ class LibriVoxService {
       apiId: 'librivox',
       call: () async {
         try {
-          final response = await _client.get(Uri.parse(url), headers: _headers);
+          // Bounded: this runs inside the serial queue, so a hang here would
+          // stall every later LibriVox search (audit S-13).
+          final response = await _client
+              .get(Uri.parse(url), headers: _headers)
+              .timeout(const Duration(seconds: 30));
           if (response.statusCode == 200) {
             final data = await compute(json.decode, response.body) as JsonMap;
             final booksData = data['books'];

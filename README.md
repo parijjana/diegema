@@ -66,7 +66,7 @@ LibriVox** or the Internet Archive.
 │   └── widgets/          # Player transport, covers, shelves, state views
 ├── design/               # Design tokens, contrast ratios, app icon source
 ├── test/                 # Unit, database, service, widget and golden tests
-├── tool/                 # Icon generator, ambience builder, sync helpers
+├── tool/                 # Icon generator, ambience builder
 ├── scripts/              # Pre-commit hook installer, demo asset fetchers
 └── assets/demo/          # Demo-only catalogue and covers (not in store builds)
 ```

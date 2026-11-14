@@ -36,11 +36,6 @@ dependencies:
   # killed (BSD-3). Pinned: 9.6.x needs Flutter >= 3.47 and we pin 3.44.5.
   background_downloader: 9.5.9
   cryptography: ^2.9.0
-  bonsoir: 7.1.5
-  qr_flutter: ^4.1.0
-  flutter_secure_storage: ^10.3.4
-  multicast_dns: ^0.3.3+1
-  args: ^2.7.0
   sqlite3: ^3.5.2
   # Vendored 2.1.0 with one patch, for HTTPS certificate checks on Windows;
   # see third_party/just_audio_media_kit/VENDORED.md.

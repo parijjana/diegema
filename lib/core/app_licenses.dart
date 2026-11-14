@@ -38,8 +38,12 @@ version 3 or later. This build of mpv was made without GPL parts and is licensed
 under the GNU Lesser General Public License version 2.1 or later. Both are
 provided here under LGPL version 3, whose text and the GNU General Public License
 version 3 it builds on follow below. libmpv-2.dll is a separate file in the app
-folder. The DLL also includes third-party libraries under their own licences;
-the build recipe lists them.
+folder. The DLL also includes third-party libraries under their own licences:
+Mbed TLS (Apache-2.0), libass (ISC), FriBidi (LGPL-2.1+), Little CMS 2 (MIT),
+libarchive (BSD-2-Clause), libjpeg (BSD-3-Clause/IJG/zlib), libpng, uchardet
+(MPL-1.1), OpenAL Soft (LGPL-2.0+), MuJS (ISC), libplacebo (LGPL-2.1+) and the
+FreeType, HarfBuzz, Fontconfig, Expat, zlib and Brotli text stack. The full
+itemised list is THIRD_PARTY_NOTICES.md in Diegema's source repository.
 
 Source code and build recipe:
   https://github.com/media-kit/libmpv-win32-audio-build

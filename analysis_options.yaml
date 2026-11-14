@@ -13,6 +13,8 @@ analyzer:
   exclude:
     # Vendored upstream code, kept close to upstream; see its VENDORED.md.
     - third_party/**
+    # Parked v1.1 sync code: not part of the build (parked/sync-v1.1/README.md).
+    - parked/**
 
 linter:
   # The lint rules applied to this project can be customized in the

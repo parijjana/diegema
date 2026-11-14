@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import '../services/sync/sync_controller.dart';
+import 'qr_code_view.dart';
 import '../theme/app_theme.dart';
 
 /// Whether this device must dial the one that scans its code: a Mac never
@@ -232,16 +232,7 @@ class _LinkDeviceSheetState extends State<LinkDeviceSheet> {
                   padding: const EdgeInsets.all(Sp.x3),
                   decoration: const BoxDecoration(
                       color: Colors.white, borderRadius: R.md),
-                  child: QrImageView(
-                    data: offer.code,
-                    padding: EdgeInsets.zero,
-                    backgroundColor: Colors.white,
-                    eyeStyle: const QrEyeStyle(
-                        eyeShape: QrEyeShape.square, color: Colors.black),
-                    dataModuleStyle: const QrDataModuleStyle(
-                        dataModuleShape: QrDataModuleShape.square,
-                        color: Colors.black),
-                  ),
+                  child: QrCodeView(data: offer.code),
                 ),
               ),
             );

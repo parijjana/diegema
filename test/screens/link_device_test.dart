@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../helpers/sync_enabled.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'package:diegema/screens/qr_code_view.dart';
 import 'package:diegema/screens/linked_devices_screen.dart';
 import 'package:diegema/services/sync/sync_controller.dart';
 import 'package:diegema/sync/sync_record.dart';
@@ -57,7 +57,7 @@ void main() {
     await pumpScreen(tester);
     await openSheet(tester);
 
-    expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.byType(QrCodeView), findsOneWidget);
     expect(find.text('DIEGEMALINK1.fake'), findsOneWidget);
     expect(find.text('Copy'), findsOneWidget);
     expect(find.textContaining('Good for 4:'), findsOneWidget);
@@ -68,7 +68,7 @@ void main() {
   testWidgets('QR also renders in the dark theme', (tester) async {
     await pumpScreen(tester, brightness: Brightness.dark);
     await openSheet(tester);
-    expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.byType(QrCodeView), findsOneWidget);
     await close(tester);
   });
 
@@ -98,7 +98,7 @@ void main() {
     await openSheet(tester);
     expect(find.text("Linking isn't available on this device right now."),
         findsOneWidget);
-    expect(find.byType(QrImageView), findsNothing);
+    expect(find.byType(QrCodeView), findsNothing);
     await close(tester);
   });
 
@@ -174,7 +174,7 @@ void main() {
     await pumpScreen(tester, textScale: 2.0);
     expect(tester.takeException(), isNull);
     await openSheet(tester);
-    expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.byType(QrCodeView), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pump(const Duration(minutes: 5, seconds: 2));
     expect(tester.takeException(), isNull);

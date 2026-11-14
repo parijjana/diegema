@@ -34,7 +34,7 @@ void main() {
     description: 'A monster story.',
     totalTimeSecs: 30000,
     authors: [LibriVoxAuthor(id: '1', firstName: 'Mary', lastName: 'Shelley')],
-    urlRss: 'https://example.invalid/rss/1205',
+    urlRss: 'https://librivox.org/rss/1205',
     urlZipFile: 'https://archive.org/compress/frankenstein_1205_librivox',
     urlIarchive: 'https://archive.org/details/frankenstein_1205_librivox',
     language: 'English',
@@ -43,7 +43,7 @@ void main() {
 
   const rssWithOneChapter = '''<?xml version="1.0"?>
 <rss version="2.0"><channel><title>Frankenstein</title>
-<item><title>Letter 1</title><enclosure url="https://example.invalid/1.mp3" length="0" type="audio/mpeg"/></item>
+<item><title>Letter 1</title><enclosure url="https://archive.org/download/x/1.mp3" length="0" type="audio/mpeg"/></item>
 </channel></rss>''';
 
   const rssWithNoChapters = '''<?xml version="1.0"?>

@@ -158,7 +158,7 @@ void main() {
         AudiobookChapter(
             id: 'c0',
             title: 'c0',
-            audioPathOrUrl: 'https://example.org/0.mp3',
+            audioPathOrUrl: 'https://archive.org/download/x/0.mp3',
             durationSeconds: 600,
             isStream: true),
       ],

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -6,6 +9,25 @@ import 'package:diegema/services/librivox_service.dart';
 import 'package:diegema/services/search_cache_store.dart';
 
 void main() {
+  test('getBookById gives up on a request that never answers (S-13)', () {
+    fakeAsync((async) {
+      final hang = Completer<http.Response>();
+      final service = LibriVoxService(client: MockClient((_) => hang.future));
+      Object? result = 'pending';
+      var done = false;
+      service.getBookById('101').then((b) {
+        result = b;
+        done = true;
+      });
+      async.elapse(const Duration(seconds: 29));
+      expect(done, isFalse);
+      async.elapse(const Duration(seconds: 2));
+      async.flushMicrotasks();
+      expect(done, isTrue);
+      expect(result, isNull);
+    });
+  });
+
   group('LibriVoxService TDD Unit Tests', () {
     test('searchBooks returns parsed books from LibriVox API response',
         () async {

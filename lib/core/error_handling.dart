@@ -11,6 +11,9 @@ import 'package:flutter/material.dart';
 /// the same uncaught async errors without the zone-mismatch trap of calling
 /// `ensureInitialized` and `runApp` in different zones.
 void installErrorHandlers() {
+  // Release builds stay quiet: log lines carry book titles, file paths and
+  // exception text with paths, and nothing reads them (audit S-14).
+  if (kReleaseMode) debugPrint = (String? message, {int? wrapWidth}) {};
   final previous = FlutterError.onError;
   FlutterError.onError = (details) {
     (previous ?? FlutterError.presentError)(details);

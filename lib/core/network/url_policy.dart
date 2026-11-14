@@ -11,22 +11,40 @@
 /// https; anything else is refused (null).
 const List<String> allowedRemoteHosts = ['librivox.org', 'archive.org'];
 
-bool _hostAllowed(String host) {
+/// Extra hosts, matched EXACTLY (no subdomains, no wildcard), that the
+/// cover lookup and cover display may reach: Open Library's search API and
+/// its cover server (see `CoverLookupService`). Never used for audio, ZIPs
+/// or feeds.
+const List<String> allowedCoverLookupHosts = [
+  'openlibrary.org',
+  'covers.openlibrary.org',
+];
+
+bool _hostAllowed(String host, {bool includeCoverHosts = false}) {
   final h = host.toLowerCase();
   for (final base in allowedRemoteHosts) {
     if (h == base || h.endsWith('.$base')) return true;
   }
-  return false;
+  return includeCoverHosts && allowedCoverLookupHosts.contains(h);
 }
 
 /// [raw] as the https URL to use, or null if the policy refuses it.
-String? permittedRemoteUrl(String raw) {
+String? permittedRemoteUrl(String raw) => _permit(raw, false);
+
+/// Like [permittedRemoteUrl] but also allows the exact Open Library hosts in
+/// [allowedCoverLookupHosts]. For cover lookup, cover checks and display,
+/// and as the per-hop check of the app's HTTP client.
+String? permittedFetchUrl(String raw) => _permit(raw, true);
+
+String? _permit(String raw, bool includeCoverHosts) {
   final uri = Uri.tryParse(raw.trim());
   if (uri == null || !uri.hasAuthority || uri.host.isEmpty) return null;
   if (uri.userInfo.isNotEmpty) return null;
   final scheme = uri.scheme.toLowerCase();
   if (scheme != 'https' && scheme != 'http') return null;
-  if (!_hostAllowed(uri.host)) return null;
+  if (!_hostAllowed(uri.host, includeCoverHosts: includeCoverHosts)) {
+    return null;
+  }
   // Any explicit port other than 443 is not what these hosts serve.
   if (uri.hasPort && uri.port != 443 && uri.port != 80) return null;
   return uri.replace(scheme: 'https', port: null).toString();

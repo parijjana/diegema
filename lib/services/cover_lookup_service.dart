@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../core/network/policy_client.dart';
 import '../core/network/user_agent.dart';
 
 /// Online, last-resort cover lookup for a locally imported book that had no
@@ -30,7 +31,7 @@ class CoverLookupService {
   };
   static const Duration _timeout = Duration(seconds: 10);
 
-  CoverLookupService({http.Client? client}) : _client = client ?? http.Client();
+  CoverLookupService({http.Client? client}) : _client = policyClient(client);
 
   /// Looks up a cover URL for a book titled [title] by [author] (optional).
   /// Returns `null` when neither source has a strong match, or on any

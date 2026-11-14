@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'package:dart_rss/dart_rss.dart';
+import '../core/network/url_policy.dart';
 import '../core/network/user_agent.dart';
 import '../domain/models/librivox_book.dart';
 import '../domain/models/audiobook.dart';
@@ -28,8 +29,12 @@ class LibriVoxStreamAndDownloader {
 
     if (book.urlRss.isNotEmpty) {
       try {
+        final rssUrl = permittedRemoteUrl(book.urlRss);
+        if (rssUrl == null) {
+          throw ChaptersUnavailable('feed URL not allowed: ${book.urlRss}');
+        }
         final response = await _client
-            .get(Uri.parse(book.urlRss), headers: _headers)
+            .get(Uri.parse(rssUrl), headers: _headers)
             .timeout(const Duration(seconds: 20));
         if (response.statusCode != 200) {
           throw ChaptersUnavailable('HTTP ${response.statusCode}');
@@ -37,7 +42,9 @@ class LibriVoxStreamAndDownloader {
         final rss = RssFeed.parse(response.body);
         int index = 0;
         for (final item in rss.items) {
-          final streamUrl = item.enclosure?.url;
+          final enclosure = item.enclosure?.url;
+          if (enclosure == null) continue;
+          final streamUrl = permittedRemoteUrl(enclosure);
           if (streamUrl == null) continue;
 
           final durationSecs = item.itunes?.duration?.inSeconds ?? 0;

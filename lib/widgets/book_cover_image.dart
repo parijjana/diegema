@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/network/url_policy.dart';
 import '../core/demo_mode.dart';
 import 'local_file_image.dart';
 
@@ -66,8 +67,12 @@ class BookCoverImage extends StatelessWidget {
       );
     }
 
+    // Same policy as every other fetch: https on the known hosts only.
+    final safeUrl = permittedFetchUrl(url);
+    if (safeUrl == null) return fallbackBuilder(context);
+
     return Image.network(
-      url,
+      safeUrl,
       width: width,
       height: height,
       fit: fit,

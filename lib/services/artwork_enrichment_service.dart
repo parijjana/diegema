@@ -1,4 +1,6 @@
 import 'package:http/http.dart' as http;
+import '../core/network/policy_client.dart';
+import '../core/network/url_policy.dart';
 import '../domain/models/librivox_book.dart';
 
 /// Resolves cover art exclusively from archive.org.
@@ -12,11 +14,13 @@ class ArtworkEnrichmentService {
   final http.Client _client;
 
   ArtworkEnrichmentService({http.Client? client})
-      : _client = client ?? http.Client();
+      : _client = policyClient(client);
 
   Future<String?> resolveCoverArtUrl(LibriVoxBook book) async {
-    final url = book.coverArtUrl;
-    if (url.isEmpty) return null;
+    final raw = book.coverArtUrl;
+    if (raw.isEmpty) return null;
+    final url = permittedFetchUrl(raw);
+    if (url == null) return null;
 
     try {
       final response = await _client

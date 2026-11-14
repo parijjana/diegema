@@ -3,6 +3,7 @@ import '../core/utils/book_identity.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../core/network/policy_client.dart';
 import '../core/network/rate_limit_dispatcher.dart';
 import '../core/network/user_agent.dart';
 import '../domain/models/librivox_book.dart';
@@ -37,7 +38,7 @@ class LibriVoxService {
     this.cacheTtl = const Duration(hours: 24),
     DateTime Function()? now,
     SearchCacheStore? cacheStore,
-  })  : _client = client ?? http.Client(),
+  })  : _client = policyClient(client),
         _rateLimiter = rateLimiter ?? RateLimitDispatcher(),
         _now = now ?? DateTime.now,
         _store = cacheStore ?? const SearchCacheStore();

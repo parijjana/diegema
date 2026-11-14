@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:dart_rss/dart_rss.dart';
 import 'package:archive/archive_io.dart';
 import 'package:path/path.dart' as p;
+import '../core/network/policy_client.dart';
 import '../core/network/url_policy.dart';
 import '../core/network/user_agent.dart';
 import '../core/utils/book_identity.dart';
@@ -20,7 +21,7 @@ class LibriVoxStreamAndDownloader {
   };
 
   LibriVoxStreamAndDownloader({http.Client? client})
-      : _client = client ?? http.Client();
+      : _client = policyClient(client);
 
   Future<UnifiedAudiobook> parseStreamableBook(LibriVoxBook book) async {
     // Canonical id: the archive.org identifier, not the LibriVox API id —
@@ -117,8 +118,13 @@ class LibriVoxStreamAndDownloader {
 
     final tempDir = await Directory.systemTemp.createTemp('diegema-zip');
     final zipFile = File(p.join(tempDir.path, 'package.zip'));
+    final zipUrl = permittedRemoteUrl(book.urlZipFile);
+    if (zipUrl == null) {
+      await tempDir.delete(recursive: true);
+      throw UrlPolicyException(book.urlZipFile, 'url not allowed');
+    }
     try {
-      await _downloadTo(zipFile, Uri.parse(book.urlZipFile), onProgress);
+      await _downloadTo(zipFile, Uri.parse(zipUrl), onProgress);
       return await extractAudioFromZip(zipFile, bookDir);
     } finally {
       try {

@@ -173,7 +173,11 @@ class LibriVoxStreamAndDownloader {
 /// editions with the same title never share (and overwrite, or on removal
 /// delete) one folder.
 String bookFolderName(String title, String identifier) {
-  final name = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+  var name = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+  // Folder names top out at 255 bytes; 64 runes (<= 4 bytes each) leaves room
+  // for the id (audit S-12).
+  final runes = name.runes.toList();
+  if (runes.length > 64) name = String.fromCharCodes(runes.take(64)).trim();
   final id = identifier.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
   return '$name [$id]';
 }

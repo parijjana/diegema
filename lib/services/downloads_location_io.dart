@@ -67,9 +67,9 @@ Future<void> openDownloadsFolder() async {
     if (bookmark == null) return;
     final opened = await FolderAccess().open(bookmark);
     if (opened == null) {
-      debugPrint('Downloads folder could not be opened; asking again.');
-      await prefs.remove(_macBookmarkKey);
-      await prefs.remove(_macFolderKey);
+      // Keep the bookmark: the drive may just be unmounted. The root is
+      // unavailable this run and is retried at the next launch (audit S-15).
+      debugPrint('Downloads folder could not be opened this run.');
       return;
     }
     _macRoot = opened.path;

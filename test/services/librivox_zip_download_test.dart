@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -66,6 +67,12 @@ void main() {
           .map((f) => p.relative(f.path, from: dir))
           .toList()
       : [];
+
+  test('a very long title cannot push the folder name past 255 bytes', () {
+    final name = bookFolderName('\u4e2d' * 300, 'some_id');
+    expect(name.endsWith(' [some_id]'), isTrue);
+    expect(utf8.encode(name).length, lessThan(255));
+  });
 
   test('extracts only the mp3s, in name order, and leaves no zip', () async {
     final body = _zip({

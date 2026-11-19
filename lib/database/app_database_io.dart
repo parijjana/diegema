@@ -341,7 +341,9 @@ class AppDatabase extends _$AppDatabase {
     return LazyDatabase(() async {
       final file = await _databaseFile();
       await backupBeforeMigration(file);
-      return NativeDatabase(file);
+      // Off the UI isolate: library reloads and the 5 s progress save no longer
+      // block frames (audit S-10).
+      return NativeDatabase.createInBackground(file);
     });
   }
 

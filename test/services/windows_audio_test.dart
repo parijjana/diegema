@@ -13,10 +13,28 @@ void main() {
     });
   });
 
+  test(
+    'libmpv may not open cleartext http, so a redirect to it is refused',
+    () {
+      expect(windowsProtocolWhitelist, isNot(contains('http')));
+      expect(
+        windowsProtocolWhitelist,
+        containsAll(['https', 'tls', 'tcp', 'file']),
+      );
+      for (final p in ['udp', 'rtp', 'crypto']) {
+        expect(windowsProtocolWhitelist, isNot(contains(p)));
+      }
+    },
+  );
+
   test('the root list is in the repo and the Windows build installs it', () {
-    expect(File('windows/tls/cacert.pem').readAsStringSync(),
-        contains('BEGIN CERTIFICATE'));
-    expect(File('windows/CMakeLists.txt').readAsStringSync(),
-        contains('tls/cacert.pem'));
+    expect(
+      File('windows/tls/cacert.pem').readAsStringSync(),
+      contains('BEGIN CERTIFICATE'),
+    );
+    expect(
+      File('windows/CMakeLists.txt').readAsStringSync(),
+      contains('tls/cacert.pem'),
+    );
   });
 }
